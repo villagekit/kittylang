@@ -10,3 +10,15 @@
 - [minirust/minirust](https://github.com/minirust/minirust)
 - [Class notes on Type Inference](https://cs.hofstra.edu/~cscccl/csc123/typing.pdf)
 - [zesterer/tao](https://github.com/zesterer/tao/)
+- [roc-lang/roc](https://github.com/roc-lang/roc)
+- [gleam-lang/gleam](https://github.com/gleam-lang/gleam)
+- [flix/flix](https://github.com/flix/flix)
+
+## TODO
+
+- rename to Ako ("to learn" in Maori)?
+  - https://maoridictionary.co.nz/word/158
+
+- use `cstree` or `rowan`?
+  - https://github.com/zesterer/chumsky/pull/681
+  - https://github.com/spreadsheet-lang/spreadsheet/blob/main/lang/src/parser.rs

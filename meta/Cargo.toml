@@ -1,0 +1,9 @@
+[package]
+name = "kitty-meta"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+ariadne = { version = "0.5.0" }
+chumsky = { workspace = true }
+internment = { workspace = true }

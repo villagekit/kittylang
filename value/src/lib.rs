@@ -1,6 +1,5 @@
-use ariadne::{sources, Color, Label, Report, ReportKind};
-use chumsky::{input::BorrowInput, pratt::*, prelude::*};
-use std::{env, fmt, fs};
+use kitty_ast::SpannedExpr;
+use kitty_meta::Spanned;
 
 #[derive(Clone, Debug)]
 pub enum Value<'src> {
@@ -9,7 +8,7 @@ pub enum Value<'src> {
     Func {
         arg: Spanned<&'src str>,
         env: Scope<'src>,
-        body: &'src Spanned<Expr<'src>>,
+        body: &'src SpannedExpr<'src>,
     },
 }
 
@@ -19,3 +18,5 @@ impl Value<'_> {
         x
     }
 }
+
+pub type Scope<'src> = Vec<(Spanned<&'src str>, Value<'src>)>;

@@ -1,10 +1,20 @@
 [workspace]
 resolver = "2"
 members = [
+  "ast",
   "core",
-  "repl"
+  "eval",
+  "meta",
+  "parse",
+  "repl",
+  "solve",
+  "value"
 ]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
+
+[workspace.dependencies]
+chumsky = { version = "1.0.0-alpha.8", features = ["pratt"] }
+internment = "0.8.6"

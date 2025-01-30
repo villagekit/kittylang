@@ -1,12 +1,9 @@
 [package]
-name = "kitty-core"
+name = "kitty-eval"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
 kitty-meta = { path = "../meta" }
 kitty-ast = { path = "../ast" }
-kitty-parse = { path = "../parse" }
 kitty-value = { path = "../value" }
-kitty-eval = { path = "../eval" }
-kitty-solve = { path = "../solve" }

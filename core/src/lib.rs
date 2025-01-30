@@ -1,14 +1,6 @@
-mod error;
-mod eval;
-mod lexer;
-mod parser;
-mod solver;
-mod span;
-mod src;
-mod value;
-
-pub use eval::Vm;
-pub use lexer::lexer;
-pub use parser::parser;
-pub use solver::Solver;
-pub use span::Span;
+pub use kitty_ast::{Expr, SpannedExpr};
+pub use kitty_check::Checker;
+pub use kitty_eval::Vm;
+pub use kitty_meta::{failure, ErrorReport, ErrorReports, SourceId, Span, Spanned};
+pub use kitty_parse::{parse, ParseError};
+pub use kitty_value::{Scope, Value};

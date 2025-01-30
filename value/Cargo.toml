@@ -1,0 +1,8 @@
+[package]
+name = "kitty-value"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+kitty-meta = { path = "../meta" }
+kitty-ast = { path = "../ast" }

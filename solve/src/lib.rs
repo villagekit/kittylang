@@ -1,6 +1,7 @@
-use ariadne::{sources, Color, Label, Report, ReportKind};
-use chumsky::{input::BorrowInput, pratt::*, prelude::*};
-use std::{env, fmt, fs};
+use core::fmt;
+
+use kitty_ast::{Expr, SpannedExpr};
+use kitty_meta::Span;
 
 // Type checker/solver
 
@@ -45,18 +46,23 @@ impl fmt::Display for Ty {
     }
 }
 
+#[derive(Debug)]
+enum SolveError {
+    TypeMismatch,
+}
+
 struct Solver<'src> {
     src: &'src str,
-    vars: Vec<(TyInfo, SimpleSpan)>,
+    vars: Vec<(TyInfo, Span)>,
 }
 
 impl Solver<'_> {
-    fn create_ty(&mut self, info: TyInfo, span: SimpleSpan) -> TyVar {
+    fn create_ty(&mut self, info: TyInfo, span: Span) -> TyVar {
         self.vars.push((info, span));
         TyVar(self.vars.len() - 1)
     }
 
-    fn unify(&mut self, a: TyVar, b: TyVar, span: SimpleSpan) {
+    fn unify(&mut self, a: TyVar, b: TyVar, span: Span) {
         match (self.vars[a.0].0, self.vars[b.0].0) {
             (TyInfo::Unknown, _) => self.vars[a.0].0 = TyInfo::Ref(b),
             (_, TyInfo::Unknown) => self.vars[b.0].0 = TyInfo::Ref(a),
@@ -81,7 +87,7 @@ impl Solver<'_> {
 
     fn check<'src>(
         &mut self,
-        expr: &Spanned<Expr<'src>>,
+        expr: &SpannedExpr<'src>,
         env: &mut Vec<(&'src str, TyVar)>,
     ) -> TyVar {
         match &expr.0 {

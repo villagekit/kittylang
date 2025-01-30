@@ -1,10 +1,5 @@
-use ariadne::{sources, Color, Label, Report, ReportKind};
-use chumsky::{input::BorrowInput, pratt::*, prelude::*};
-use std::{env, fmt, fs};
-
-use crate::parser::Expr;
-
-type Scope<'src> = Vec<(Spanned<&'src str>, Value<'src>)>;
+use kitty_ast::{Expr, SpannedExpr};
+use kitty_value::{Scope, Value};
 
 #[derive(Default)]
 pub struct Vm<'src> {
@@ -12,7 +7,7 @@ pub struct Vm<'src> {
 }
 
 impl<'src> Vm<'src> {
-    pub fn eval(&mut self, expr: &'src Spanned<Expr<'src>>) -> Value<'src> {
+    pub fn eval(&mut self, expr: &'src SpannedExpr<'src>) -> Value<'src> {
         match &expr.0 {
             Expr::Num(x) => Value::Num(*x),
             Expr::Bool(x) => Value::Bool(*x),

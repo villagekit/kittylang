@@ -1,8 +1,11 @@
-use ariadne::{sources, Color, Label, Report, ReportKind};
-use chumsky::{input::BorrowInput, pratt::*, prelude::*};
-use std::{env, fmt, fs};
+use chumsky::{input::MappedSpan, prelude::*};
+use std::fmt;
+
+use kitty_meta::{Span, Spanned};
 
 // Tokens and lexer
+
+pub type LexerError<'src> = Rich<'src, char, Span>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token<'src> {
@@ -23,6 +26,8 @@ pub enum Token<'src> {
     False,
 }
 
+pub type SpannedToken<'src> = Spanned<Token<'src>>;
+
 impl fmt::Display for Token<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -41,10 +46,15 @@ impl fmt::Display for Token<'_> {
     }
 }
 
-pub type Spanned<T> = (T, SimpleSpan);
-
-fn lexer<'src>(
-) -> impl Parser<'src, &'src str, Vec<Spanned<Token<'src>>>, extra::Err<Rich<'src, char>>> {
+pub fn lexer<'src, F>() -> impl Parser<
+    'src,
+    MappedSpan<Span, &'src str, F>,
+    Vec<SpannedToken<'src>>,
+    extra::Err<LexerError<'src>>,
+>
+where
+    F: Fn(SimpleSpan) -> Span + 'src,
+{
     recursive(|token| {
         choice((
             // Keywords

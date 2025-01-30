@@ -1,26 +1,34 @@
+use chumsky::span::Span as ChumskySpan;
+use std::{fmt, ops::Range};
+
+use crate::source::SourceId;
+
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub struct Span {
-    src: SrcId,
+    source: SourceId,
     range: (usize, usize),
 }
 
 impl Span {
     #[cfg(test)]
     pub fn empty() -> Self {
-        Self::new(SrcId::empty(), 0..0)
+        Self::new(SourceId::empty(), 0..0)
     }
 
-    pub fn src(&self) -> SrcId {
-        self.src
+    pub fn source(&self) -> SourceId {
+        self.source
     }
 
     pub fn range(&self) -> Range<usize> {
-        self.start()..self.end()
+        Range {
+            start: self.start(),
+            end: self.end(),
+        }
     }
 
     pub fn union(self, other: Self) -> Self {
         assert_eq!(
-            self.src, other.src,
+            self.source, other.source,
             "attempted to union spans with different sources"
         );
         Self {
@@ -32,24 +40,24 @@ impl Span {
 
 impl fmt::Debug for Span {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}:{:?}", self.src, self.range())
+        write!(f, "{:?}:{:?}", self.source, self.range())
     }
 }
 
-impl chumsky::Span for Span {
-    type Context = SrcId;
+impl ChumskySpan for Span {
+    type Context = SourceId;
     type Offset = usize;
 
-    fn new(src: SrcId, range: Range<usize>) -> Self {
+    fn new(source: SourceId, range: Range<usize>) -> Self {
         assert!(range.start <= range.end);
         Self {
-            src,
+            source,
             range: (range.start, range.end),
         }
     }
 
-    fn context(&self) -> SrcId {
-        self.src
+    fn context(&self) -> SourceId {
+        self.source
     }
     fn start(&self) -> Self::Offset {
         self.range.0
@@ -60,10 +68,10 @@ impl chumsky::Span for Span {
 }
 
 impl ariadne::Span for Span {
-    type SourceId = SrcId;
+    type SourceId = SourceId;
 
-    fn source(&self) -> &SrcId {
-        &self.src
+    fn source(&self) -> &SourceId {
+        &self.source
     }
 
     fn start(&self) -> usize {
@@ -73,3 +81,5 @@ impl ariadne::Span for Span {
         self.range.1
     }
 }
+
+pub type Spanned<T> = (T, Span);
