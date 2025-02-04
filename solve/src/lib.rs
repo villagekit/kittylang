@@ -1,21 +1,23 @@
 use core::fmt;
 
 use kitty_ast::{Expr, SpannedExpr};
-use kitty_meta::Span;
+use kitty_meta::{ErrorReport, Span, Spanned};
 
 // Type checker/solver
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-struct TyVar(usize);
+pub struct TyVar(usize);
 
 #[derive(Copy, Clone, Debug)]
-enum TyInfo {
+pub enum TyInfo {
     Unknown,
     Ref(TyVar),
     Num,
     Bool,
     Func(TyVar, TyVar),
 }
+
+type SpannedTyInfo = Spanned<TyInfo>;
 
 impl fmt::Display for TyInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -30,7 +32,7 @@ impl fmt::Display for TyInfo {
 }
 
 #[derive(Debug)]
-enum Ty {
+pub enum Ty {
     Num,
     Bool,
     Func(Box<Self>, Box<Self>),
@@ -46,112 +48,153 @@ impl fmt::Display for Ty {
     }
 }
 
-#[derive(Debug)]
-enum SolveError {
-    TypeMismatch,
+#[derive(Default)]
+pub struct Solver {
+    vars: Vec<SpannedTyInfo>,
 }
 
-struct Solver<'src> {
-    src: &'src str,
-    vars: Vec<(TyInfo, Span)>,
-}
-
-impl Solver<'_> {
+impl<'src> Solver {
     fn create_ty(&mut self, info: TyInfo, span: Span) -> TyVar {
         self.vars.push((info, span));
         TyVar(self.vars.len() - 1)
     }
 
-    fn unify(&mut self, a: TyVar, b: TyVar, span: Span) {
+    fn unify(&mut self, a: TyVar, b: TyVar, span: Span) -> Result<(), SolveError<'src>> {
         match (self.vars[a.0].0, self.vars[b.0].0) {
-            (TyInfo::Unknown, _) => self.vars[a.0].0 = TyInfo::Ref(b),
-            (_, TyInfo::Unknown) => self.vars[b.0].0 = TyInfo::Ref(a),
-            (TyInfo::Ref(a), _) => self.unify(a, b, span),
-            (_, TyInfo::Ref(b)) => self.unify(a, b, span),
-            (TyInfo::Num, TyInfo::Num) | (TyInfo::Bool, TyInfo::Bool) => {}
-            (TyInfo::Func(a_i, a_o), TyInfo::Func(b_i, b_o)) => {
-                self.unify(b_i, a_i, span); // Order swapped: function args are contravariant
-                self.unify(a_o, b_o, span);
+            (TyInfo::Unknown, _) => {
+                self.vars[a.0].0 = TyInfo::Ref(b);
+                Ok(())
             }
-            (a_info, b_info) => failure(
-                format!("Type mismatch between {a_info} and {b_info}"),
-                ("mismatch occurred here".to_string(), span),
-                vec![
-                    (format!("{a_info}"), self.vars[a.0].1),
-                    (format!("{b_info}"), self.vars[b.0].1),
-                ],
-                self.src,
-            ),
+            (_, TyInfo::Unknown) => {
+                self.vars[b.0].0 = TyInfo::Ref(a);
+                Ok(())
+            }
+            (TyInfo::Ref(a), _) => {
+                self.unify(a, b, span)?;
+                Ok(())
+            }
+            (_, TyInfo::Ref(b)) => {
+                self.unify(a, b, span)?;
+                Ok(())
+            }
+            (TyInfo::Num, TyInfo::Num) | (TyInfo::Bool, TyInfo::Bool) => Ok(()),
+            (TyInfo::Func(a_i, a_o), TyInfo::Func(b_i, b_o)) => {
+                self.unify(b_i, a_i, span)?; // Order swapped: function args are contravariant
+                self.unify(a_o, b_o, span)?;
+                Ok(())
+            }
+            (_a_info, _b_info) => Err(SolveError::TypeMismatch {
+                span,
+                a_ty: self.vars[a.0],
+                b_ty: self.vars[b.0],
+            }),
         }
     }
 
-    fn check<'src>(
+    pub fn check(
         &mut self,
         expr: &SpannedExpr<'src>,
         env: &mut Vec<(&'src str, TyVar)>,
-    ) -> TyVar {
+    ) -> Result<TyVar, SolveError<'src>> {
         match &expr.0 {
-            Expr::Num(_) => self.create_ty(TyInfo::Num, expr.1),
-            Expr::Bool(_) => self.create_ty(TyInfo::Bool, expr.1),
-            Expr::Var(name) => {
-                env.iter()
-                    .rev()
-                    .find(|(n, _)| n == name)
-                    .unwrap_or_else(|| {
-                        failure(
-                            format!("No such local '{name}'"),
-                            ("not found in scope".to_string(), expr.1),
-                            None,
-                            self.src,
-                        )
+            Expr::Num(_) => Ok(self.create_ty(TyInfo::Num, expr.1)),
+            Expr::Bool(_) => Ok(self.create_ty(TyInfo::Bool, expr.1)),
+            Expr::Var(name) => env.iter().rev().find(|(n, _)| n == name).map_or_else(
+                || {
+                    Err(SolveError::NoSuchLocal {
+                        name: name.to_string(),
+                        expr: expr.clone(),
                     })
-                    .1
-            }
+                },
+                |v| Ok(v.1),
+            ),
             Expr::Let { lhs, rhs, then } => {
-                let rhs_ty = self.check(rhs, env);
+                let rhs_ty = self.check(rhs, env)?;
                 env.push((lhs.0, rhs_ty));
-                let out_ty = self.check(then, env);
+                let out_ty = self.check(then, env)?;
                 env.pop();
-                out_ty
+                Ok(out_ty)
             }
             Expr::Func { arg, body } => {
                 let arg_ty = self.create_ty(TyInfo::Unknown, arg.1);
                 env.push((arg.0, arg_ty));
-                let body_ty = self.check(body, env);
+                let body_ty = self.check(body, env)?;
                 env.pop();
-                self.create_ty(TyInfo::Func(arg_ty, body_ty), expr.1)
+                Ok(self.create_ty(TyInfo::Func(arg_ty, body_ty), expr.1))
             }
             Expr::Apply { func, arg } => {
-                let func_ty = self.check(func, env);
-                let arg_ty = self.check(arg, env);
+                let func_ty = self.check(func, env)?;
+                let arg_ty = self.check(arg, env)?;
                 let out_ty = self.create_ty(TyInfo::Unknown, expr.1);
                 let func_req_ty = self.create_ty(TyInfo::Func(arg_ty, out_ty), func.1);
-                self.unify(func_req_ty, func_ty, expr.1);
-                out_ty
+                self.unify(func_req_ty, func_ty, expr.1)?;
+                Ok(out_ty)
             }
             Expr::Add(l, r) | Expr::Mul(l, r) => {
                 let out_ty = self.create_ty(TyInfo::Num, expr.1);
-                let l_ty = self.check(l, env);
-                self.unify(out_ty, l_ty, expr.1);
-                let r_ty = self.check(r, env);
-                self.unify(out_ty, r_ty, expr.1);
-                out_ty
+                let l_ty = self.check(l, env)?;
+                self.unify(out_ty, l_ty, expr.1)?;
+                let r_ty = self.check(r, env)?;
+                self.unify(out_ty, r_ty, expr.1)?;
+                Ok(out_ty)
             }
         }
     }
 
-    pub fn solve(&self, var: TyVar) -> Ty {
+    pub fn solve(&self, var: TyVar) -> Result<Ty, SolveError<'src>> {
         match self.vars[var.0].0 {
-            TyInfo::Unknown => failure(
-                "Cannot infer type".to_string(),
-                ("has unknown type".to_string(), self.vars[var.0].1),
-                None,
-                self.src,
-            ),
+            TyInfo::Unknown => Err(SolveError::InferFailure {
+                ty: self.vars[var.0],
+            }),
             TyInfo::Ref(var) => self.solve(var),
-            TyInfo::Num => Ty::Num,
-            TyInfo::Bool => Ty::Bool,
-            TyInfo::Func(i, o) => Ty::Func(Box::new(self.solve(i)), Box::new(self.solve(o))),
+            TyInfo::Num => Ok(Ty::Num),
+            TyInfo::Bool => Ok(Ty::Bool),
+            TyInfo::Func(i, o) => Ok(Ty::Func(Box::new(self.solve(i)?), Box::new(self.solve(o)?))),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum SolveError<'src> {
+    TypeMismatch {
+        span: Span,
+        a_ty: SpannedTyInfo,
+        b_ty: SpannedTyInfo,
+    },
+    InferFailure {
+        ty: SpannedTyInfo,
+    },
+    NoSuchLocal {
+        name: String,
+        expr: SpannedExpr<'src>,
+    },
+}
+
+impl From<SolveError<'_>> for ErrorReport {
+    fn from(value: SolveError) -> Self {
+        match value {
+            SolveError::TypeMismatch { span, a_ty, b_ty } => ErrorReport {
+                span,
+                message: format!("Type mismatch between {0} and {1}", a_ty.0, b_ty.0),
+                labels: vec![
+                    (span, "mismatch occurred here".into()),
+                    (a_ty.1, a_ty.0.to_string()),
+                    (b_ty.1, b_ty.0.to_string()),
+                ],
+                notes: vec![],
+            },
+            SolveError::InferFailure { ty } => ErrorReport {
+                span: ty.1,
+                message: "Cannot infer type".into(),
+                labels: vec![(ty.1, "has unknown type".into())],
+                notes: vec![],
+            },
+            SolveError::NoSuchLocal { name, expr } => ErrorReport {
+                span: expr.1,
+                message: format!("No such local '{name}'"),
+                labels: vec![(expr.1, "not found in scope".into())],
+                notes: vec![],
+            },
         }
     }
 }

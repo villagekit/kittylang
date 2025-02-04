@@ -26,7 +26,7 @@ impl ErrorReport {
         report
             .with_config(Config::default().with_compact(false))
             .finish()
-            .eprint((source_id.clone(), Source::from(source)))
+            .eprint((source_id, Source::from(source)))
             .unwrap();
     }
 }
@@ -36,8 +36,20 @@ pub struct ErrorReports {
     pub reports: Vec<ErrorReport>,
 }
 
-impl From<Vec<ErrorReport>> for ErrorReports {
-    fn from(reports: Vec<ErrorReport>) -> Self {
+impl<E> From<Vec<E>> for ErrorReports
+where
+    E: Into<ErrorReport>,
+{
+    fn from(reports: Vec<E>) -> Self {
+        let reports: Vec<ErrorReport> = reports.into_iter().map(Into::into).collect();
         ErrorReports { reports }
+    }
+}
+
+impl ErrorReports {
+    pub fn display(&self, source: &str, source_id: SourceId) {
+        for report in &self.reports {
+            report.display(source, source_id)
+        }
     }
 }

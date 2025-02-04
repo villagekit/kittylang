@@ -2,13 +2,11 @@ use chumsky::{input::BorrowInput, pratt::*, prelude::*};
 
 use crate::lexer::Token;
 use kitty_ast::Expr;
-use kitty_meta::{Span, Spanned};
-
-pub type ParserError<'src> = Rich<'src, Token<'src>, Span>;
+use kitty_meta::{ErrorReport, Span, Spanned};
 
 pub fn parser<'src, I, M>(
     make_input: M,
-) -> impl Parser<'src, I, Spanned<Expr<'src>>, extra::Err<ParserError<'src>>>
+) -> impl Parser<'src, I, Spanned<Expr<'src>>, extra::Err<ParserErrorInner<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
     // Because this function is generic over the input type, we need the caller to tell us how to create a new input,
@@ -82,4 +80,33 @@ where
         .labelled("expression")
         .as_context()
     })
+}
+
+pub type ParserErrorInner<'src> = Rich<'src, Token<'src>, Span>;
+
+pub struct ParserError<'src>(pub ParserErrorInner<'src>);
+
+impl From<ParserError<'_>> for ErrorReport {
+    fn from(value: ParserError) -> ErrorReport {
+        let error = value.0;
+        ErrorReport {
+            message: error.reason().to_string(),
+            span: *error.span(),
+            labels: vec![(
+                *error.span(),
+                error
+                    .found()
+                    .map(|c| c.to_string())
+                    .unwrap_or_else(|| "end of input".to_string()),
+            )]
+            .into_iter()
+            .chain(
+                error
+                    .contexts()
+                    .map(|(l, _s)| (*error.span(), format!("while parsing this {l}"))),
+            )
+            .collect(),
+            notes: vec![],
+        }
+    }
 }

@@ -1,11 +1,9 @@
 use chumsky::{input::MappedSpan, prelude::*};
 use std::fmt;
 
-use kitty_meta::{Span, Spanned};
+use kitty_meta::{ErrorReport, Span, Spanned};
 
 // Tokens and lexer
-
-pub type LexerError<'src> = Rich<'src, char, Span>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token<'src> {
@@ -50,7 +48,7 @@ pub fn lexer<'src, F>() -> impl Parser<
     'src,
     MappedSpan<Span, &'src str, F>,
     Vec<SpannedToken<'src>>,
-    extra::Err<LexerError<'src>>,
+    extra::Err<LexerErrorInner<'src>>,
 >
 where
     F: Fn(SimpleSpan) -> Span + 'src,
@@ -88,4 +86,33 @@ where
     })
     .repeated()
     .collect()
+}
+
+pub type LexerErrorInner<'src> = Rich<'src, char, Span>;
+
+pub struct LexerError<'src>(pub LexerErrorInner<'src>);
+
+impl From<LexerError<'_>> for ErrorReport {
+    fn from(value: LexerError) -> ErrorReport {
+        let error = value.0;
+        ErrorReport {
+            message: error.reason().to_string(),
+            span: *error.span(),
+            labels: vec![(
+                *error.span(),
+                error
+                    .found()
+                    .map(|c| c.to_string())
+                    .unwrap_or_else(|| "end of input".to_string()),
+            )]
+            .into_iter()
+            .chain(
+                error
+                    .contexts()
+                    .map(|(l, _s)| (*error.span(), format!("while parsing this {l}"))),
+            )
+            .collect(),
+            notes: vec![],
+        }
+    }
 }
