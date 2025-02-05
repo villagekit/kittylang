@@ -1,0 +1,29 @@
+trait Add
+  fn add(self, other: Self): Self
+
+trait Default
+  fn default(): Self
+
+export struct Length
+  prop x: Number
+
+impl Add for Length
+  fn add(self, other) =>
+    Self { x: self.x + other.x }
+
+impl Default for Length
+  fn default() => Self(0)
+
+export struct Meter
+  prop x: Number
+
+impl From<Meter> for Length
+  fn from(value) =>
+    Length(value.x)
+
+export struct Feet
+  prop x: Number
+
+impl From<Feet> for Length
+  fn from(value) =>
+    Length(value.x * 0.3048)
