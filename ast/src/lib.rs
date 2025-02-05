@@ -1,81 +1,77 @@
 use kitty_meta::Spanned;
 
-pub struct Identifier<'src>(&'src str);
-
-/// A single segment of a path (for example, the “foo” in `Foo.Bar`).
-#[derive(Debug, Clone)]
-pub struct PathSegment<'src>(Spanned<Identifier<'src>>, Option<GenericArgList<'src>>);
-
-/// A (possibly multi‐segment) path.
-#[derive(Debug, Clone)]
-pub struct Path<'src>(Vec<Spanned<PathSegment<'src>>>);
-
 /// A generic type argument.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct GenericArg<'src>(TypeAnnotation<'src>);
 
-/// A list of generic type arguments.
-pub struct GenericArgList<'src>(Vec<Spanned<GenericArg<'src>>>);
-
-/// A type bound (for use in generic parameter declarations).
-#[derive(Debug, Clone)]
-pub struct TypeBound<'src>(TypeAnnotation<'src>);
-
-/// A list of type bounds.
-pub struct TypeBoundList<'src>(Vec<Spanned<TypeBound<'src>>>);
+/// Generic type arguments.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct GenericArgs<'src> {
+    positional: Vec<Spanned<TypeAnnotation<'src>>>,
+    labelled: Vec<(Spanned<&'src str>, Spanned<TypeAnnotation<'src>>)>
+}
 
 /// A generic type parameter.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct GenericParam<'src> {
-    identifier: Spanned<Identifier<'src>>,
+    name: Spanned<&'src str>,
     /// Optional trait bounds.
-    bounds: Option<TypeBoundList<'src>>,
+    bounds: Option<Vec<Spanned<TypeBound<'src>>>>,
     /// An optional default type.
     default: Option<Spanned<TypeAnnotation<'src>>>,
 }
 
-/// A list of generic type parameters.
-pub type GenericParamList<'src> = Vec<Spanned<GenericParam<'src>>>;
+/// A type bound (for use in generic parameter declarations).
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct TypeBound<'src>(TypeAnnotation<'src>);
 
-// TODO where clauses
-
-/// A user annotation to describe a type.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TypeAnnotation<'src> {
-    /// A path type, like `Foo` or `Iterator.Item`.
-    Path(Path<'src>),
+    /// Named types (user-defined or from standard library)
+    Identifier(&'src str),
+
+    /// Parametrized types with type arguments (e.g. `List[Number]`, same as `Vec<f64>` in Rust)
+    Parametrized {
+        base: Box<Spanned<Self>>,
+        args: Vec<Spanned<GenericArg<'src>>>,
+    },
+
     /// A tuple type.
-    Tuple(Vec<Spanned<Type<'src>>>),
+    Tuple(Vec<Spanned<Self>>),
+
     /// A function type.
     Function {
-        params: Vec<Spanned<Type<'src>>>,
-        ret: Option<Box<Spanned<Type<'src>>>>,
+        params: Vec<Spanned<Self>>,
+        ret: Option<Box<Spanned<Self>>>,
     },
+
     /// A trait type, like `impl Add`
     Trait {
-        bounds: TypeBoundList<'src>
-    }
-}
+        bounds: Vec<Spanned<TypeBound<'src>>>
+    },
 
-/// Literals.
-#[derive(Debug, Clone)]
-pub enum Literal<'src> {
-    /// Boolean literal.
-    Boolean(bool),
-    /// Number literal.
-    Number(&'src str),
-    /// String literal.
-    String(&'src str),
+    /// Associated type access (e.g. `Iterator.Item`, same as `Iterator::Item` in Rust)
+    Associated {
+        trt: Box<Spanned<Self>>,
+        typ: Box<Spanned<Self>>,
+    },
+
+    /// Trait projection (e.g. `T.[Iterator]`, same as `<T as Iterator>` in Rust)
+    Projection {
+        typ: Box<Spanned<Self>>,
+        trt: Spanned<&'src str>,
+    },
 }
 
 /// Unary operators.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum UnaryOperator {
     Negate,
     Not,
 }
 
 /// Binary operators.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum BinaryOperator {
     And,
     Or,
@@ -93,89 +89,102 @@ pub enum BinaryOperator {
     NotEqual
 }
 
-/// Expressions.
-#[derive(Debug, Clone)]
+
+/// An expression represents an entity which can be evaluated to a value.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Expression<'src> {
-    /// A literal expression.
-    Literal(Literal<'src>),
-    /// A variable or constant reference (a path).
-    Path(Path<'src>),
-    /// A block expression.
+    /// Block expression.
     Block(Block<'src>),
-    /// A function lambda
-    Function {
-        args: Vec<Spanned<Identifier<'src>>>,
-        body: Box<Spanned<Self>
+
+    /// Literal boolean.
+    Boolean(bool),
+
+    /// Literal string.
+    String(&'src str),
+
+    /// Literal number.
+    Number(f64),
+
+    /// A named local variable.
+    Identifier(&'src str),
+
+    /// A tuple.
+    Tuple(Vec<Spanned<Self>>),
+
+    /// A function definition.
+    Function(Function),
+
+    /// An operation on a single [`Expression`] operand with an [`Operator`]
+    Unary {
+        right: Box<Spanned<Self>>,
+        operator: UnaryOperator,
     },
-    /// A function call.
+
+    /// An operation on two [`Expression`] operands with a an [`Operator`].
+    Binary {
+        left: Box<Spanned<Self>>,
+        right: Box<Spanned<Self>>,
+        operator: BinaryOperator,
+    },
+
+    /// A function invocation with a list of [`Expression`] parameters.
     Call {
-        func: Box<Spanned<Self>>,
-        args: Vec<Spanned<Self>>,
+        function: Box<Spanned<Self>>,
+        args: FnArgs,
     },
-    /// A binary expression.
-    Binary {
-        operator: BinaryOperator,
-        lhs: Box<Spanned<Self>>,
-        rhs: Box<Spanned<Self>>,
+
+    /// Get key operation (`c.z`).
+    GetKey {
+        container: Box<Spanned<Self>>,
+        key: Spanned<String>,
     },
-    /// A binary expression.
-    Binary {
-        operator: BinaryOperator,
-        lhs: Box<Spanned<Self>>,
-        rhs: Box<Spanned<Self>>,
-    },
+
     /// An `if` expression.
     If {
         cond: Box<Spanned<Self>>,
         then_branch: Box<Spanned<Self>>,
         else_branch: Option<Box<Spanned<Self>>>,
     },
+
     /// A `match` expression.
     Match {
         expr: Box<Spanned<Self>>,
         arms: Vec<Spanned<MatchArm<'src>>>,
     },
-    // You can add additional expression forms (loops, closures, etc).
 }
 
 /// A block of statements with an optional tail expression.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Block<'src> {
-    pub stmts: Vec<Spanned<Stmt<'src>>>,
-    pub expr: Option<Box<Spanned<Expr<'src>>>>,
+    pub statements: Vec<Spanned<Statement<'src>>>,
+    pub tail_expression: Option<Box<Spanned<Expression<'src>>>>,
 }
 
 /// Statements.
-#[derive(Debug, Clone)]
-pub enum Stmt<'src> {
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Statement<'src> {
     /// An expression statement.
-    Expr(Expr<'src>),
+    Expression(Expression<'src>),
     /// A `let` declaration.
     Let {
-        pat: Spanned<Pat<'src>>,
-        ty: Option<Spanned<Type<'src>>>,
-        init: Box<Spanned<Expr<'src>>>,
+        pattern: Spanned<Pattern<'src>>,
+        typ: Option<Spanned<TypeAnnotation<'src>>>,
+        init: Box<Spanned<Expression<'src>>>,
     },
     /// An item declaration (e.g. a function or struct).
-    Item(Spanned<Item<'src>>),
+    Declaration(Spanned<Declaration<'src>>),
 }
-
-// ────────────────────────────────
-// Patterns
-// ────────────────────────────────
 
 /// Patterns used in let bindings, match arms, etc.
 #[derive(Debug, Clone)]
-pub enum Pat<'src> {
-    /// An identifier, with an optional “@” pattern.
-    Ident(Identifier<'src>, Option<Box<Spanned<Pat<'src>>>>),
-    /// A wildcard: `_`.
-    Wildcard,
+pub enum Pattern<'src> {
+    /// A named identifier.
+    Name(&'src str),
     /// A tuple pattern.
     Tuple(Vec<Spanned<Pat<'src>>>),
     /// A struct pattern, with a path and a list of field patterns.
     Struct {
-        path: Path<'src>,
+        path: TypePath<'src>,
         fields: Vec<Spanned<RecordPatField<'src>>>,
         /// `true` if the pattern uses “..” to capture the rest.
         rest: bool,
@@ -213,13 +222,20 @@ pub enum Item<'src> {
     // (Other items like Const, Static, TypeAlias, etc. could be added here.)
 }
 
-/// A function declaration.
-#[derive(Debug, Clone)]
+/// Function arguments
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct FnArgs<'src> {
+    positional: Vec<Spanned<Expression<'src>>>,
+    labelled: Vec<(Spanned<&'src str>, Spanned<Expression<'src>>)>
+};
+
+/// A named function declaration.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Function<'src> {
     /// The function’s name.
-    pub ident: Identifier<'src>,
+    pub name: Option<&'src str>,
     /// Optional generics.
-    pub generics: Option<GenericParamList<'src>>,
+    pub generics: Option<Vec<Spanned<GenericParam<'src>>>,
     /// The list of parameters.
     pub params: Vec<Spanned<FunctionParam<'src>>>,
     /// Optional return type.
@@ -228,7 +244,7 @@ pub struct Function<'src> {
     pub body: Option<Block<'src>>,
 }
 
-/// A function declaration.
+/// An anonymous lambda function declaration.
 #[derive(Debug, Clone)]
 pub struct Lambda<'src> {
     /// The function’s name.

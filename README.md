@@ -42,3 +42,4 @@
       - Am interested in this...
       - Scala implements `.apply` on the List class to do this: https://www.scala-lang.org/api/current/scala/collection/immutable/List.html
     - Always parse `<>` in favor of generics
+- Use labelled arguments like https://tour.gleam.run/everything/#functions-labelled-arguments

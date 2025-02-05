@@ -3,7 +3,7 @@ use std::{fmt, ops::Range};
 
 use crate::source::SourceId;
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Span {
     source: SourceId,
     range: (usize, usize),
