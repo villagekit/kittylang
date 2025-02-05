@@ -32,4 +32,13 @@
 - Functions can be called with either positional args or keyword args
   - Type generics are the same
 - Functions can describe multi-arity multi-type overloads
+- Use only `where` clause to describe type trait bounds, not in generic params
 - Use `.` instead of `::` for type paths
+- Can we remove the turbofish? (`::<T>`)
+  - https://github.com/rust-lang/rust/blob/e98309298d927307c5184f4869604bd068d26183/src/test/ui/parser/bastion-of-the-turbofish.rs
+  - https://github.com/rust-lang/rfcs/pull/2527#issuecomment-414635205
+  - Is there a better alternative?
+    - Use `[]` for generics, use `()` for tuples, use `List()` for lists, use `list(x)` for indexing
+      - Am interested in this...
+      - Scala implements `.apply` on the List class to do this: https://www.scala-lang.org/api/current/scala/collection/immutable/List.html
+    - Always parse `<>` in favor of generics

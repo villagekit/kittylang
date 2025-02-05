@@ -1,5 +1,8 @@
 trait Add
-  fn add(self, other: Self): Self
+  type Rhs = Self
+  type Output = Self
+
+  fn add(self, other: Self.Rhs): Self.Output
 
 trait Default
   fn default(): Self
@@ -17,13 +20,13 @@ impl Default for Length
 export struct Meter
   prop x: Number
 
-impl From<Meter> for Length
+impl From[Meter] for Length
   fn from(value) =>
     Length(value.x)
 
 export struct Feet
   prop x: Number
 
-impl From<Feet> for Length
+impl From[Feet] for Length
   fn from(value) =>
     Length(value.x * 0.3048)

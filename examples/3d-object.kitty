@@ -4,7 +4,7 @@ import from @std/3d-math
   Quaternion
 
 export struct Transform
-  prop translation: Vector3<Length>
+  prop translation: Vector3[Length]
 
   prop rotation: Quaternion
 
@@ -13,13 +13,20 @@ export struct Transform
   fn translate(self, x: Length, y: Length, z: Length): Self =>
     Self
       ...self
-      translation = Vector3
+      translation: Vector3
         self.translation.x + x
         self.translation.y + y
         self.translation.z + z
 
+impl Default for Transform
+  fn default()
+    Self
+      translation: Vector3[Length].default()
+      rotation: Quaternion.default()
+      scale: Vector3.default()
+
 export trait Object3d
-  prop transform: Transform
+  prop transform: Transform = Transform.default()
 
   fn translate(self, x: Length, y: Length, z: Length): Self =>
     Self

@@ -1,15 +1,18 @@
 import sqrt from @std/math
 
-export struct Vector3<N: Default = Number>
-  prop x: N = N::default()
+export struct Vector3[N = Number]
+  where
+    N: Default + Add + Mul + Sqrt
 
-  prop y: N = N::default()
+  prop x: N = N.default()
 
-  prop z: N = N::default()
+  prop y: N = N.default()
+
+  prop z: N = N.default()
 
   fn length(self): N =>
     let Self { x, y, z } = self
-    sqrt(x * x + y * y + z * z)
+    (x * x + y * y + z * z).sqrt()
 
 export struct Quaternion
   prop x: Number = 0

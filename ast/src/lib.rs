@@ -2,26 +2,23 @@ use kitty_meta::Spanned;
 
 pub struct Identifier<'src>(&'src str);
 
-/// A single segment of a path (for example, the “foo” in `foo::bar`).
+/// A single segment of a path (for example, the “foo” in `Foo.Bar`).
 #[derive(Debug, Clone)]
 pub struct PathSegment<'src>(Spanned<Identifier<'src>>, Option<GenericArgList<'src>>);
 
 /// A (possibly multi‐segment) path.
 #[derive(Debug, Clone)]
-pub struct Path<'src> {
-    /// The segments of the path.
-    pub segments: Vec<Spanned<PathSegment<'src>>>,
-}
+pub struct Path<'src>(Vec<Spanned<PathSegment<'src>>>);
 
 /// A generic type argument.
-pub struct GenericArg<'src>(Type<'src>);
+pub struct GenericArg<'src>(TypeAnnotation<'src>);
 
 /// A list of generic type arguments.
 pub struct GenericArgList<'src>(Vec<Spanned<GenericArg<'src>>>);
 
 /// A type bound (for use in generic parameter declarations).
 #[derive(Debug, Clone)]
-pub struct TypeBound<'src>(Type<'src>);
+pub struct TypeBound<'src>(TypeAnnotation<'src>);
 
 /// A list of type bounds.
 pub struct TypeBoundList<'src>(Vec<Spanned<TypeBound<'src>>>);
@@ -44,7 +41,7 @@ pub type GenericParamList<'src> = Vec<Spanned<GenericParam<'src>>>;
 /// A user annotation to describe a type.
 #[derive(Debug, Clone)]
 pub enum TypeAnnotation<'src> {
-    /// A path type, like `Foo` or `std::vec::Vec<T>`.
+    /// A path type, like `Foo` or `Iterator.Item`.
     Path(Path<'src>),
     /// A tuple type.
     Tuple(Vec<Spanned<Type<'src>>>),
