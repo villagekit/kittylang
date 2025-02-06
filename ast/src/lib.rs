@@ -8,7 +8,7 @@ pub struct GenericArg<'src>(TypeAnnotation<'src>);
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct GenericArgs<'src> {
     positional: Vec<Spanned<TypeAnnotation<'src>>>,
-    labelled: Vec<(Spanned<&'src str>, Spanned<TypeAnnotation<'src>>)>
+    labelled: Vec<(Spanned<&'src str>, Option<Spanned<TypeAnnotation<'src>>>)>
 }
 
 /// A generic type parameter.
@@ -16,25 +16,51 @@ pub struct GenericArgs<'src> {
 pub struct GenericParam<'src> {
     name: Spanned<&'src str>,
     /// Optional trait bounds.
-    bounds: Option<Vec<Spanned<TypeBound<'src>>>>,
+    bounds: Option<TypeBounds>,
     /// An optional default type.
     default: Option<Spanned<TypeAnnotation<'src>>>,
 }
+
+/// Generic type parameters.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct GenericParams<'src>(Vec<Spanned<GenericParam<'src>>>);
 
 /// A type bound (for use in generic parameter declarations).
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TypeBound<'src>(TypeAnnotation<'src>);
 
+/// Type bounds (for use in generic parameter declarations).
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum TypeAnnotation<'src> {
+pub struct TypeBounds<'src>(Vec<Spanned<TypeBound<'src>>>);
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum TypePath<'src> {
     /// Named types (user-defined or from standard library)
-    Identifier(&'src str),
+    Name(&'src str),
 
     /// Parametrized types with type arguments (e.g. `List[Number]`, same as `Vec<f64>` in Rust)
-    Parametrized {
+    Generic {
         base: Box<Spanned<Self>>,
         args: Vec<Spanned<GenericArg<'src>>>,
     },
+
+    /// Trait projection (e.g. `T.[Iterator]`, same as `<T as Iterator>` in Rust)
+    Projection {
+        typ: Box<Spanned<Self>>,
+        trt: Spanned<&'src str>,
+    },
+
+    /// Associated type access (e.g. `Iterator.Item`, same as `Iterator::Item` in Rust)
+    Association {
+        trt: Box<Spanned<Self>>,
+        typ: Box<Spanned<Self>>,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum TypeAnnotation<'src> {
+    // A qualified type
+    Path(TypePath<'src>),
 
     /// A tuple type.
     Tuple(Vec<Spanned<Self>>),
@@ -48,18 +74,6 @@ pub enum TypeAnnotation<'src> {
     /// A trait type, like `impl Add`
     Trait {
         bounds: Vec<Spanned<TypeBound<'src>>>
-    },
-
-    /// Associated type access (e.g. `Iterator.Item`, same as `Iterator::Item` in Rust)
-    Associated {
-        trt: Box<Spanned<Self>>,
-        typ: Box<Spanned<Self>>,
-    },
-
-    /// Trait projection (e.g. `T.[Iterator]`, same as `<T as Iterator>` in Rust)
-    Projection {
-        typ: Box<Spanned<Self>>,
-        trt: Spanned<&'src str>,
     },
 }
 
@@ -89,13 +103,9 @@ pub enum BinaryOperator {
     NotEqual
 }
 
-
-/// An expression represents an entity which can be evaluated to a value.
+// A literal primitive.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Expression<'src> {
-    /// Block expression.
-    Block(Block<'src>),
-
+pub enum Literal<'src> {
     /// Literal boolean.
     Boolean(bool),
 
@@ -104,9 +114,19 @@ pub enum Expression<'src> {
 
     /// Literal number.
     Number(f64),
+}
+
+/// An expression represents an entity which can be evaluated to a value.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Expression<'src> {
+    /// Block expression.
+    Block(Block<'src>),
 
     /// A named local variable.
     Identifier(&'src str),
+
+    /// A literal primitive.
+    Literal(Literal<'src>),
 
     /// A tuple.
     Tuple(Vec<Spanned<Self>>),
@@ -130,7 +150,7 @@ pub enum Expression<'src> {
     /// A function invocation with a list of [`Expression`] parameters.
     Call {
         function: Box<Spanned<Self>>,
-        args: FnArgs,
+        args: FunctionArgs,
     },
 
     /// Get key operation (`c.z`).
@@ -141,7 +161,7 @@ pub enum Expression<'src> {
 
     /// An `if` expression.
     If {
-        cond: Box<Spanned<Self>>,
+        condition: Box<Spanned<Self>>,
         then_branch: Box<Spanned<Self>>,
         else_branch: Option<Box<Spanned<Self>>>,
     },
@@ -179,36 +199,34 @@ pub enum Statement<'src> {
 #[derive(Debug, Clone)]
 pub enum Pattern<'src> {
     /// A named identifier.
-    Name(&'src str),
-    /// A tuple pattern.
-    Tuple(Vec<Spanned<Pat<'src>>>),
-    /// A struct pattern, with a path and a list of field patterns.
-    Struct {
-        path: TypePath<'src>,
-        fields: Vec<Spanned<RecordPatField<'src>>>,
-        /// `true` if the pattern uses “..” to capture the rest.
-        rest: bool,
-    },
+    Identifier(&'src str),
+
     /// A literal pattern.
     Literal(Literal<'src>),
-    // Additional pattern forms (slice, or-pattern, etc.) can be added.
+
+    /// A tuple pattern.
+    Tuple(Vec<Spanned<Self>>),
+
+    /// A struct pattern, with a path and a list of field patterns.
+    Struct {
+        typ: TypePath<'src>,
+        positional: Vec<Spanned<Self>>,
+        labelled: Vec<(Spanned<&'src str>, Option<Spanned<Self>>)>
+    },
+
+    /// A wildcard pattern (`_`).
+    Wildcard,
+
+    /// An or operator pattern.
+    Or {
+        left: Spanned<Self>,
+        right: Spanned<Self>,
+    }
 }
 
-/// A single field in a record (struct) pattern.
+/// Declarations.
 #[derive(Debug, Clone)]
-pub struct RecordPatField<'src> {
-    pub name: Identifier<'src>,
-    /// If `None`, then the field is “shorthand” (e.g. `foo`).
-    pub pat: Option<Box<Spanned<Pat<'src>>>>,
-}
-
-// ────────────────────────────────
-// Items (Top‑Level Declarations)
-// ────────────────────────────────
-
-/// The kinds of items we support.
-#[derive(Debug, Clone)]
-pub enum Item<'src> {
+pub enum Declaration<'src> {
     /// A function.
     Fn(Function<'src>),
     /// A struct.
@@ -219,38 +237,26 @@ pub enum Item<'src> {
     Impl(Impl<'src>),
     /// A trait.
     Trait(Trait<'src>),
-    // (Other items like Const, Static, TypeAlias, etc. could be added here.)
+    /// Constant.
+    Constant(Constant<'src>),
+    /// Type alias.
+    TypeAlias(TypeAlias<'src>),
 }
 
 /// Function arguments
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct FnArgs<'src> {
+pub struct FunctionArgs<'src> {
     positional: Vec<Spanned<Expression<'src>>>,
-    labelled: Vec<(Spanned<&'src str>, Spanned<Expression<'src>>)>
-};
+    labelled: Vec<(Spanned<&'src str>, Option<Spanned<Expression<'src>>>)>
+}
 
 /// A named function declaration.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Function<'src> {
-    /// The function’s name.
+    /// The function’s name (if missing, this is an anonymous function).
     pub name: Option<&'src str>,
     /// Optional generics.
-    pub generics: Option<Vec<Spanned<GenericParam<'src>>>,
-    /// The list of parameters.
-    pub params: Vec<Spanned<FunctionParam<'src>>>,
-    /// Optional return type.
-    pub ret: Option<Spanned<Type<'src>>>,
-    /// Optional function body (if missing, this is a declaration).
-    pub body: Option<Block<'src>>,
-}
-
-/// An anonymous lambda function declaration.
-#[derive(Debug, Clone)]
-pub struct Lambda<'src> {
-    /// The function’s name.
-    pub ident: Identifier<'src>,
-    /// Optional generics.
-    pub generics: Option<GenericParamList<'src>>,
+    pub generics: Option<GenericParams<'src>>,
     /// The list of parameters.
     pub params: Vec<Spanned<FunctionParam<'src>>>,
     /// Optional return type.
@@ -260,47 +266,44 @@ pub struct Lambda<'src> {
 }
 
 /// A function parameter.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FunctionParam<'src> {
-    pub pat: Spanned<Pat<'src>>,
-    pub ty: Option<Spanned<Type<'src>>>,
+    pub pattern: Spanned<Pattern<'src>>,
+    pub typ: Option<Spanned<TypeAnnotation<'src>>>,
 }
 
 /// A struct declaration.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Struct<'src> {
     /// The struct’s name.
-    pub ident: Identifier<'src>,
+    pub name: Spanned<&'src str>,
     /// Optional generics.
-    pub generics: Option<GenericParamList<'src>>,
-    /// The fields.
-    pub fields: StructFields<'src>,
+    pub generics: Option<GenericParams<'src>>,
+    /// Struct declarations: properties, constants, and methods.
+    pub declarations: Vec<Spanned<StructItem<'src>>,
 }
 
-/// The different forms a struct’s fields can take.
-#[derive(Debug, Clone)]
-pub enum StructFields<'src> {
-    /// A record-like struct: `struct Foo { a: A, b: B }`
-    Named(Vec<Spanned<StructField<'src>>>),
-    /// A tuple struct: `struct Foo(A, B);`
-    Unnamed(Vec<Spanned<StructField<'src>>>),
-    /// A unit struct: `struct Foo;`
-    Unit,
+/// Items that can appear in a struct.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum StructItem {
+    Property(Property<'src>),
+    Constant(Constant<'src>),
+    Method(Function<'src>),
 }
 
-/// A single struct field.
-#[derive(Debug, Clone)]
-pub struct StructField<'src> {
-    /// In a named field, this is the field name.
-    pub ident: Option<Identifier<'src>>,
-    pub ty: Spanned<Type<'src>>,
+/// A single struct property.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Property<'src> {
+    pub name: Spanned<&'src str>,
+    pub typ: Spanned<TypeAnnotation<'src>>,
+    pub default: Spanned<Expression<'src>>,
 }
 
 /// An enum declaration.
 #[derive(Debug, Clone)]
 pub struct Enum<'src> {
-    pub ident: Identifier<'src>,
-    pub generics: Option<GenericParamList<'src>>,
+    pub name: <'src>,
+    pub generics: Option<GenericParams<'src>>,
     pub variants: Vec<Spanned<EnumVariant<'src>>>,
 }
 
@@ -318,7 +321,7 @@ pub struct EnumVariant<'src> {
 #[derive(Debug, Clone)]
 pub struct Impl<'src> {
     /// Optional generics.
-    pub generics: Option<GenericParamList<'src>>,
+    pub generics: Option<GenericParams<'src>>,
     /// If present, this is an “impl of a trait for …”
     pub trait_path: Option<Path<'src>>,
     /// The type being implemented.
@@ -331,9 +334,9 @@ pub struct Impl<'src> {
 #[derive(Debug, Clone)]
 pub struct Trait<'src> {
     pub ident: Identifier<'src>,
-    pub generics: Option<GenericParamList<'src>>,
+    pub generics: Option<GenericParams<'src>>,
     /// Optional “supertraits” (bounds).
-    pub bounds: Option<TypeBoundList<'src>>,
+    pub bounds: Option<TypeBounds<'src>>,
     /// The items defined in the trait.
     pub items: Vec<Spanned<TraitItem<'src>>>,
 }
@@ -346,25 +349,25 @@ pub enum TraitItem<'src> {
     /// An associated type.
     TypeAlias(TypeAlias<'src>),
     /// An associated constant.
-    Const(ConstItem<'src>),
+    Const(Const<'src>),
 }
 
 /// A type alias (which may be used for generic associated types).
 #[derive(Debug, Clone)]
 pub struct TypeAlias<'src> {
-    pub ident: Identifier<'src>,
-    pub generics: Option<GenericParamList<'src>>,
-    pub bounds: Option<TypeBoundList<'src>>,
+    pub name: Spanned<&'src str>,
+    pub generics: Option<GenericParams<'src>>,
+    pub bounds: Option<TypeBounds<'src>>,
     /// The aliased type (if defined).
     pub ty: Option<Spanned<Type<'src>>>,
 }
 
 /// A constant item.
 #[derive(Debug, Clone)]
-pub struct ConstItem<'src> {
-    pub ident: Identifier<'src>,
-    pub ty: Spanned<Type<'src>>,
-    pub expr: Option<Spanned<Expr<'src>>>,
+pub struct Constant<'src> {
+    pub name: Spanned<&'src str>,
+    pub typ: Spanned<TypeAnnotation<'src>>,
+    pub expr: Option<Spanned<Expression<'src>>>,
 }
 
 // ────────────────────────────────

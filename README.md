@@ -14,6 +14,7 @@
 - [gleam-lang/gleam](https://github.com/gleam-lang/gleam)
 - [flix/flix](https://github.com/flix/flix)
 - [sway/sway](https://docs.fuel.network/docs/sway/)
+- https://mckayla.blog/posts/all-you-need-is-data-and-functions.html
 
 ## TODO
 
@@ -25,6 +26,14 @@
   - https://github.com/spreadsheet-lang/spreadsheet/blob/main/lang/src/parser.rs
 - use `ungrammar`?
   - https://rust-analyzer.github.io/blog/2020/10/24/introducing-ungrammar.html
+- use `chalk`?
+  - https://rust-lang.github.io/chalk/book/
+  - or use concepts: https://rustc-dev-guide.rust-lang.org/traits/goals-and-clauses.html
+  - or use next-gen solver concepts: https://rustc-dev-guide.rust-lang.org/solve/trait-solving.html
+- interesting to see how `fuel` handles Spans in the AST
+  - Spanned is a trait
+  - only tokens actually store spans, then tree enums implement functions to return the node span using the leaf spans
+  - also means all tokens are stored in the AST
 
 ## Language
 
@@ -42,4 +51,5 @@
       - Am interested in this...
       - Scala implements `.apply` on the List class to do this: https://www.scala-lang.org/api/current/scala/collection/immutable/List.html
     - Always parse `<>` in favor of generics
-- Use labelled arguments like https://tour.gleam.run/everything/#functions-labelled-arguments
+- Use labelled arguments like Gleam: https://tour.gleam.run/everything/#functions-labelled-arguments
+- Match like Gleam: https://tour.gleam.run/everything/#data-types-record-pattern-matching
