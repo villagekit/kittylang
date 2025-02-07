@@ -2,16 +2,12 @@ use chumsky::{
     combinator::RepeatedCfg,
     input::{self},
     prelude::*,
+    primitive::JustCfg,
 };
 
 use kitty_meta::{ErrorReport, Span};
 
 use crate::{token::SpannedToken, Token};
-
-#[derive(Debug, Default, Clone)]
-pub(crate) struct Context {
-    pub parent_indent: usize,
-}
 
 pub(crate) trait Input<'src>:
     input::Input<'src, Cursor = usize, Span = Span, Token = char, MaybeToken = char>
@@ -55,36 +51,6 @@ pub fn lexer<'src, I: Input<'src>>() -> impl Lexer<'src, I, Vec<SpannedToken<'sr
         .padded()
         .repeated()
         .collect()
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum Stmt {
-    Expr,
-    Loop(Vec<Stmt>),
-}
-
-pub(self) fn block_parser<'src, I: Input<'src>>() -> impl Lexer<'src, I, Vec<Stmt>> {
-    let expr = just("expr"); // TODO
-
-    let block = recursive(|block| {
-        let indent = just(' ')
-            .repeated()
-            .configure(|cfg: RepeatedCfg, ctx: &Context| cfg.exactly(ctx.parent_indent));
-
-        let expr_stmt = expr.then_ignore(text::newline()).to(Stmt::Expr);
-        let control_flow = just("loop:")
-            .then(text::newline())
-            .ignore_then(block)
-            .map(Stmt::Loop);
-        let stmt = expr_stmt.or(control_flow);
-
-        text::whitespace()
-            .count()
-            .map(|n| Context { parent_indent: n })
-            .ignore_with_ctx(stmt.separated_by(indent).collect())
-    });
-
-    block.with_ctx(Context { parent_indent: 0 })
 }
 
 /*
@@ -272,37 +238,85 @@ impl From<LexerError<'_>> for ErrorReport {
     }
 }
 
-#[test]
-fn test_block_parser() {
-    use chumsky::input::Input;
-    use kitty_meta::SourceId;
+#[derive(Debug, Default, Clone)]
+pub(crate) struct Context {
+    pub parent_indent: String,
+}
 
-    let input = r#"
+#[derive(Clone, Debug, PartialEq)]
+enum Stmt {
+    Expr,
+    Block(Vec<Stmt>),
+}
+
+fn block_parser<'src, I: Input<'src>>() -> impl Lexer<'src, I, Vec<Stmt>> {
+    let expr = just("expr"); // TODO
+
+    let block = recursive(|block| {
+        let indent = just("".to_string())
+            .configure(|cfg: JustCfg<String>, ctx: &Context| cfg.seq(ctx.parent_indent.clone()));
+
+        // TODO implement empty lines, to skip
+
+        let expr_stmt = expr.then_ignore(text::newline()).to(Stmt::Expr);
+        let control_flow = just("block:")
+            .then(text::newline())
+            .ignore_then(block)
+            .map(Stmt::Block);
+        let stmt = expr_stmt.or(control_flow);
+
+        just(" ")
+            .or(just("\t"))
+            .repeated()
+            .collect()
+            .map(|indent: Vec<&str>| Context {
+                parent_indent: indent.join(""),
+            })
+            .ignore_with_ctx(stmt.separated_by(indent).collect())
+    });
+
+    block.with_ctx(Context {
+        parent_indent: "".into(),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_block_parser() {
+        use chumsky::input::Input;
+        use kitty_meta::SourceId;
+
+        let input = r#"
 expr
 expr
-loop:
+block:
     expr
-    loop:
+    block:
         expr
-        expr
+        block:
+            expr
     expr
 expr
 "#;
-    let input = input.map_span(move |span| Span::new(SourceId::empty(), span.into_range()));
+        let input = input.map_span(move |span| Span::new(SourceId::empty(), span.into_range()));
 
-    let result = block_parser().padded().parse(input);
+        let result = block_parser().padded().parse(input);
 
-    let expected = vec![
-        Stmt::Expr,
-        Stmt::Expr,
-        Stmt::Loop(vec![
+        let expected = vec![
             Stmt::Expr,
-            Stmt::Loop(vec![Stmt::Expr, Stmt::Expr]),
             Stmt::Expr,
-        ]),
-        Stmt::Expr,
-    ];
+            Stmt::Block(vec![
+                Stmt::Expr,
+                Stmt::Block(vec![Stmt::Expr, Stmt::Block(vec![Stmt::Expr])]),
+                Stmt::Expr,
+            ]),
+            Stmt::Expr,
+        ];
 
-    assert_eq!(result.output(), Some(&expected));
-    assert!(result.errors().next().is_none());
+        assert_eq!(result.errors().next(), None);
+        assert_eq!(result.output(), Some(&expected));
+    }
 }
