@@ -24,7 +24,6 @@ impl fmt::Debug for SourceId {
 }
 
 impl SourceId {
-    #[cfg(test)]
     pub fn empty() -> Self {
         SourceId(Intern::new(Vec::new()))
     }

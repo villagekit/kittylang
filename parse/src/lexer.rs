@@ -1,65 +1,47 @@
-use chumsky::{input::MappedSpan, input::*, prelude::*};
+use chumsky::{
+    combinator::RepeatedCfg,
+    input::{self},
+    prelude::*,
+};
 
-use kitty_meta::{ErrorReport, Span, Spanned};
+use kitty_meta::{ErrorReport, Span};
 
-use crate::token::{SpannedToken, Token};
+use crate::{token::SpannedToken, Token};
 
-/*
-pub trait Lexer<'src, F, T>:
-    Parser<
-        'src,
-        MappedSpan<Span, &'src str, F>,
-        Vec<SpannedToken<'src>>,
-        extra::Err<LexerErrorInner<'src>>,
-    > + Sized
-    + Clone
-where
-    F: Fn(SimpleSpan) -> Span + 'src,
-{
-}
-impl<'src, P, F, T> Lexer<'src, F, T> for P
-where
-    P: Parser<
-            'src,
-            MappedSpan<Span, &'src str, F>,
-            Vec<SpannedToken<'src>>,
-            extra::Err<LexerErrorInner<'src>>,
-        > + Clone,
-    F: Fn(SimpleSpan) -> Span + 'src,
-{
+#[derive(Debug, Default, Clone)]
+pub(crate) struct Context {
+    pub parent_indent: usize,
 }
 
-pub fn lexer<'src, F>() -> impl Lexer<'src, F, SpannedToken<'src>>
-where
-    F: Fn(SimpleSpan) -> Span + 'src,
-*/
+pub(crate) trait Input<'src>:
+    input::Input<'src, Cursor = usize, Span = Span, Token = char, MaybeToken = char>
+    + input::SliceInput<'src>
+    + input::StrInput<'src>
+    + input::ValueInput<'src>
+    + input::ExactSizeInput<'src>
+{
+}
+impl<'src, I> Input<'src> for I where
+    I: input::Input<'src, Cursor = usize, Span = Span, Token = char, MaybeToken = char>
+        + input::SliceInput<'src>
+        + input::StrInput<'src>
+        + input::ValueInput<'src>
+        + input::ExactSizeInput<'src>
+{
+}
 
-/*
-pub fn lexer<'src, I>(
-) -> impl Parser<'src, I, Vec<SpannedToken<'src>>, extra::Err<LexerErrorInner<'src>>>
-where
-    I: Input<'src, Cursor = usize, Span = Span, Token = char, MaybeToken = char>
-        + SliceInput<'src>
-        + StrInput<'src>
-        + ValueInput<'src>
-        + ExactSizeInput<'src>,
-*/
-trait MapSpan<'src>: Fn(SimpleSpan) -> Span + 'src {}
-impl<'src, T: Fn(SimpleSpan) -> Span + 'src> MapSpan<'src> for T {}
-
-type Input<'src, F: MapSpan<'src>> = MappedSpan<Span, &'src str, F>;
 type Output<'src> = Vec<SpannedToken<'src>>;
-type Extra<'src> = extra::Err<LexerErrorInner<'src>>;
+type Extra<'src> = extra::Full<LexerErrorInner<'src>, (), Context>;
 
-trait Lexer<'src, T, F: MapSpan<'src>>: Parser<'src, Input<'src, F>, T, Extra<'src>> {}
-impl<'src, P, T, F> Lexer<'src, T, F> for P
+pub(crate) trait Lexer<'src, I: Input<'src>, O>: Parser<'src, I, O, Extra<'src>> {}
+impl<'src, P, I, O> Lexer<'src, I, O> for P
 where
-    P: Parser<'src, Input<'src, F>, T, Extra<'src>>,
-    F: MapSpan<'src>,
+    I: Input<'src>,
+    P: Parser<'src, I, O, Extra<'src>>,
 {
 }
 
-pub fn lexer<'src, F: MapSpan<'src>>() -> impl Lexer<'src, Vec<SpannedToken<'src>>, F> {
+pub fn lexer<'src, I: Input<'src>>() -> impl Lexer<'src, I, Vec<SpannedToken<'src>>> {
     let boolean = choice((
         just("true").to(Token::Boolean(true)),
         just("false").to(Token::Boolean(false)),
@@ -74,6 +56,54 @@ pub fn lexer<'src, F: MapSpan<'src>>() -> impl Lexer<'src, Vec<SpannedToken<'src
         .repeated()
         .collect()
 }
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Stmt {
+    Expr,
+    Loop(Vec<Stmt>),
+}
+
+pub(self) fn block_parser<'src, I: Input<'src>>() -> impl Lexer<'src, I, Vec<Stmt>> {
+    let expr = just("expr"); // TODO
+
+    let block = recursive(|block| {
+        let indent = just(' ')
+            .repeated()
+            .configure(|cfg: RepeatedCfg, ctx: &Context| cfg.exactly(ctx.parent_indent));
+
+        let expr_stmt = expr.then_ignore(text::newline()).to(Stmt::Expr);
+        let control_flow = just("loop:")
+            .then(text::newline())
+            .ignore_then(block)
+            .map(Stmt::Loop);
+        let stmt = expr_stmt.or(control_flow);
+
+        text::whitespace()
+            .count()
+            .map(|n| Context { parent_indent: n })
+            .ignore_with_ctx(stmt.separated_by(indent).collect())
+    });
+
+    block.with_ctx(Context { parent_indent: 0 })
+}
+
+/*
+fn expression_parser<'src, I: Input<'src>>() -> impl Lexer<'src, I, Vec<SpannedToken<'src>>> {
+    let boolean = choice((
+        just("true").to(Token::Boolean(true)),
+        just("false").to(Token::Boolean(false)),
+    ))
+    .labelled("boolean");
+
+    let token = boolean;
+
+    token
+        .map_with(|tok, e| (tok, e.span()))
+        .padded()
+        .repeated()
+        .collect()
+}
+*/
 
 /*
 pub fn lexer<'src, F>() -> impl Parser<
@@ -240,4 +270,39 @@ impl From<LexerError<'_>> for ErrorReport {
             notes: vec![],
         }
     }
+}
+
+#[test]
+fn test_block_parser() {
+    use chumsky::input::Input;
+    use kitty_meta::SourceId;
+
+    let input = r#"
+expr
+expr
+loop:
+    expr
+    loop:
+        expr
+        expr
+    expr
+expr
+"#;
+    let input = input.map_span(move |span| Span::new(SourceId::empty(), span.into_range()));
+
+    let result = block_parser().padded().parse(input);
+
+    let expected = vec![
+        Stmt::Expr,
+        Stmt::Expr,
+        Stmt::Loop(vec![
+            Stmt::Expr,
+            Stmt::Loop(vec![Stmt::Expr, Stmt::Expr]),
+            Stmt::Expr,
+        ]),
+        Stmt::Expr,
+    ];
+
+    assert_eq!(result.output(), Some(&expected));
+    assert!(result.errors().next().is_none());
 }
