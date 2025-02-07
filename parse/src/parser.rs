@@ -1,6 +1,6 @@
 use chumsky::{input::BorrowInput, pratt::*, prelude::*};
 
-use crate::lexer::Token;
+use crate::{lexer::Token, token::Token};
 use kitty_ast::Expr;
 use kitty_meta::{ErrorReport, Span, Spanned};
 

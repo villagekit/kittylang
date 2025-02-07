@@ -1,5 +1,6 @@
 mod lexer;
 mod parser;
+mod token;
 
 pub use lexer::{LexerError, SpannedToken, Token};
 pub use parser::ParserError;

@@ -5,3 +5,4 @@ edition.workspace = true
 
 [dependencies]
 kitty-meta = { path = "../meta" }
+fastnum = "0.1.11"

@@ -1,3 +1,4 @@
+use fastnum::U128;
 use kitty_meta::Spanned;
 
 /// A generic type argument.
@@ -113,7 +114,7 @@ pub enum Literal<'src> {
     String(&'src str),
 
     /// Literal number.
-    Number(f64),
+    Number(U128),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
