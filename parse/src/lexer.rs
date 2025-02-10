@@ -274,7 +274,7 @@ fn block_parser<'src, I: Input<'src>, LineTokens: 'src>(
             .configure(|cfg: JustCfg<String>, ctx: &Context| cfg.seq(ctx.parent_indent.clone()))
             .map(|_| ());
 
-        let new_indent = just(" ").or(just("\t")).repeated().collect();
+        let new_indent = just(" ").or(just("\t")).repeated().at_least(1).collect();
 
         let line = line_parser
             .then_ignore(text::newline())
@@ -287,7 +287,6 @@ fn block_parser<'src, I: Input<'src>, LineTokens: 'src>(
                 },
             )
             .ignore_with_ctx(block_parser)
-            .then_ignore(text::newline())
             .map(BlockToken::Block);
 
         let item = line.or(block);
@@ -341,14 +340,18 @@ expr
         let expected = vec![
             BlockToken::Line(LineToken::Expr),
             BlockToken::Line(LineToken::Expr),
-            /*
-            Stmt::Block(vec![
-                Stmt::Expr,
-                Stmt::Block(vec![Stmt::Expr, Stmt::Block(vec![Stmt::Expr])]),
-                Stmt::Expr,
+            BlockToken::Line(LineToken::BlockStart),
+            BlockToken::Block(vec![
+                BlockToken::Line(LineToken::Expr),
+                BlockToken::Line(LineToken::BlockStart),
+                BlockToken::Block(vec![
+                    BlockToken::Line(LineToken::Expr),
+                    BlockToken::Line(LineToken::BlockStart),
+                    BlockToken::Block(vec![BlockToken::Line(LineToken::Expr)]),
+                ]),
+                BlockToken::Line(LineToken::Expr),
             ]),
-            Stmt::Expr,
-            */
+            BlockToken::Line(LineToken::Expr),
         ];
 
         assert_eq!(result.errors().next(), None);
