@@ -1,5 +1,5 @@
 [package]
-name = "kitty-ast"
+name = "kitty-lexer"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
@@ -12,8 +12,5 @@ keywords.workspace = true
 categories.workspace = true
 
 [dependencies]
-kitty-syntax = { path = "../syntax" }
-text-size = "1.1.0"
-
-[dev-dependencies]
-kitty-parser = { path = "../parser" }
+logos = "0.11.4"
+text-size = "1.0.0"

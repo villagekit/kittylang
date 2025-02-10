@@ -1,5 +1,5 @@
 [package]
-name = "kitty-ast"
+name = "kitty-hir"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
@@ -11,9 +11,12 @@ license.workspace = true
 keywords.workspace = true
 categories.workspace = true
 
+
 [dependencies]
+kitty-ast = { path = "../ast" }
 kitty-syntax = { path = "../syntax" }
-text-size = "1.1.0"
+la-arena = "0.2.0"
+smol_str = "0.1.17"
 
 [dev-dependencies]
 kitty-parser = { path = "../parser" }

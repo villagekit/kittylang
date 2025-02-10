@@ -1,12 +1,17 @@
 [package]
 name = "kitty-core"
 version.workspace = true
+rust-version.workspace = true
 edition.workspace = true
+description.workspace = true
+readme.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [dependencies]
-kitty-meta = { path = "../meta" }
 kitty-ast = { path = "../ast" }
-kitty-parse = { path = "../parse" }
-kitty-value = { path = "../value" }
-kitty-eval = { path = "../eval" }
-kitty-solve = { path = "../solve" }
+kitty-hir = { path = "../hir" }
+kitty-parser = { path = "../parser" }

@@ -1,20 +1,25 @@
 [workspace]
 resolver = "2"
 members = [
-  # "ast",
-  # "core",
-  # "eval",
-  "meta",
-  "parse",
-  # "repl",
-  # "solve",
-  # "value"
+  "ast",
+  "core",
+  "hir",
+  "lexer",
+  "parser",
+  "syntax"
 ]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
 
+rust-version = "1.83.0"
+description = ""
+readme = "README.md"
+homepage = "https://github.com/villagekit/kittylang"
+repository = "https://github.com/villagekit/kittylang"
+license = "MIT OR Apache-2.0"
+keywords = []
+categories = []
+
 [workspace.dependencies]
-chumsky = { version = "1.0.0-alpha.8", features = ["pratt"] }
-internment = "0.8.6"
