@@ -244,38 +244,62 @@ pub(crate) struct Context {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-enum Stmt {
-    Expr,
-    Block(Vec<Stmt>),
+enum BlockToken<LineTokens> {
+    Block(Vec<Self>),
+    Line(LineTokens),
 }
 
-fn block_parser<'src, I: Input<'src>>() -> impl Lexer<'src, I, Vec<Stmt>> {
-    let expr = just("expr"); // TODO
+fn block_parser<'src, I: Input<'src>, LineTokens: 'src>(
+    line_parser: impl Lexer<'src, I, LineTokens> + Clone + 'src,
+) -> impl Lexer<'src, I, Vec<BlockToken<LineTokens>>> {
+    /*
+    let empty_lines = text::inline_whitespace()
+        .then_ignore(text::newline())
+        .repeated();
+    */
 
-    let block = recursive(|block| {
-        let indent = just("".to_string())
-            .configure(|cfg: JustCfg<String>, ctx: &Context| cfg.seq(ctx.parent_indent.clone()));
+    // line = [line whitespace][line content][line whitespace (ignore)][newline]
+    //
+    // or
+    //
+    // same_level_line = [same indent][line content][line whitespace (ignore)][newline]
+    // new_level_line = [more indent][line content][line whitespace (ignore)][newline]
 
-        // TODO implement empty lines, to skip
+    // ohhh, the issue is that we double check indents
+    //  we check on beginning of block, AND we check at beginning of line.
+    //  that's why they did the "repeated" thing.
+    //
+    let block_parser = recursive(|block_parser| {
+        let same_indent = just("".to_string())
+            .configure(|cfg: JustCfg<String>, ctx: &Context| cfg.seq(ctx.parent_indent.clone()))
+            .map(|_| ());
 
-        let expr_stmt = expr.then_ignore(text::newline()).to(Stmt::Expr);
-        let control_flow = just("block:")
-            .then(text::newline())
-            .ignore_then(block)
-            .map(Stmt::Block);
-        let stmt = expr_stmt.or(control_flow);
+        let line = same_indent
+            .clone()
+            .ignore_then(line_parser)
+            .then_ignore(text::newline())
+            .map(BlockToken::Line);
 
-        just(" ")
-            .or(just("\t"))
-            .repeated()
-            .collect()
-            .map(|indent: Vec<&str>| Context {
-                parent_indent: indent.join(""),
-            })
-            .ignore_with_ctx(stmt.separated_by(indent).collect())
+        let new_indent = just(" ").or(just("\t")).repeated().collect();
+
+        let block = same_indent
+            .clone()
+            .ignore_then(
+                new_indent
+                    .map(|indent: Vec<&str>| Context {
+                        parent_indent: indent.join(""),
+                    })
+                    .ignore_with_ctx(block_parser),
+            )
+            .then_ignore(text::newline())
+            .map(BlockToken::Block);
+
+        let item = line.or(block);
+
+        item.repeated().collect()
     });
 
-    block.with_ctx(Context {
+    block_parser.with_ctx(Context {
         parent_indent: "".into(),
     })
 }
@@ -286,8 +310,20 @@ mod tests {
 
     #[test]
     fn test_block_parser() {
-        use chumsky::input::Input;
+        use chumsky::input::Input as ChumskyInput;
         use kitty_meta::SourceId;
+
+        #[derive(Clone, Debug, PartialEq)]
+        enum LineToken {
+            BlockStart,
+            Expr,
+        }
+
+        fn line_parser<'src, I: Input<'src>>() -> impl Lexer<'src, I, LineToken> + Clone {
+            let block_start = just("block:").to(LineToken::BlockStart);
+            let expr = just("expr").to(LineToken::Expr);
+            block_start.or(expr)
+        }
 
         let input = r#"
 expr
@@ -303,17 +339,19 @@ expr
 "#;
         let input = input.map_span(move |span| Span::new(SourceId::empty(), span.into_range()));
 
-        let result = block_parser().padded().parse(input);
+        let result = block_parser(line_parser()).padded().parse(input);
 
         let expected = vec![
-            Stmt::Expr,
-            Stmt::Expr,
+            BlockToken::Line(LineToken::Expr),
+            BlockToken::Line(LineToken::Expr),
+            /*
             Stmt::Block(vec![
                 Stmt::Expr,
                 Stmt::Block(vec![Stmt::Expr, Stmt::Block(vec![Stmt::Expr])]),
                 Stmt::Expr,
             ]),
             Stmt::Expr,
+            */
         ];
 
         assert_eq!(result.errors().next(), None);
