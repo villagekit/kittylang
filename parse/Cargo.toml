@@ -7,3 +7,4 @@ edition.workspace = true
 kitty-meta = { path = "../meta" }
 kitty-ast = { path = "../ast" }
 chumsky = { workspace = true }
+fastnum = "0.1.11"

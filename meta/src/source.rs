@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SourceId(Intern<Vec<String>>);
 
 impl fmt::Display for SourceId {
@@ -24,7 +24,6 @@ impl fmt::Debug for SourceId {
 }
 
 impl SourceId {
-    #[cfg(test)]
     pub fn empty() -> Self {
         SourceId(Intern::new(Vec::new()))
     }

@@ -1,0 +1,5 @@
+export fn main() =>
+  let add = fn (x, y) => x + y
+  let mul = fn (x, y) => x * y
+  let x = mul(add(5, 42), 2)
+  add(x, 3.5)

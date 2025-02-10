@@ -1,0 +1,34 @@
+import Length from @std/units
+import from @std/3d-math
+  Vector3
+  Quaternion
+
+export struct Transform
+  prop translation: Vector3[Length]
+
+  prop rotation: Quaternion
+
+  prop scale: Vector3
+
+  fn translate(self, x: Length, y: Length, z: Length): Self =>
+    Self
+      ...self
+      translation: Vector3
+        self.translation.x + x
+        self.translation.y + y
+        self.translation.z + z
+
+impl Default for Transform
+  fn default()
+    Self
+      translation: Vector3[Length].default()
+      rotation: Quaternion.default()
+      scale: Vector3.default()
+
+export trait Object3d
+  prop transform: Transform = Transform.default()
+
+  fn translate(self, x: Length, y: Length, z: Length): Self =>
+    Self
+      ...self
+      transform: self.transform.translate(x, y, z)

@@ -1,14 +1,14 @@
 [workspace]
 resolver = "2"
 members = [
-  "ast",
-  "core",
-  "eval",
+  # "ast",
+  # "core",
+  # "eval",
   "meta",
   "parse",
-  "repl",
-  "solve",
-  "value"
+  # "repl",
+  # "solve",
+  # "value"
 ]
 
 [workspace.package]
