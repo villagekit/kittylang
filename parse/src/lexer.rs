@@ -276,6 +276,7 @@ fn block_parser<'src, I: Input<'src>, Token: 'src>(
         let tokens = token_parser
             .map(TokenTree::Token)
             .repeated()
+            .collect()
             .then_ignore(text::newline());
 
         let block = new_indent
@@ -284,10 +285,9 @@ fn block_parser<'src, I: Input<'src>, Token: 'src>(
                     parent_indent: extra.ctx().parent_indent.clone() + &indent.join(""),
                 },
             )
-            .ignore_with_ctx(block_parser)
-            .map(|b| TokenTree::Tree(Delim::Block, b));
+            .ignore_with_ctx(block_parser);
 
-        let item = tokens.or(block);
+        let item = tokens.or(block).map(|b| TokenTree::Tree(Delim::Block, b));
 
         item.separated_by(same_indent).collect()
     });
