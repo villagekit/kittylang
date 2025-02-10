@@ -5,7 +5,7 @@ use chumsky::{
     primitive::JustCfg,
 };
 
-use kitty_meta::{ErrorReport, Span};
+use kitty_meta::{ErrorReport, Span, Spanned};
 
 use crate::{token::SpannedToken, Token};
 
@@ -243,32 +243,29 @@ pub(crate) struct Context {
     pub parent_indent: String,
 }
 
-#[derive(Clone, Debug, PartialEq)]
-enum BlockToken<LineTokens> {
-    Block(Vec<Self>),
-    Line(LineTokens),
+#[derive(Copy, Clone, Debug, PartialEq)]
+enum Delim {
+    Block,
+    Paren,
+    Brace,
+    Bracket,
 }
 
-fn block_parser<'src, I: Input<'src>, LineTokens: 'src>(
-    line_parser: impl Lexer<'src, I, LineTokens> + Clone + 'src,
-) -> impl Lexer<'src, I, Vec<BlockToken<LineTokens>>> {
+#[derive(Clone, Debug, PartialEq)]
+enum TokenTree<Token> {
+    Tree(Delim, Vec<Self>),
+    Token(Token),
+}
+
+fn block_parser<'src, I: Input<'src>, Token: 'src>(
+    token_parser: impl Lexer<'src, I, Token> + Clone + 'src,
+) -> impl Lexer<'src, I, Vec<TokenTree<Token>>> {
     /*
     let empty_lines = text::inline_whitespace()
         .then_ignore(text::newline())
         .repeated();
     */
 
-    // line = [line whitespace][line content][line whitespace (ignore)][newline]
-    //
-    // or
-    //
-    // same_level_line = [same indent][line content][line whitespace (ignore)][newline]
-    // new_level_line = [more indent][line content][line whitespace (ignore)][newline]
-
-    // ohhh, the issue is that we double check indents
-    //  we check on beginning of block, AND we check at beginning of line.
-    //  that's why they did the "repeated" thing.
-    //
     let block_parser = recursive(|block_parser| {
         let same_indent = just("".to_string())
             .configure(|cfg: JustCfg<String>, ctx: &Context| cfg.seq(ctx.parent_indent.clone()))
@@ -276,9 +273,10 @@ fn block_parser<'src, I: Input<'src>, LineTokens: 'src>(
 
         let new_indent = just(" ").or(just("\t")).repeated().at_least(1).collect();
 
-        let line = line_parser
-            .then_ignore(text::newline())
-            .map(BlockToken::Line);
+        let tokens = token_parser
+            .map(TokenTree::Token)
+            .repeated()
+            .then_ignore(text::newline());
 
         let block = new_indent
             .map_with(
@@ -287,12 +285,11 @@ fn block_parser<'src, I: Input<'src>, LineTokens: 'src>(
                 },
             )
             .ignore_with_ctx(block_parser)
-            .map(BlockToken::Block);
+            .map(|b| TokenTree::Tree(Delim::Block, b));
 
-        let item = line.or(block);
-        let items = item.separated_by(same_indent).collect();
+        let item = tokens.or(block);
 
-        items
+        item.separated_by(same_indent).collect()
     });
 
     block_parser.with_ctx(Context {
@@ -310,14 +307,14 @@ mod tests {
         use kitty_meta::SourceId;
 
         #[derive(Clone, Debug, PartialEq)]
-        enum LineToken {
+        enum Token {
             BlockStart,
             Expr,
         }
 
-        fn line_parser<'src, I: Input<'src>>() -> impl Lexer<'src, I, LineToken> + Clone {
-            let block_start = just("block:").to(LineToken::BlockStart);
-            let expr = just("expr").to(LineToken::Expr);
+        fn line_parser<'src, I: Input<'src>>() -> impl Lexer<'src, I, Token> + Clone {
+            let block_start = just("block:").to(Token::BlockStart);
+            let expr = just("expr").to(Token::Expr);
             block_start.or(expr)
         }
 
@@ -338,20 +335,26 @@ expr
         let result = block_parser(line_parser()).padded().parse(input);
 
         let expected = vec![
-            BlockToken::Line(LineToken::Expr),
-            BlockToken::Line(LineToken::Expr),
-            BlockToken::Line(LineToken::BlockStart),
-            BlockToken::Block(vec![
-                BlockToken::Line(LineToken::Expr),
-                BlockToken::Line(LineToken::BlockStart),
-                BlockToken::Block(vec![
-                    BlockToken::Line(LineToken::Expr),
-                    BlockToken::Line(LineToken::BlockStart),
-                    BlockToken::Block(vec![BlockToken::Line(LineToken::Expr)]),
-                ]),
-                BlockToken::Line(LineToken::Expr),
-            ]),
-            BlockToken::Line(LineToken::Expr),
+            TokenTree::Token(Token::Expr),
+            TokenTree::Token(Token::Expr),
+            TokenTree::Token(Token::BlockStart),
+            TokenTree::Tree(
+                Delim::Block,
+                vec![
+                    TokenTree::Token(Token::Expr),
+                    TokenTree::Token(Token::BlockStart),
+                    TokenTree::Tree(
+                        Delim::Block,
+                        vec![
+                            TokenTree::Token(Token::Expr),
+                            TokenTree::Token(Token::BlockStart),
+                            TokenTree::Tree(Delim::Block, vec![TokenTree::Token(Token::Expr)]),
+                        ],
+                    ),
+                    TokenTree::Token(Token::Expr),
+                ],
+            ),
+            TokenTree::Token(Token::Expr),
         ];
 
         assert_eq!(result.errors().next(), None);
