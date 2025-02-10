@@ -245,7 +245,7 @@ pub(crate) struct Context {
 
 #[derive(Clone, Debug, PartialEq)]
 enum BlockToken<LineTokens> {
-    Block(Vec<Self>),
+    Block(LineTokens, Vec<Self>),
     Line(LineTokens),
 }
 
@@ -274,29 +274,28 @@ fn block_parser<'src, I: Input<'src>, LineTokens: 'src>(
             .configure(|cfg: JustCfg<String>, ctx: &Context| cfg.seq(ctx.parent_indent.clone()))
             .map(|_| ());
 
-        let line = same_indent
+        let next_line = same_indent
             .clone()
             .ignore_then(line_parser)
-            .then_ignore(text::newline())
-            .map(BlockToken::Line);
+            .then_ignore(text::newline());
+
+        let line = next_line.clone().map(BlockToken::Line);
+
+        let block = next_line
+            .clone()
+            .then(block_parser)
+            .map(|(l, b)| BlockToken::Block(l, b));
+
+        let item = line.or(block);
+        let items = item.separated_by(same_indent).collect();
 
         let new_indent = just(" ").or(just("\t")).repeated().collect();
 
-        let block = same_indent
-            .clone()
-            .ignore_then(
-                new_indent
-                    .map(|indent: Vec<&str>| Context {
-                        parent_indent: indent.join(""),
-                    })
-                    .ignore_with_ctx(block_parser),
-            )
-            .then_ignore(text::newline())
-            .map(BlockToken::Block);
-
-        let item = line.or(block);
-
-        item.repeated().collect()
+        new_indent
+            .map(|indent: Vec<&str>| Context {
+                parent_indent: indent.join(""),
+            })
+            .ignore_with_ctx(items)
     });
 
     block_parser.with_ctx(Context {
