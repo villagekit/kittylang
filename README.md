@@ -15,6 +15,13 @@
 - [flix/flix](https://github.com/flix/flix)
 - [sway/sway](https://docs.fuel.network/docs/sway/)
 - https://mckayla.blog/posts/all-you-need-is-data-and-functions.html
+- https://lunacookies.github.io/lang/
+  - https://github.com/lunacookies/eldiro
+  - https://github.com/lunacookies/fictional-dollop
+  - https://github.com/lunacookies/haze
+  - https://github.com/gingerbread-lang/gingerbread
+  - https://github.com/capy-language/capy
+- https://github.com/naalit/pika/
 
 ## TODO
 
