@@ -21,6 +21,55 @@ impl<'src> Lexer<'src> {
             queued_tokens,
         }
     }
+
+    fn handle_whitespace(&mut self) -> (Token, Span) {
+        let span = self.lex.span();
+        let ws = &self.lex.source()[span.clone()];
+
+        let mut indent = 0;
+
+        for ch in ws.chars() {
+            match ch {
+                ' ' => indent += 1,
+                // TODO handle tabs correctly
+                '\t' => indent += 4,
+                _ => break,
+            }
+        }
+
+        // Get the current indent level (the top of our stack).
+        let current_indent = *self.indents.last().unwrap();
+
+        match indent.cmp(&current_indent) {
+            Ordering::Greater => {
+                // Increased indent: push new level and queue an Indent token.
+                self.indents.push(indent);
+                let indent_span = (span.start + current_indent)..span.end;
+                self.queued_tokens.push((Token::Indent, indent_span));
+            }
+            Ordering::Less => {
+                // Decreased indent: pop until we match the new level, queuing Dedent tokens.
+                while let Some(&level) = self.indents.last() {
+                    if level > indent {
+                        self.indents.pop();
+                        let dedent_span = span.end..span.end;
+                        self.queued_tokens.push((Token::Dedent, dedent_span));
+                    } else {
+                        break;
+                    }
+                }
+            }
+            Ordering::Equal => {}
+        }
+
+        // If queued an indent or dedent, return that.
+        if let Some((token, span)) = self.queued_tokens.pop() {
+            (token, span)
+        } else {
+            // Otherwise return original whitespace
+            (Token::Whitespace, span)
+        }
+    }
 }
 
 impl<'src> Iterator for Lexer<'src> {
@@ -34,7 +83,6 @@ impl<'src> Iterator for Lexer<'src> {
 
         // Get the next token.
         let token = self.lex.next();
-        let span = self.lex.span();
 
         // If the last token was a newline (or this is the first token)
         //   and the current token is whitespace,
@@ -42,51 +90,8 @@ impl<'src> Iterator for Lexer<'src> {
         if (self.last_token.is_none() || self.last_token == Some(Ok(Token::Newline)))
             && token == Some(Ok(Token::Whitespace))
         {
-            let ws = &self.lex.source()[span.clone()];
-
-            let mut indent = 0;
-
-            for ch in ws.chars() {
-                match ch {
-                    ' ' => indent += 1,
-                    // TODO handle tabs correctly
-                    '\t' => indent += 4,
-                    _ => break,
-                }
-            }
-
-            // Get the current indent level (the top of our stack).
-            let current_indent = *self.indents.last().unwrap();
-
-            match indent.cmp(&current_indent) {
-                Ordering::Greater => {
-                    // Increased indent: push new level and queue an Indent token.
-                    self.indents.push(indent);
-                    let indent_span = (span.start + current_indent)..span.end;
-                    self.queued_tokens.push((Token::Indent, indent_span));
-                }
-                Ordering::Less => {
-                    // Decreased indent: pop until we match the new level, queuing Dedent tokens.
-                    while let Some(&level) = self.indents.last() {
-                        if level > indent {
-                            self.indents.pop();
-                            let dedent_span = span.end..span.end;
-                            self.queued_tokens.push((Token::Dedent, dedent_span));
-                        } else {
-                            break;
-                        }
-                    }
-                }
-                Ordering::Equal => {}
-            }
-
-            // If queued an indent or dedent, return that.
-            return if let Some((token, span)) = self.queued_tokens.pop() {
-                Some((Ok(token), span))
-            } else {
-                // Otherwise return original whitespace
-                Some((Ok(Token::Whitespace), span))
-            };
+            let (next_token, next_span) = self.handle_whitespace();
+            return Some((Ok(next_token), next_span));
         }
 
         // If we have no more tokens but still indented, return dedents.
