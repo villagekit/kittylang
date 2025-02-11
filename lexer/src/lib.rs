@@ -2,14 +2,24 @@ use logos::{Lexer as LogosLexer, Logos, Span};
 use std::{cmp::Ordering, fmt};
 
 pub struct Lexer<'src> {
-    inner: LogosLexer<'src, Token>,
+    lex: LogosLexer<'src, Token>,
+    last_token: Option<Result<Token, <Token as Logos<'src>>::Error>>,
+    indents: Vec<usize>,
+    queued_tokens: Vec<(Token, Span)>,
 }
 
 impl<'src> Lexer<'src> {
     pub fn new(input: &'src str) -> Self {
-        let extras = LexerExtras::new();
-        let inner = Token::lexer_with_extras(input, extras);
-        Self { inner }
+        let lex = Token::lexer(input);
+        let last_token = None;
+        let indents = vec![0];
+        let queued_tokens = Vec::new();
+        Self {
+            lex,
+            last_token,
+            indents,
+            queued_tokens,
+        }
     }
 }
 
@@ -17,54 +27,95 @@ impl<'src> Iterator for Lexer<'src> {
     type Item = (Result<Token, <Token as Logos<'src>>::Error>, Span);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let inner = &mut self.inner;
-
-        // If we have some tokens queued, return them first.
-        if let Some((token, span)) = inner.extras.queued_tokens.pop() {
+        // If we have some tokens queued, return them first
+        if let Some((token, span)) = self.queued_tokens.pop() {
             return Some((Ok(token), span));
         }
 
-        // Get the next token (and corresponding span).
-        let res = inner.next().map(|token| (token, inner.span()));
+        // Get the next token.
+        let token = self.lex.next();
+        let span = self.lex.span();
+
+        // If the last token was a newline (or this is the first token)
+        //   and the current token is whitespace,
+        //   return / queue any indents.
+        if (self.last_token.is_none() || self.last_token == Some(Ok(Token::Newline)))
+            && token == Some(Ok(Token::Whitespace))
+        {
+            let ws = &self.lex.source()[span.clone()];
+
+            let mut indent = 0;
+
+            for ch in ws.chars() {
+                match ch {
+                    ' ' => indent += 1,
+                    // TODO handle tabs correctly
+                    '\t' => indent += 4,
+                    _ => break,
+                }
+            }
+
+            // Get the current indent level (the top of our stack).
+            let current_indent = *self.indents.last().unwrap();
+
+            match indent.cmp(&current_indent) {
+                Ordering::Greater => {
+                    // Increased indent: push new level and queue an Indent token.
+                    self.indents.push(indent);
+                    let indent_span = (span.start + current_indent)..span.end;
+                    self.queued_tokens.push((Token::Indent, indent_span));
+                }
+                Ordering::Less => {
+                    // Decreased indent: pop until we match the new level, queuing Dedent tokens.
+                    while let Some(&level) = self.indents.last() {
+                        if level > indent {
+                            self.indents.pop();
+                            let dedent_span = span.end..span.end;
+                            self.queued_tokens.push((Token::Dedent, dedent_span));
+                        } else {
+                            break;
+                        }
+                    }
+                }
+                Ordering::Equal => {}
+            }
+
+            // If queued an indent or dedent, return that.
+            return if let Some((token, span)) = self.queued_tokens.pop() {
+                Some((Ok(token), span))
+            } else {
+                // Otherwise return original whitespace
+                Some((Ok(Token::Whitespace), span))
+            };
+        }
 
         // If we have no more tokens but still indented, return dedents.
-        if res.is_none() && inner.extras.indent_stack.len() > 1 {
-            inner.extras.indent_stack.pop();
-            let end = inner.source().len();
+        if token.is_none() && self.indents.len() > 1 {
+            self.indents.pop();
+            let end = self.lex.source().len();
             let span = end..end;
             let token = Token::Dedent;
             return Some((Ok(token), span));
         }
 
-        res
-    }
-}
+        self.last_token = token;
 
-#[derive(Debug)]
-pub struct LexerExtras {
-    indent_stack: Vec<usize>,
-    queued_tokens: Vec<(Token, Span)>,
-}
-
-impl LexerExtras {
-    fn new() -> Self {
-        LexerExtras {
-            indent_stack: vec![0],
-            queued_tokens: Vec::new(),
-        }
+        token.map(|token| (token, self.lex.span()))
     }
 }
 
 #[derive(Logos, Debug, Copy, Clone, PartialEq)]
-#[logos(extras = LexerExtras)]
 pub enum Token {
-    #[regex(r"(\r)?\n", handle_newline)]
-    Newline,
+    #[regex(r"[ \t\f]+(\r)?\n")]
+    EmptyLine,
 
     #[regex(r"[ \t\f]+")]
     Whitespace,
 
-    // These tokens will be generated manually in our handle_newline callback.
+    #[regex(r"(\r)?\n")]
+    Newline,
+
+    // These tokens will be generated manually by our iterator wrapping Logos.
     Indent,
     Dedent,
 
@@ -120,8 +171,9 @@ impl Token {
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
-            Self::Newline => "newline",
+            Self::EmptyLine => "empty-line",
             Self::Whitespace => "whitespace",
+            Self::Newline => "newline",
             Self::Indent => "indent",
             Self::Dedent => "dedent",
             Self::FnKw => "‘fn’",
@@ -140,60 +192,6 @@ impl fmt::Display for Token {
             Self::Comment => "comment",
         })
     }
-}
-
-/// This callback is called whenever a newline is lexed.
-/// It examines the following whitespace (if any) to determine the new indentation level.
-fn handle_newline(lex: &mut LogosLexer<Token>) -> Token {
-    // Look at the remaining input to count leading whitespace.
-    let remainder = lex.remainder();
-    let mut indent = 0;
-
-    // For simplicity, assume a space counts as 1 and a tab as 4.
-    for ch in remainder.chars() {
-        match ch {
-            ' ' => indent += 1,
-            '\t' => indent += 4,
-            _ => break,
-        }
-    }
-    // Advance the lexer past the counted whitespace.
-    lex.bump(indent);
-
-    // Get the current indent level (the top of our stack).
-    let current_indent = *lex.extras.indent_stack.last().unwrap();
-
-    let current_span = lex.span();
-
-    match indent.cmp(&current_indent) {
-        Ordering::Greater => {
-            // Increased indent: push new level and queue an Indent token.
-            lex.extras.indent_stack.push(indent);
-            let indent_span = Span {
-                start: current_span.start + current_indent,
-                end: current_span.end,
-            };
-            lex.extras.queued_tokens.push((Token::Indent, indent_span));
-        }
-        Ordering::Less => {
-            // Decreased indent: pop until we match the new level, queuing Dedent tokens.
-            while let Some(&level) = lex.extras.indent_stack.last() {
-                if level > indent {
-                    lex.extras.indent_stack.pop();
-                    let dedent_span = Span {
-                        start: current_span.end,
-                        end: current_span.end,
-                    };
-                    lex.extras.queued_tokens.push((Token::Dedent, dedent_span));
-                } else {
-                    break;
-                }
-            }
-        }
-        Ordering::Equal => {}
-    }
-    // Always return the newline token.
-    Token::Newline
 }
 
 #[cfg(test)]
@@ -219,8 +217,8 @@ mod tests {
     }
 
     #[test]
-    fn lex_spaces_and_newlines() {
-        check_token("   ", Token::Whitespace);
+    fn lex_empty_line() {
+        check_token("   \n", Token::EmptyLine);
     }
 
     #[test]
