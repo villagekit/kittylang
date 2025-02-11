@@ -1,5 +1,5 @@
 use logos::{Lexer as LogosLexer, Logos, Span};
-use std::fmt;
+use std::{cmp::Ordering, fmt};
 
 pub struct Lexer<'src> {
     inner: LogosLexer<'src, Token>,
@@ -17,11 +17,26 @@ impl<'src> Iterator for Lexer<'src> {
     type Item = (Result<Token, <Token as Logos<'src>>::Error>, Span);
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some((token, span)) = self.inner.extras.queued_tokens.pop() {
+        let inner = &mut self.inner;
+
+        // If we have some tokens queued, return them first.
+        if let Some((token, span)) = inner.extras.queued_tokens.pop() {
             return Some((Ok(token), span));
         }
 
-        self.inner.next().map(|token| (token, self.inner.span()))
+        // Get the next token (and corresponding span).
+        let res = inner.next().map(|token| (token, inner.span()));
+
+        // If we have no more tokens but still indented, return dedents.
+        if res.is_none() && inner.extras.indent_stack.len() > 1 {
+            inner.extras.indent_stack.pop();
+            let end = inner.source().len();
+            let span = end..end;
+            let token = Token::Dedent;
+            return Some((Ok(token), span));
+        }
+
+        res
     }
 }
 
@@ -150,28 +165,32 @@ fn handle_newline(lex: &mut LogosLexer<Token>) -> Token {
 
     let current_span = lex.span();
 
-    if indent > current_indent {
-        // Increased indent: push new level and queue an Indent token.
-        lex.extras.indent_stack.push(indent);
-        let indent_span = Span {
-            start: current_span.start + current_indent,
-            end: current_span.end,
-        };
-        lex.extras.queued_tokens.push((Token::Indent, indent_span));
-    } else if indent < current_indent {
-        // Decreased indent: pop until we match the new level, queuing Dedent tokens.
-        while let Some(&level) = lex.extras.indent_stack.last() {
-            if level > indent {
-                lex.extras.indent_stack.pop();
-                let dedent_span = Span {
-                    start: current_span.end,
-                    end: current_span.end,
-                };
-                lex.extras.queued_tokens.push((Token::Dedent, dedent_span));
-            } else {
-                break;
+    match indent.cmp(&current_indent) {
+        Ordering::Greater => {
+            // Increased indent: push new level and queue an Indent token.
+            lex.extras.indent_stack.push(indent);
+            let indent_span = Span {
+                start: current_span.start + current_indent,
+                end: current_span.end,
+            };
+            lex.extras.queued_tokens.push((Token::Indent, indent_span));
+        }
+        Ordering::Less => {
+            // Decreased indent: pop until we match the new level, queuing Dedent tokens.
+            while let Some(&level) = lex.extras.indent_stack.last() {
+                if level > indent {
+                    lex.extras.indent_stack.pop();
+                    let dedent_span = Span {
+                        start: current_span.end,
+                        end: current_span.end,
+                    };
+                    lex.extras.queued_tokens.push((Token::Dedent, dedent_span));
+                } else {
+                    break;
+                }
             }
         }
+        Ordering::Equal => {}
     }
     // Always return the newline token.
     Token::Newline
@@ -182,101 +201,120 @@ mod tests {
     use super::*;
     use crate::Lexer;
 
-    fn check(input: &str, expected_token: Token) {
+    fn check_token(input: &str, expected_token: Token) {
         let mut lexer = Lexer::new(input);
 
-        let (actual_token, _span) = lexer.next().unwrap();
-        assert!(actual_token.is_ok());
+        let (actual_token, actual_span) = lexer.next().unwrap();
         assert_eq!(expected_token, actual_token.unwrap());
+        assert_eq!(0..input.len(), actual_span);
+    }
+
+    fn check_tokens(input: &str, expected_tokens: Vec<(Token, Span)>) {
+        let lexer = Lexer::new(input);
+
+        let actual_tokens: Vec<(Token, Span)> =
+            lexer.map(|(tok, span)| (tok.unwrap(), span)).collect();
+
+        assert_eq!(expected_tokens, actual_tokens);
     }
 
     #[test]
     fn lex_spaces_and_newlines() {
-        check("  \n ", Token::Whitespace);
+        check_token("   ", Token::Whitespace);
     }
 
     #[test]
     fn lex_fn_keyword() {
-        check("fn", Token::FnKw);
+        check_token("fn", Token::FnKw);
     }
 
     #[test]
     fn lex_let_keyword() {
-        check("let", Token::LetKw);
+        check_token("let", Token::LetKw);
     }
 
     #[test]
     fn lex_alphabetic_identifier() {
-        check("abcd", Token::Ident);
+        check_token("abcd", Token::Ident);
     }
 
     #[test]
     fn lex_alphanumeric_identifier() {
-        check("ab123cde456", Token::Ident);
+        check_token("ab123cde456", Token::Ident);
     }
 
     #[test]
     fn lex_mixed_case_identifier() {
-        check("ABCdef", Token::Ident);
+        check_token("ABCdef", Token::Ident);
     }
 
     #[test]
     fn lex_single_char_identifier() {
-        check("x", Token::Ident);
+        check_token("x", Token::Ident);
     }
 
     #[test]
     fn lex_number() {
-        check("123456", Token::Number);
+        check_token("123456", Token::Number);
     }
 
     #[test]
     fn lex_plus() {
-        check("+", Token::Plus);
+        check_token("+", Token::Plus);
     }
 
     #[test]
     fn lex_minus() {
-        check("-", Token::Minus);
+        check_token("-", Token::Minus);
     }
 
     #[test]
     fn lex_star() {
-        check("*", Token::Star);
+        check_token("*", Token::Star);
     }
 
     #[test]
     fn lex_slash() {
-        check("/", Token::Slash);
+        check_token("/", Token::Slash);
     }
 
     #[test]
     fn lex_equals() {
-        check("=", Token::Equals);
+        check_token("=", Token::Equals);
     }
 
     #[test]
     fn lex_left_parenthesis() {
-        check("(", Token::LParen);
+        check_token("(", Token::LParen);
     }
 
     #[test]
     fn lex_right_parenthesis() {
-        check(")", Token::RParen);
+        check_token(")", Token::RParen);
     }
 
     #[test]
     fn lex_left_brace() {
-        check("{", Token::LBrace);
+        check_token("{", Token::LBrace);
     }
 
     #[test]
     fn lex_right_brace() {
-        check("}", Token::RBrace);
+        check_token("}", Token::RBrace);
     }
 
     #[test]
     fn lex_comment() {
-        check("# foo", Token::Comment);
+        check_token("# foo", Token::Comment);
+    }
+
+    #[test]
+    fn lex_indentation() {
+        let input = r"fn foo()
+  fn bar()
+    baz
+";
+        let expected = vec![(Token::FnKw, 0..2)];
+        check_tokens(input, expected);
     }
 }
