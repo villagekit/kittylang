@@ -12,3 +12,4 @@ keywords.workspace = true
 categories.workspace = true
 
 [dependencies]
+prettydiff = "0.8.0"

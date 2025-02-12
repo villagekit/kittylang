@@ -1,3 +1,4 @@
+use prettydiff::diff_lines;
 use std::fs;
 use std::panic::RefUnwindSafe;
 
@@ -45,12 +46,22 @@ pub fn run_tests(test_fn: impl Fn(&str) -> String + RefUnwindSafe) {
             let result = std::panic::catch_unwind(|| test_fn(&source));
             match result {
                 Ok(actual) => {
+                    let actual = actual.trim();
                     if actual != expected {
                         did_any_test_fail = true;
-                        println!("Test case {} failed in file {:?}:", i + 1, test_path);
+                        println!("Test case {} failed in file {:?}:\n", i + 1, test_path);
+                        println!(
+                            "len, expected: {}, actual: {}",
+                            expected.len(),
+                            actual.len()
+                        );
+                        println!("{}", diff_lines(&expected, actual));
+
+                        /*
                         println!("Source:\n{}\n", source);
                         println!("Expected:\n{}\n", expected);
                         println!("Got:\n{}\n", actual);
+                        */
                     }
                 }
                 Err(_) => {
@@ -154,7 +165,7 @@ fn parse_test_cases(file: &str) -> Vec<(String, String)> {
             }
             expected_lines.push(lines.next().unwrap());
         }
-        let expected = expected_lines.join("\n");
+        let expected = expected_lines.join("\n").trim().to_string();
 
         tests.push((source, expected));
     }
@@ -167,19 +178,3 @@ fn is_header_line(line: &str) -> bool {
     let trimmed = line.trim();
     !trimmed.is_empty() && trimmed.chars().all(|c| c == '=')
 }
-
-// === Example usage ===
-//
-// Suppose you have a function `parse_source` that turns source code into a string
-// representation of a parse tree. You could run your tests like so:
-//
-// ```rust
-// fn parse_source(input: &str) -> String {
-//     // ... your parsing logic ...
-//     format!("(source_file (function_definition ...))")
-// }
-//
-// fn main() {
-//     run_tests(parse_source);
-// }
-// ```

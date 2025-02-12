@@ -20,6 +20,9 @@ pub enum Token {
     #[regex(r"(\p{XID_Start}|_)\p{XID_Continue}*")]
     Identifier,
 
+    #[regex(r"@[a-zA-Z0-9-]+\/[a-zA-Z0-9-]")]
+    Package,
+
     #[token("(")]
     ParenOpen,
     #[token(")")]
@@ -137,6 +140,7 @@ impl fmt::Display for Token {
             Self::String => "string",
             Self::Number => "number",
             Self::Identifier => "identifier",
+            Self::Package => "package",
             Self::ParenOpen => "‘(’",
             Self::ParenClose => "‘)’",
             Self::BraceOpen => "‘{’",
