@@ -15,5 +15,6 @@ categories.workspace = true
 logos = "0.15.0"
 peek-again = "0.4.0"
 text-size = "1.1.1"
+fastnum = "0.1.13"
 
 [dev-dependencies]

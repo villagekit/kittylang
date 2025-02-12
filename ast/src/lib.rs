@@ -1,3 +1,4 @@
+pub mod number;
 pub mod validation;
 
 use kitty_syntax::{SyntaxElement, SyntaxKind, SyntaxNode, SyntaxToken};

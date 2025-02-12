@@ -1,3 +1,4 @@
+use fastnum::{decimal, D128};
 use logos::Logos;
 use std::fmt;
 
@@ -5,55 +6,52 @@ use std::fmt;
 pub enum Token {
     #[regex(r"[ \t\f]+")]
     Whitespace,
-
     #[regex(r"(\r)?\n")]
     Newline,
 
-    // These tokens will be generated manually by our iterator wrapping Logos.
+    // These tokens will be generated manually by our indenter wrapping Logos.
     Indent,
     Dedent,
 
-    #[token("fn")]
-    FnKw,
-
-    #[token("let")]
-    LetKw,
-
-    #[regex("[A-Za-z_][A-Za-z0-9_]*")]
-    Ident,
-
-    #[regex("[0-9]+")]
+    #[regex(r#""([^"\\]|\\t|\\u|\\n|\\")*""#)]
+    String,
+    #[regex(r"-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?")]
     Number,
 
-    #[token("+")]
-    Plus,
-
-    #[token("-")]
-    Minus,
-
-    #[token("*")]
-    Star,
-
-    #[token("/")]
-    Slash,
-
-    #[token("=")]
-    Equals,
+    #[regex(r"(\p{XID_Start}|_)\p{XID_Continue}*")]
+    Identifier,
 
     #[token("(")]
-    LParen,
-
+    ParenOpen,
     #[token(")")]
-    RParen,
-
+    ParenClose,
     #[token("{")]
-    LBrace,
-
+    BraceOpen,
     #[token("}")]
-    RBrace,
+    BraceClose,
+    #[token("[")]
+    BracketOpen,
+    #[token("]")]
+    BracketClose,
 
     #[regex("#.*")]
     Comment,
+
+    #[token("fn")]
+    Fn,
+    #[token("let")]
+    Let,
+
+    #[token("+")]
+    Plus,
+    #[token("-")]
+    Minus,
+    #[token("*")]
+    Star,
+    #[token("/")]
+    Slash,
+    #[token("=")]
+    Equals,
 }
 
 impl Token {
@@ -69,19 +67,22 @@ impl fmt::Display for Token {
             Self::Newline => "newline",
             Self::Indent => "indent",
             Self::Dedent => "dedent",
-            Self::FnKw => "‘fn’",
-            Self::LetKw => "‘let’",
-            Self::Ident => "identifier",
+            Self::String => "string",
             Self::Number => "number",
+            Self::Identifier => "identifier",
+            Self::ParenOpen => "‘(’",
+            Self::ParenClose => "‘)’",
+            Self::BraceOpen => "‘{’",
+            Self::BraceClose => "‘}’",
+            Self::BracketOpen => "‘[’",
+            Self::BracketClose => "‘]’",
+            Self::Fn => "‘fn’",
+            Self::Let => "‘let’",
             Self::Plus => "‘+’",
             Self::Minus => "‘-’",
             Self::Star => "‘*’",
             Self::Slash => "‘/’",
             Self::Equals => "‘=’",
-            Self::LParen => "‘(’",
-            Self::RParen => "‘)’",
-            Self::LBrace => "‘{’",
-            Self::RBrace => "‘}’",
             Self::Comment => "comment",
         })
     }
@@ -107,32 +108,32 @@ mod tests {
 
     #[test]
     fn lex_fn_keyword() {
-        check_token("fn", Token::FnKw);
+        check_token("fn", Token::Fn);
     }
 
     #[test]
     fn lex_let_keyword() {
-        check_token("let", Token::LetKw);
+        check_token("let", Token::Let);
     }
 
     #[test]
     fn lex_alphabetic_identifier() {
-        check_token("abcd", Token::Ident);
+        check_token("abcd", Token::Identifier);
     }
 
     #[test]
     fn lex_alphanumeric_identifier() {
-        check_token("ab123cde456", Token::Ident);
+        check_token("ab123cde456", Token::Identifier);
     }
 
     #[test]
     fn lex_mixed_case_identifier() {
-        check_token("ABCdef", Token::Ident);
+        check_token("ABCdef", Token::Identifier);
     }
 
     #[test]
     fn lex_single_char_identifier() {
-        check_token("x", Token::Ident);
+        check_token("x", Token::Identifier);
     }
 
     #[test]
@@ -167,22 +168,22 @@ mod tests {
 
     #[test]
     fn lex_left_parenthesis() {
-        check_token("(", Token::LParen);
+        check_token("(", Token::ParenOpen);
     }
 
     #[test]
     fn lex_right_parenthesis() {
-        check_token(")", Token::RParen);
+        check_token(")", Token::ParenClose);
     }
 
     #[test]
     fn lex_left_brace() {
-        check_token("{", Token::LBrace);
+        check_token("{", Token::BraceOpen);
     }
 
     #[test]
     fn lex_right_brace() {
-        check_token("}", Token::RBrace);
+        check_token("}", Token::BraceClose);
     }
 
     #[test]
