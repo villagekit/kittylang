@@ -60,3 +60,5 @@
     - Always parse `<>` in favor of generics
 - Use labelled arguments like Gleam: https://tour.gleam.run/everything/#functions-labelled-arguments
 - Match like Gleam: https://tour.gleam.run/everything/#data-types-record-pattern-matching
+- `True` and `False` are part of a `Boolean` enum
+  - but they are aliased so you can use as `True` and `False`.
