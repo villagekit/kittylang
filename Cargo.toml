@@ -6,7 +6,8 @@ members = [
   # "hir",
   "lexer",
   # "parser",
-  # "syntax"
+  # "syntax",
+  "test-utils"
 ]
 
 [workspace.package]

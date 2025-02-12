@@ -31,6 +31,22 @@ mod tests {
     use super::*;
     use crate::Lexer;
 
+    #[test]
+    fn run_tests() {
+        kitty_test_utils::run_tests(|input| {
+            let lexer = Lexer::new(input);
+
+            let actual_tokens: Vec<(Token, Span)> =
+                lexer.map(|(tok, span)| (tok.unwrap(), span)).collect();
+
+            actual_tokens
+                .into_iter()
+                .map(|(token, span)| format!("{:?}@{:?}", token, span))
+                .collect::<Vec<_>>()
+                .join("\n")
+        });
+    }
+
     fn check_tokens(input: &str, expected_tokens: Vec<(Token, Span)>) {
         let lexer = Lexer::new(input);
 

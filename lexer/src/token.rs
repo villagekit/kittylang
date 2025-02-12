@@ -1,4 +1,3 @@
-use fastnum::{decimal, D128};
 use logos::Logos;
 use std::fmt;
 
