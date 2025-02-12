@@ -41,7 +41,7 @@ mod tests {
     }
 
     #[test]
-    fn lex_indentation() {
+    fn lex_indent() {
         let input = r"
 fn foo()
   fn bar()
@@ -69,6 +69,61 @@ fn foo()
             (Newline, 28..29),
             (Dedent, 29..29),
             (Dedent, 29..29),
+        ];
+        check_tokens(input, expected);
+    }
+
+    #[test]
+    fn lex_indent_empty_lines() {
+        let input = r"
+fn foo()
+
+  baz
+
+";
+        use Token::*;
+        let expected = vec![
+            (Newline, 0..1),
+            (FnKw, 1..3),
+            (Whitespace, 3..4),
+            (Ident, 4..7),
+            (LParen, 7..8),
+            (RParen, 8..9),
+            (Newline, 9..10),
+            (Newline, 10..11),
+            (Indent, 11..13),
+            (Ident, 13..16),
+            (Newline, 16..17),
+            (Newline, 17..18),
+            (Dedent, 18..18),
+        ];
+        check_tokens(input, expected);
+    }
+
+    #[test]
+    fn lex_indent_2() {
+        let input = r"
+fn foo()
+  baz
+foo()
+";
+        use Token::*;
+        let expected = vec![
+            (Newline, 0..1),
+            (FnKw, 1..3),
+            (Whitespace, 3..4),
+            (Ident, 4..7),
+            (LParen, 7..8),
+            (RParen, 8..9),
+            (Newline, 9..10),
+            (Indent, 10..12),
+            (Ident, 12..15),
+            (Newline, 15..16),
+            (Dedent, 16..16),
+            (Ident, 16..19),
+            (LParen, 19..20),
+            (RParen, 20..21),
+            (Newline, 21..22),
         ];
         check_tokens(input, expected);
     }

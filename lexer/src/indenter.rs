@@ -32,6 +32,50 @@ impl<'src, I: TokenIterator<'src>> Indenter<'src, I> {
             queued_tokens,
         }
     }
+
+    fn get_next_indent_level(&self, ws_span: Span) -> usize {
+        let ws = &self.source[ws_span];
+
+        let mut indent = 0;
+
+        for ch in ws.chars() {
+            match ch {
+                ' ' => indent += 1,
+                // TODO handle tabs correctly
+                '\t' => indent += 4,
+                _ => break,
+            }
+        }
+
+        indent
+    }
+
+    fn pop_and_queue_dedents(&mut self, indent: usize, dedent_span: Span) {
+        // Pop until we match the new level
+        while let Some(&level) = self.indents.last() {
+            if level > indent {
+                self.indents.pop();
+
+                // Queuing Dedent tokens.
+                self.queued_tokens
+                    .push_back((Token::Dedent, dedent_span.clone()));
+            } else {
+                break;
+            }
+        }
+    }
+
+    fn pop_dedent(
+        &mut self,
+        dedent_span: Span,
+    ) -> Option<(Result<Token, <Token as Logos<'src>>::Error>, Span)> {
+        if self.indents.len() > 1 {
+            self.indents.pop();
+            Some((Ok(Token::Dedent), dedent_span))
+        } else {
+            None
+        }
+    }
 }
 
 impl<'src, I: TokenIterator<'src>> Iterator for Indenter<'src, I> {
@@ -44,51 +88,38 @@ impl<'src, I: TokenIterator<'src>> Iterator for Indenter<'src, I> {
         }
 
         // Get the next token.
-        match self.tokens.next() {
+        let next = self.tokens.next();
+
+        match next {
             Some((Ok(token), span)) => {
                 let mut peek = self.tokens.peek();
                 let ahead = peek.get().cloned();
                 let ahead_2 = peek.peek().cloned();
 
-                // If newline followed by an empty line
-                if let (
-                    Token::Newline,
-                    Some((Ok(Token::Whitespace), ws_span)),
-                    Some((Ok(Token::Newline), _)),
-                ) = (token, ahead.clone(), ahead_2)
+                if token != Token::Newline {
+                    // Return the next token
+                    return Some((Ok(token), span));
+                }
+
+                // If newline followed by an whitespace followed by newline
+                if let (Some((Ok(Token::Whitespace), ws_span)), Some((Ok(Token::Newline), _))) =
+                    (ahead.clone(), ahead_2)
                 {
                     // Skip and queue the whitespace
                     self.tokens.next();
-                    self.queued_tokens
-                        .push_back((Token::Whitespace, ws_span.clone()));
-
-                    // Return the newline
-                    Some((Ok(Token::Newline), span))
+                    self.queued_tokens.push_back((Token::Whitespace, ws_span));
+                }
+                // If newline followed by newline
+                else if let Some((Ok(Token::Newline), _)) = ahead {
+                    // Do nothing
                 }
                 // If newline followed by a whitespace (but not on an empty line),
                 //   Return / queue any indents
-                else if let (Token::Newline, Some((Ok(Token::Whitespace), ws_span))) =
-                    (token, ahead)
-                {
-                    println!("hiiii");
-
-                    let ws = &self.source[ws_span.clone()];
-
-                    let mut indent = 0;
-
-                    for ch in ws.chars() {
-                        match ch {
-                            ' ' => indent += 1,
-                            // TODO handle tabs correctly
-                            '\t' => indent += 4,
-                            _ => break,
-                        }
-                    }
+                else if let Some((Ok(Token::Whitespace), ws_span)) = ahead {
+                    let indent = self.get_next_indent_level(ws_span.clone());
 
                     // Get the current indent level (the top of our stack).
                     let current_indent = *self.indents.last().unwrap();
-
-                    println!("indent: {}, current_indent: {}", indent, current_indent);
 
                     match indent.cmp(&current_indent) {
                         Ordering::Greater => {
@@ -114,43 +145,29 @@ impl<'src, I: TokenIterator<'src>> Iterator for Indenter<'src, I> {
 
                             // Skip and queue whitespace as-is
                             self.tokens.next();
-                            self.queued_tokens.push_back((Token::Whitespace, ws_span));
+                            self.queued_tokens
+                                .push_back((Token::Whitespace, ws_span.clone()));
 
-                            // Pop until we match the new level
-                            while let Some(&level) = self.indents.last() {
-                                if level > indent {
-                                    self.indents.pop();
-
-                                    // Queuing Dedent tokens.
-                                    let dedent_span = span.end..span.end;
-                                    self.queued_tokens.push_back((Token::Dedent, dedent_span));
-                                } else {
-                                    break;
-                                }
-                            }
+                            let dedent_span = ws_span.end..ws_span.end;
+                            self.pop_and_queue_dedents(indent, dedent_span);
                         }
                         Ordering::Equal => {}
                     }
-
-                    // Return the newline
-                    Some((Ok(Token::Newline), span))
-                } else {
-                    // Return the next token
-                    Some((Ok(token), span))
                 }
+                // If newline followed by not whitespace.
+                else if let Some((Ok(_), _)) = ahead {
+                    let dedent_span = span.end..span.end;
+                    self.pop_and_queue_dedents(0, dedent_span);
+                }
+
+                // Return the newline
+                Some((Ok(Token::Newline), span))
             }
             Some((Err(error), span)) => Some((Err(error), span)),
             None => {
-                // If we have no more tokens but still indented, return dedents.
-                if self.indents.len() > 1 {
-                    self.indents.pop();
-                    let end = self.source.len();
-                    let span = end..end;
-                    let token = Token::Dedent;
-                    Some((Ok(token), span))
-                } else {
-                    None
-                }
+                let end = self.source.len();
+                let dedent_span = end..end;
+                self.pop_dedent(dedent_span)
             }
         }
     }

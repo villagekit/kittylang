@@ -3,9 +3,6 @@ use std::fmt;
 
 #[derive(Logos, Debug, Copy, Clone, PartialEq)]
 pub enum Token {
-    #[regex(r"[ \t\f]+(\r)?\n")]
-    EmptyLine,
-
     #[regex(r"[ \t\f]+")]
     Whitespace,
 
@@ -68,7 +65,6 @@ impl Token {
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
-            Self::EmptyLine => "empty-line",
             Self::Whitespace => "whitespace",
             Self::Newline => "newline",
             Self::Indent => "indent",
@@ -106,7 +102,7 @@ mod tests {
 
     #[test]
     fn lex_empty_line() {
-        check_token("   \n", Token::EmptyLine);
+        check_token("   ", Token::Whitespace);
     }
 
     #[test]
