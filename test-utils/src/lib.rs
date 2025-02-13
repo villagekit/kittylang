@@ -10,7 +10,6 @@ use std::panic::RefUnwindSafe;
 /// ==================
 /// Some test name
 /// ==================
-///
 /// <source code>
 /// ---
 /// <expected output>
@@ -31,7 +30,7 @@ pub fn run_tests(test_fn: impl Fn(&str) -> String + RefUnwindSafe) {
             .expect("Cannot canonicalize path");
 
         println!(
-            "\n==== RUNNING TEST FILE: {:?} ====",
+            "\n==== RUNNING TEST FILE: {:?} ====\n",
             test_path.file_stem().unwrap_or_default()
         );
 
@@ -42,11 +41,10 @@ pub fn run_tests(test_fn: impl Fn(&str) -> String + RefUnwindSafe) {
         let test_cases = parse_test_cases(&file_text);
 
         for (i, (source, expected)) in test_cases.into_iter().enumerate() {
-            println!("\n--- Test case {} ---", i + 1);
+            println!("--- Test case {} ---", i + 1);
             let result = std::panic::catch_unwind(|| test_fn(&source));
             match result {
                 Ok(actual) => {
-                    let actual = actual.trim();
                     if actual != expected {
                         did_any_test_fail = true;
                         println!("Test case {} failed in file {:?}:\n", i + 1, test_path);
@@ -55,13 +53,11 @@ pub fn run_tests(test_fn: impl Fn(&str) -> String + RefUnwindSafe) {
                             expected.len(),
                             actual.len()
                         );
-                        println!("{}", diff_lines(&expected, actual));
+                        println!("Diff:\n{}\n", diff_lines(&expected, &actual));
 
-                        /*
-                        println!("Source:\n{}\n", source);
-                        println!("Expected:\n{}\n", expected);
-                        println!("Got:\n{}\n", actual);
-                        */
+                        // println!("Source:\n{}\n", source);
+                        // println!("Expected:\n{}\n", expected);
+                        // println!("Got:\n{}\n", actual);
                     }
                 }
                 Err(_) => {
@@ -95,17 +91,10 @@ fn parse_test_cases(file: &str) -> Vec<(String, String)> {
     let mut lines = file.lines().peekable();
 
     while let Some(line) = lines.peek() {
-        // Skip any leading blank lines.
-        if line.trim().is_empty() {
-            lines.next();
-            continue;
-        }
-
         // A test case is expected to start with a header block.
-        if !is_header_line(lines.peek().unwrap()) {
+        if !is_header_line(line) {
             panic!(
-                "Expected a header line (a line of '=' characters) at the beginning of a test case, but got: {}",
-                lines.peek().unwrap()
+                "Expected a header line (a line of '=' characters) at the beginning of a test case, but got: {}", line
             );
         }
 
@@ -121,15 +110,6 @@ fn parse_test_cases(file: &str) -> Vec<(String, String)> {
             panic!("Header block malformed");
         }
 
-        // Skip blank lines between the header and the test case.
-        while let Some(l) = lines.peek() {
-            if l.trim().is_empty() {
-                lines.next();
-            } else {
-                break;
-            }
-        }
-
         // Collect source code lines until we hit a delimiter line that is exactly `---`
         let mut source_lines = Vec::new();
         while let Some(l) = lines.peek() {
@@ -138,22 +118,14 @@ fn parse_test_cases(file: &str) -> Vec<(String, String)> {
             }
             source_lines.push(lines.next().unwrap());
         }
-        let source = source_lines.join("\n");
+        let mut source = source_lines.join("\n");
+        source.push('\n');
 
         // Expect a line that is exactly `---` as a delimiter.
         match lines.next() {
             Some(delim) if delim.trim() == "---" => { /* OK */ }
             Some(other) => panic!("Expected delimiter '---' but found: {}", other),
             None => panic!("Expected delimiter '---' but reached end of file"),
-        }
-
-        // Skip any blank lines after the delimiter.
-        while let Some(l) = lines.peek() {
-            if l.trim().is_empty() {
-                lines.next();
-            } else {
-                break;
-            }
         }
 
         // Collect expected output lines until we hit the next header block or EOF.
@@ -173,7 +145,7 @@ fn parse_test_cases(file: &str) -> Vec<(String, String)> {
     tests
 }
 
-/// Returns true if the given line (after trimming) is nonempty and consists only of '=' characters.
+/// Returns true if the given line (after trimming) is non-empty and consists only of '=' characters.
 fn is_header_line(line: &str) -> bool {
     let trimmed = line.trim();
     !trimmed.is_empty() && trimmed.chars().all(|c| c == '=')

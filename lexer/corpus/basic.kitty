@@ -1,15 +1,12 @@
 ===
 Basic
 ===
-
 export fn main() =>
   let add = fn (x, y) => x + y
   let mul = fn (x, y) => x * y
   let x = mul(add(5, 42), 2)
   add(x, 3.5)
-
 ---
-
 Export@0..6
 Whitespace@6..7
 Fn@7..9
@@ -99,11 +96,9 @@ Number@120..123
 ParenClose@123..124
 Newline@124..125
 Dedent@125..125
-
 ===
 3d math
 ===
-
 import sqrt from @std/math
 
 export struct Vector3[N = Number]
@@ -128,9 +123,7 @@ export struct Quaternion
   prop z: Number = 0
 
   prop w: Number = 0
-
 ---
-
 Import@0..6
 Whitespace@6..7
 Identifier@7..11
@@ -354,5 +347,3 @@ Whitespace@387..388
 Number@388..389
 Newline@389..390
 Dedent@390..390
-
----
