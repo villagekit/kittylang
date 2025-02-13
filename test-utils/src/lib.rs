@@ -1,6 +1,15 @@
 use prettydiff::diff_lines;
 use std::fs;
-use std::panic::RefUnwindSafe;
+use std::panic::{catch_unwind, RefUnwindSafe};
+use std::path::Path;
+
+/// Represents a single test case extracted from a file.
+#[derive(Debug, Clone)]
+struct TestCase {
+    pub title: String,
+    pub source: String,
+    pub expected: String,
+}
 
 /// Runs all tests found in files under the directory `corpus`.
 ///
@@ -20,137 +29,163 @@ use std::panic::RefUnwindSafe;
 /// The caller provides a function `test_fn` that takes the source code and returns
 /// the output (for example, a string representing the parse tree).
 pub fn run_tests(test_fn: impl Fn(&str) -> String + RefUnwindSafe) {
-    let mut did_any_test_fail = false;
+    let mut has_failures = false;
 
-    for entry in fs::read_dir("corpus").expect("Cannot read corpus directory") {
-        let entry = entry.expect("Invalid directory entry");
-        let test_path = entry
+    // Read all files in the "corpus" directory and process them.
+    for entry_result in fs::read_dir("corpus").expect("Cannot read corpus directory") {
+        let entry = entry_result.expect("Invalid directory entry");
+        let path = entry
             .path()
             .canonicalize()
             .expect("Cannot canonicalize path");
 
         println!(
             "\n==== RUNNING TEST FILE: {:?} ====\n",
-            test_path.file_stem().unwrap_or_default()
+            path.file_stem().unwrap_or_default()
         );
 
-        let file_text = fs::read_to_string(&test_path)
-            .unwrap_or_else(|err| panic!("{}: {}", test_path.display(), err));
-
-        // Parse the file into a vector of (source, expected) test cases.
-        let test_cases = parse_test_cases(&file_text);
-
-        for TestCase {
-            title,
-            source,
-            expected,
-        } in test_cases.into_iter()
-        {
-            println!("--- Test case {} ---", title);
-            let result = std::panic::catch_unwind(|| test_fn(&source));
-            match result {
-                Ok(actual) => {
-                    if actual != expected {
-                        did_any_test_fail = true;
-                        println!("Test case {} failed in file {:?}:\n", title, test_path);
-                        println!(
-                            "len, expected: {}, actual: {}",
-                            expected.len(),
-                            actual.len()
-                        );
-                        println!("Diff:\n{}\n", diff_lines(&expected, &actual));
-
-                        // println!("Source:\n{}\n", source);
-                        // println!("Expected:\n{}\n", expected);
-                        // println!("Got:\n{}\n", actual);
-                    }
-                }
-                Err(_) => {
-                    did_any_test_fail = true;
-                    println!("Test case {} panicked in file {:?}", title, test_path);
-                }
-            }
+        // If the file has at least one failing test, track that.
+        if run_test_file(&test_fn, &path) {
+            has_failures = true;
         }
     }
 
-    assert!(!did_any_test_fail, "Some tests failed");
+    // Fail the entire run if any test in any file failed.
+    assert!(!has_failures, "Some tests failed");
 }
 
-#[derive(Debug, Clone)]
-struct TestCase {
-    pub title: String,
-    pub source: String,
-    pub expected: String,
+/// Runs all test cases in a single file, returning `true` if any tests fail.
+fn run_test_file(test_fn: &(impl Fn(&str) -> String + RefUnwindSafe), path: &Path) -> bool {
+    let mut file_has_failures = false;
+
+    // Read the file text.
+    let file_text =
+        fs::read_to_string(path).unwrap_or_else(|err| panic!("{}: {}", path.display(), err));
+
+    // Parse the file into a vector of `TestCase` structs.
+    let test_cases = parse_test_cases(&file_text);
+
+    // Run each test case individually.
+    for test_case in test_cases {
+        if run_single_test_case(test_fn, &test_case, path) {
+            file_has_failures = true;
+        }
+    }
+
+    file_has_failures
 }
 
-/// Returns a vector of (source, expected) pairs by parsing the file text.
+/// Runs a single test case and prints diagnostic information if it fails.
+/// Returns `true` if this test fails, otherwise `false`.
+fn run_single_test_case(
+    test_fn: &(impl Fn(&str) -> String + RefUnwindSafe),
+    test_case: &TestCase,
+    path: &Path,
+) -> bool {
+    println!("--- Test case {} ---", test_case.title);
+    let result = catch_unwind(|| test_fn(&test_case.source));
+
+    match result {
+        Ok(actual) => {
+            if actual != test_case.expected {
+                println!(
+                    "Test case {} failed in file {:?}:\n",
+                    test_case.title,
+                    path.file_name().unwrap_or_default()
+                );
+                println!(
+                    "len, expected: {}, actual: {}",
+                    test_case.expected.len(),
+                    actual.len()
+                );
+                println!("Diff:\n{}\n", diff_lines(&test_case.expected, &actual));
+                return true; // Test failed
+            }
+        }
+        Err(_) => {
+            println!(
+                "Test case {} panicked in file {:?}",
+                test_case.title,
+                path.file_name().unwrap_or_default()
+            );
+            return true; // Test failed (panicked)
+        }
+    }
+
+    false // Test succeeded
+}
+
+/// Parses the given file text into a list of `TestCase` items.
 ///
-/// The expected file format is as follows:
+/// The expected file format is:
 ///
 /// 1. A header block (three lines):
 ///    - A line of only '=' characters.
 ///    - A title (any text).
 ///    - Another line of only '=' characters.
-/// 2. A blank line.
-/// 3. A source code block (one or more lines) that goes until a line that is exactly `---`.
+/// 2. A blank line (optional in some cases).
+/// 3. A source code block (one or more lines) that ends at a line exactly `---`.
 /// 4. A line containing exactly `---`.
 /// 5. An expected output block (until the next header block or EOF).
 ///
-/// If there is more than one test case in the file, then after the expected output
-/// of one test case the next header block begins.
-fn parse_test_cases(file: &str) -> Vec<TestCase> {
+/// Multiple test cases may appear in a single file.
+fn parse_test_cases(file_text: &str) -> Vec<TestCase> {
+    let lines: Vec<&str> = file_text.lines().collect();
     let mut tests = Vec::new();
-    let mut lines = file.lines().peekable();
+    let mut i = 0;
 
-    while let Some(line) = lines.peek() {
-        // A test case is expected to start with a header block.
-        if !is_header_line(line) {
+    while i < lines.len() {
+        // 1. A test case must start with a header line of "=" characters.
+        if !is_header_line(lines[i]) {
             panic!(
-                "Expected a header line (a line of '=' characters) at the beginning of a test case, but got: {}", line
+                "Expected a header line (only '=' characters) at the start of a test case, but got: {}",
+                lines[i],
             );
         }
+        i += 1;
 
-        // Consume the header block: three lines.
-        let header_line1 = lines.next().unwrap();
-        let title = lines
-            .next()
-            .unwrap_or_else(|| panic!("Missing title line after header line: {}", header_line1))
-            .to_string();
-        let header_line2 = lines
-            .next()
-            .unwrap_or_else(|| panic!("Missing closing header line after title"));
-        if !is_header_line(header_line1) || !is_header_line(header_line2) {
-            panic!("Header block malformed");
+        // 2. The next line is the test case title.
+        if i >= lines.len() {
+            panic!("Missing title line after header line.");
         }
+        let title = lines[i].to_string();
+        i += 1;
 
-        // Collect source code lines until we hit a delimiter line that is exactly `---`
+        // 3. The next line should again be a header line of "=" characters.
+        if i >= lines.len() || !is_header_line(lines[i]) {
+            panic!(
+                "Expected a closing header line after the title '{}'.",
+                title
+            );
+        }
+        i += 1;
+
+        // 4. Gather the source lines until we encounter the delimiter "---".
         let mut source_lines = Vec::new();
-        while let Some(l) = lines.peek() {
-            if l.trim() == "---" {
-                break;
-            }
-            source_lines.push(lines.next().unwrap());
+        while i < lines.len() && lines[i].trim() != "---" {
+            source_lines.push(lines[i]);
+            i += 1;
         }
+        if i >= lines.len() {
+            panic!(
+                "Expected '---' delimiter for test case '{}', but reached EOF.",
+                title
+            );
+        }
+        // Skip the "---" line
+        i += 1;
+
+        // 5. Gather the expected output until we see the next header line or EOF.
+        let start_expected = i;
+        while i < lines.len() && !is_header_line(lines[i]) {
+            i += 1;
+        }
+        let expected_lines = &lines[start_expected..i];
+        let expected = expected_lines.join("\n").trim().to_string();
+
+        // Construct the source string with a trailing newline (if desired).
         let mut source = source_lines.join("\n");
         source.push('\n');
-
-        // Expect a line that is exactly `---` as a delimiter.
-        match lines.next() {
-            Some(delim) if delim.trim() == "---" => { /* OK */ }
-            Some(other) => panic!("Expected delimiter '---' but found: {}", other),
-            None => panic!("Expected delimiter '---' but reached end of file"),
-        }
-
-        // Collect expected output lines until we hit the next header block or EOF.
-        let mut expected_lines = Vec::new();
-        while let Some(&l) = lines.peek() {
-            if is_header_line(l) {
-                // Start of a new test case.
-                break;
-            }
-            expected_lines.push(lines.next().unwrap());
-        }
-        let expected = expected_lines.join("\n").trim().to_string();
 
         tests.push(TestCase {
             title,
