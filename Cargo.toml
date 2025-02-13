@@ -1,9 +1,9 @@
 [workspace]
 resolver = "2"
-members = [
+members = [ "cst",
   "hir",
   "lexer",
-  "number",
+  "number", "parser",
   "syntax",
   "test-utils"
 ]

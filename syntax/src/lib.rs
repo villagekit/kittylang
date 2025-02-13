@@ -1,5 +1,6 @@
-use kitty_lexer::Token as TokenKind;
 use std::mem;
+
+pub use kitty_lexer::Token as TokenKind;
 
 pub type SyntaxBuilder = eventree::SyntaxBuilder<TreeConfig>;
 pub type SyntaxElement = eventree::SyntaxElement<TreeConfig>;
@@ -34,61 +35,100 @@ unsafe impl eventree::TreeConfig for TreeConfig {
 }
 
 /// Represents a group of tokens or other nodes.
-///
-/// For example, StmtExpr might contain an IntLiteral which contains an Int token
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum NodeKind {
     Root,
-    VarRef,
-    Call,
-    ArgList,
-    Arg,
-    ArrayDecl,
-    ArraySize,
-    ArrayLiteral,
-    ArrayBody,
-    ArrayItem,
-    IndexExpr, // the entire expression of indexing. e.g. `my_array[6]`
-    Index,     // the actual index. `6` in `my_array[6]`
-    Source,
-    Distinct,
-    ComptimeExpr,
+
+    // Expressions
+    IdentifierExpr,
+    LiteralExpr,
     ParenExpr,
-    Block,
+    BlockExpr,
+    FunctionExpr,
+    LetExpr,
     IfExpr,
-    ElseBranch,
-    WhileExpr,
-    Condition,
-    LabelDecl,
-    LabelRef,
-    IntLiteral,
-    FloatLiteral,
-    BoolLiteral,
-    CharLiteral,
-    StringLiteral,
-    CastExpr,
-    RefExpr,
-    DerefExpr,
-    BinaryExpr,
+    CallExpr,
+    TupleExpr,
     UnaryExpr,
-    Binding, // `x :: 5`
-    VarDef,  // `x := 5`
-    Assign,
-    ExprStmt,
-    ReturnStmt, // todo: change these to void expressions
-    BreakStmt,
-    ContinueStmt,
-    DeferStmt,
-    Lambda,
-    ParamList,
-    Param,
-    StructDecl,    // `struct { foo: i32 }`
-    MemberDecl,    // `foo: i32`
-    StructLiteral, // `My_Struct { foo: 123 }`
-    MemberLiteral, // `foo: 123`
-    ImportExpr,
-    Ty,
-    Path,
-    Comment,
+    BinaryExpr,
+    GetExpr,
+
+    // Match
+    MatchExpr,
+    MatchArm,
+
+    // Type Path
+    TypeName,
+    TypeGeneric,
+    TypeProjection,
+    TypeAssociation,
+
+    // Type Annotation
+    TypeTuple,
+    TypeFunction,
+    TypeTrait,
+
+    // Generic Parameters
+    GenericParam,
+    GenericParams,
+
+    // Type Arguments
+    GenericArg,
+    GenericArgs,
+
+    // Type Bounds
+    TypeBound,
+    TypeBounds,
+
+    // Operators.
+    UnaryOperator,
+    BinaryOperator,
+
+    // Patterns.
+    Pattern,
+    PatternType,
+    PatternLiteral,
+    PatternTuple,
+    PatternConstructor,
+    PatternWildcard,
+    PatternOr,
+
+    // Top-Level Declarations
+    TypeDecl,
+    ConstantDecl,
+
+    // Function Declarations
+    FunctionDecl,
+    FunctionParam,
+    FunctionParams,
+    FunctionArg,
+    FunctionArgs,
+    FunctionBody,
+
+    // Enum Declarations
+    EnumDecl,
+    EnumCase,
+
+    // Struct Declarations
+    StructDecl,
+    StructProp,
+    StructFunction,
+    StructConstant,
+
+    // Traits
+    TraitDecl,
+    TraitType,
+    TraitProp,
+    TraitFunction,
+    TraitConstant,
+
+    // Impl
+    ImplTraitDecl,
+    ImplTraitType,
+    ImplTraitProp,
+    ImplTraitFunction,
+    ImplTraitConstant,
+
+    // Misc catch-all for error recovery
     Error,
 }

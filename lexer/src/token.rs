@@ -1,7 +1,7 @@
 use logos::Logos;
 use std::fmt;
 
-#[derive(Logos, Debug, Copy, Clone, PartialEq)]
+#[derive(Logos, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Token {
     #[regex(r"[ \t\f]+")]
     Whitespace,
@@ -12,12 +12,14 @@ pub enum Token {
     Indent,
     Dedent,
 
+    #[regex("(True|False)")]
+    Boolean,
     #[regex(r#""([^"\\]|\\t|\\u|\\n|\\")*""#)]
     String,
     #[regex(r"-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?")]
     Number,
 
-    #[regex(r"(\p{XID_Start}|_)\p{XID_Continue}*")]
+    #[regex(r"[\p{XID_Start}_]\p{XID_Continue}*")]
     Identifier,
 
     #[regex(r"@[a-zA-Z0-9-]+\/[a-zA-Z0-9-]")]
@@ -90,13 +92,13 @@ pub enum Token {
     FatArrow,
 
     #[token("+")]
-    Cross,
+    Plus,
     #[token("-")]
-    Dash,
+    Minus,
     #[token("*")]
-    Star,
+    Multiply,
     #[token("/")]
-    Slash,
+    Divide,
     #[token(">=")]
     GreaterEqual,
     #[token(">")]
@@ -137,6 +139,7 @@ impl fmt::Display for Token {
             Self::Newline => "newline",
             Self::Indent => "indent",
             Self::Dedent => "dedent",
+            Self::Boolean => "boolean",
             Self::String => "string",
             Self::Number => "number",
             Self::Identifier => "identifier",
@@ -171,10 +174,10 @@ impl fmt::Display for Token {
             Self::Ellipses => "‘...’",
             Self::Dot => "‘.’",
             Self::FatArrow => "‘=>’",
-            Self::Cross => "‘+’",
-            Self::Dash => "‘-’",
-            Self::Star => "‘*’",
-            Self::Slash => "‘/’",
+            Self::Plus => "‘+’",
+            Self::Minus => "‘-’",
+            Self::Multiply => "‘*’",
+            Self::Divide => "‘/’",
             Self::GreaterEqual => "‘>=’",
             Self::Greater => "‘>’",
             Self::LessEqual => "‘<=’",
@@ -219,6 +222,16 @@ mod tests {
     }
 
     // Indent and Dedent are handled manually by the indenter wrapper.
+
+    #[test]
+    fn lex_boolean_true() {
+        check_token("True", Token::Boolean);
+    }
+
+    #[test]
+    fn lex_boolean_false() {
+        check_token("False", Token::Boolean);
+    }
 
     #[test]
     fn lex_string() {
@@ -387,22 +400,22 @@ mod tests {
 
     #[test]
     fn lex_plus() {
-        check_token("+", Token::Cross);
+        check_token("+", Token::Plus);
     }
 
     #[test]
     fn lex_minus() {
-        check_token("-", Token::Dash);
+        check_token("-", Token::Minus);
     }
 
     #[test]
     fn lex_star() {
-        check_token("*", Token::Star);
+        check_token("*", Token::Multiply);
     }
 
     #[test]
     fn lex_slash() {
-        check_token("/", Token::Slash);
+        check_token("/", Token::Divide);
     }
 
     #[test]
