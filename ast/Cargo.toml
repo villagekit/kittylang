@@ -1,8 +1,0 @@
-[package]
-name = "kitty-ast"
-version.workspace = true
-edition.workspace = true
-
-[dependencies]
-kitty-meta = { path = "../meta" }
-fastnum = "0.1.11"

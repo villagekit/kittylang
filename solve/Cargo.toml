@@ -1,9 +1,0 @@
-[package]
-name = "kitty-solve"
-version.workspace = true
-edition.workspace = true
-
-[dependencies]
-kitty-meta = { path = "../meta" }
-kitty-ast = { path = "../ast" }
-chumsky = { workspace = true }

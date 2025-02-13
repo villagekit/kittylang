@@ -1,9 +1,0 @@
-[package]
-name = "kitty-eval"
-version.workspace = true
-edition.workspace = true
-
-[dependencies]
-kitty-meta = { path = "../meta" }
-kitty-ast = { path = "../ast" }
-kitty-value = { path = "../value" }
