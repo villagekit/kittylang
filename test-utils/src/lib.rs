@@ -40,14 +40,19 @@ pub fn run_tests(test_fn: impl Fn(&str) -> String + RefUnwindSafe) {
         // Parse the file into a vector of (source, expected) test cases.
         let test_cases = parse_test_cases(&file_text);
 
-        for (i, (source, expected)) in test_cases.into_iter().enumerate() {
-            println!("--- Test case {} ---", i + 1);
+        for TestCase {
+            title,
+            source,
+            expected,
+        } in test_cases.into_iter()
+        {
+            println!("--- Test case {} ---", title);
             let result = std::panic::catch_unwind(|| test_fn(&source));
             match result {
                 Ok(actual) => {
                     if actual != expected {
                         did_any_test_fail = true;
-                        println!("Test case {} failed in file {:?}:\n", i + 1, test_path);
+                        println!("Test case {} failed in file {:?}:\n", title, test_path);
                         println!(
                             "len, expected: {}, actual: {}",
                             expected.len(),
@@ -62,13 +67,20 @@ pub fn run_tests(test_fn: impl Fn(&str) -> String + RefUnwindSafe) {
                 }
                 Err(_) => {
                     did_any_test_fail = true;
-                    println!("Test case {} panicked in file {:?}", i + 1, test_path);
+                    println!("Test case {} panicked in file {:?}", title, test_path);
                 }
             }
         }
     }
 
     assert!(!did_any_test_fail, "Some tests failed");
+}
+
+#[derive(Debug, Clone)]
+struct TestCase {
+    pub title: String,
+    pub source: String,
+    pub expected: String,
 }
 
 /// Returns a vector of (source, expected) pairs by parsing the file text.
@@ -86,7 +98,7 @@ pub fn run_tests(test_fn: impl Fn(&str) -> String + RefUnwindSafe) {
 ///
 /// If there is more than one test case in the file, then after the expected output
 /// of one test case the next header block begins.
-fn parse_test_cases(file: &str) -> Vec<(String, String)> {
+fn parse_test_cases(file: &str) -> Vec<TestCase> {
     let mut tests = Vec::new();
     let mut lines = file.lines().peekable();
 
@@ -100,9 +112,10 @@ fn parse_test_cases(file: &str) -> Vec<(String, String)> {
 
         // Consume the header block: three lines.
         let header_line1 = lines.next().unwrap();
-        let _title = lines
+        let title = lines
             .next()
-            .unwrap_or_else(|| panic!("Missing title line after header line: {}", header_line1));
+            .unwrap_or_else(|| panic!("Missing title line after header line: {}", header_line1))
+            .to_string();
         let header_line2 = lines
             .next()
             .unwrap_or_else(|| panic!("Missing closing header line after title"));
@@ -139,7 +152,11 @@ fn parse_test_cases(file: &str) -> Vec<(String, String)> {
         }
         let expected = expected_lines.join("\n").trim().to_string();
 
-        tests.push((source, expected));
+        tests.push(TestCase {
+            title,
+            source,
+            expected,
+        });
     }
 
     tests
