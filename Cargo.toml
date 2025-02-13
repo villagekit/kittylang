@@ -1,12 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
-  # "ast",
-  # "core",
-  # "hir",
   "lexer",
-  # "parser",
-  # "syntax",
   "test-utils"
 ]
 
