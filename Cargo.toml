@@ -1,7 +1,10 @@
 [workspace]
 resolver = "2"
 members = [
+  "hir",
   "lexer",
+  "number",
+  "syntax",
   "test-utils"
 ]
 
