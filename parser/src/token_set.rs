@@ -17,6 +17,7 @@ pub(crate) struct TokenSet(u64);
 
 impl TokenSet {
     pub(crate) const ALL: Self = Self(u64::MAX);
+    pub(crate) const NONE: Self = Self(u64::MIN);
 
     pub(crate) const fn new<const LEN: usize>(kinds: [TokenKind; LEN]) -> Self {
         let mut value = 0;
@@ -36,6 +37,10 @@ impl TokenSet {
 
     pub(crate) const fn union(self, other: Self) -> Self {
         Self(self.0 | other.0)
+    }
+
+    pub(crate) const fn without(self, kind: TokenKind) -> Self {
+        Self(self.0 ^ mask(kind))
     }
 }
 

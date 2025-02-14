@@ -145,6 +145,12 @@ pub enum TokenKind {
     Error,
 }
 
+impl TokenKind {
+    pub fn is_trivia(self) -> bool {
+        matches!(self, Self::Whitespace | Self::Newline | Self::Comment)
+    }
+}
+
 impl fmt::Display for TokenKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {

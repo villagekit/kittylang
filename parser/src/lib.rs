@@ -1,3 +1,4 @@
+mod error;
 mod event;
 mod grammar;
 mod marker;
@@ -9,8 +10,9 @@ use kitty_lexer::{lex, Token};
 use kitty_syntax::SyntaxTreeBuf;
 use std::fmt;
 
+use crate::error::SyntaxError;
 use crate::event::{process_events, Event};
-use crate::parser::{Error, Parser};
+use crate::parser::Parser;
 
 pub fn parse(input: &str) -> Parse<Source> {
     let tokens: Vec<Token> = lex(input).collect();
@@ -23,7 +25,7 @@ pub fn parse(input: &str) -> Parse<Source> {
 pub struct Parse<N: CstNode> {
     pub tree: SyntaxTreeBuf,
     pub node: N,
-    pub errors: Vec<Error>,
+    pub errors: Vec<SyntaxError>,
 }
 
 impl<N: CstNode> fmt::Debug for Parse<N> {

@@ -54,11 +54,7 @@ impl Sink<'_> {
             return;
         };
         let next_token = self.tokens[self.cursor].kind;
-        let is_trivia = matches!(
-            next_token,
-            TokenKind::Whitespace | TokenKind::Newline | TokenKind::Comment
-        );
-        if is_trivia {
+        if next_token.is_trivia() {
             self.add_token();
         };
     }
