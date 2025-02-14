@@ -1,8 +1,8 @@
 use crate::Parser;
 use kitty_syntax::{NodeKind, TokenKind};
 
-pub(crate) fn source_file(p: &mut Parser) {
-    p.start_node(NodeKind::SourceFile);
+pub(crate) fn source(p: &mut Parser) {
+    p.start_node(NodeKind::Source);
 
     while !p.eof() {
         opt_item(p);

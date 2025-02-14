@@ -36,8 +36,9 @@ unsafe impl eventree::TreeConfig for TreeConfig {
 
 /// Represents a group of tokens or other nodes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(u8)]
 pub enum NodeKind {
-    Root,
+    Source,
 
     // Expressions
     IdentifierExpr,

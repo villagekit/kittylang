@@ -15,4 +15,5 @@ categories.workspace = true
 kitty-cst = { path = "../cst" }
 kitty-lexer = { path = "../lexer" }
 kitty-syntax = { path = "../syntax" }
-text-size = "1.1.1"
+text-size = { workspace = true }
+drop_bomb = "0.1.5"

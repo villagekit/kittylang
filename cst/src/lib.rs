@@ -111,9 +111,9 @@ macro_rules! define_compound_token {
 	};
 }
 
-define_node!(Root);
+define_node!(Source);
 
-impl Root {
+impl Source {
     pub fn declarations(self, tree: &SyntaxTree) -> impl Iterator<Item = Decl> + '_ {
         nodes(self, tree)
     }

@@ -2,7 +2,7 @@ use logos::{Logos, Span};
 use std::fmt;
 use text_size::TextRange;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Token {
     pub kind: TokenKind,
     pub range: TextRange,
@@ -17,7 +17,8 @@ impl Token {
     }
 }
 
-#[derive(Logos, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Logos, Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(u8)]
 pub enum TokenKind {
     #[regex(r"[ \t\f]+")]
     Whitespace,
@@ -142,12 +143,6 @@ pub enum TokenKind {
     Rem,
 
     Error,
-}
-
-impl TokenKind {
-    pub fn is_trivia(self) -> bool {
-        matches!(self, Self::Whitespace | Self::Newline | Self::Comment)
-    }
 }
 
 impl fmt::Display for TokenKind {
