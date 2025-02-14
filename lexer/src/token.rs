@@ -1,8 +1,24 @@
-use logos::Logos;
+use logos::{Logos, Span};
 use std::fmt;
+use text_size::TextRange;
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Token {
+    pub kind: TokenKind,
+    pub range: TextRange,
+}
+
+impl Token {
+    pub fn new(kind: TokenKind, span: Span) -> Self {
+        Self {
+            kind,
+            range: TextRange::new((span.start as u32).into(), (span.end as u32).into()),
+        }
+    }
+}
 
 #[derive(Logos, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Token {
+pub enum TokenKind {
     #[regex(r"[ \t\f]+")]
     Whitespace,
     #[regex(r"(\r)?\n")]
@@ -124,15 +140,17 @@ pub enum Token {
     Not,
     #[token("rem")]
     Rem,
+
+    Error,
 }
 
-impl Token {
+impl TokenKind {
     pub fn is_trivia(self) -> bool {
-        matches!(self, Self::Whitespace | Self::Comment)
+        matches!(self, Self::Whitespace | Self::Newline | Self::Comment)
     }
 }
 
-impl fmt::Display for Token {
+impl fmt::Display for TokenKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Self::Whitespace => "whitespace",
@@ -190,6 +208,7 @@ impl fmt::Display for Token {
             Self::Xor => "‘xor’",
             Self::Not => "‘not’",
             Self::Rem => "‘rem’",
+            Self::Error => "‘error’",
         })
     }
 }
@@ -199,282 +218,285 @@ mod tests {
     use super::*;
     use crate::Lexer;
 
-    fn check_token(input: &str, expected_token: Token) {
+    fn check_token(input: &str, expected: TokenKind) {
         let mut lexer = Lexer::new(input);
-        let (actual_token, actual_span) = lexer.next().unwrap();
-        assert_eq!(expected_token, actual_token.unwrap());
-        assert_eq!(0..input.len(), actual_span);
+        let actual = lexer.next().unwrap();
+        assert_eq!(expected, actual.kind);
+        assert_eq!(
+            TextRange::new(0.into(), (input.len() as u32).into()),
+            actual.range
+        );
     }
 
     #[test]
     fn lex_whitespace() {
-        check_token("   ", Token::Whitespace);
+        check_token("   ", TokenKind::Whitespace);
     }
 
     #[test]
     fn lex_newline() {
-        check_token("\n", Token::Newline);
+        check_token("\n", TokenKind::Newline);
     }
 
     #[test]
     fn lex_newline_crlf() {
-        check_token("\r\n", Token::Newline);
+        check_token("\r\n", TokenKind::Newline);
     }
 
     // Indent and Dedent are handled manually by the indenter wrapper.
 
     #[test]
     fn lex_boolean_true() {
-        check_token("True", Token::Boolean);
+        check_token("True", TokenKind::Boolean);
     }
 
     #[test]
     fn lex_boolean_false() {
-        check_token("False", Token::Boolean);
+        check_token("False", TokenKind::Boolean);
     }
 
     #[test]
     fn lex_string() {
-        check_token("\"hello\"", Token::String);
+        check_token("\"hello\"", TokenKind::String);
     }
 
     #[test]
     fn lex_number() {
-        check_token("123456", Token::Number);
+        check_token("123456", TokenKind::Number);
     }
 
     #[test]
     fn lex_identifier() {
-        check_token("abcd", Token::Identifier);
+        check_token("abcd", TokenKind::Identifier);
     }
 
     #[test]
     fn lex_left_parenthesis() {
-        check_token("(", Token::ParenOpen);
+        check_token("(", TokenKind::ParenOpen);
     }
 
     #[test]
     fn lex_right_parenthesis() {
-        check_token(")", Token::ParenClose);
+        check_token(")", TokenKind::ParenClose);
     }
 
     #[test]
     fn lex_left_brace() {
-        check_token("{", Token::BraceOpen);
+        check_token("{", TokenKind::BraceOpen);
     }
 
     #[test]
     fn lex_right_brace() {
-        check_token("}", Token::BraceClose);
+        check_token("}", TokenKind::BraceClose);
     }
 
     #[test]
     fn lex_left_bracket() {
-        check_token("[", Token::BracketOpen);
+        check_token("[", TokenKind::BracketOpen);
     }
 
     #[test]
     fn lex_right_bracket() {
-        check_token("]", Token::BracketClose);
+        check_token("]", TokenKind::BracketClose);
     }
 
     #[test]
     fn lex_comment() {
-        check_token("# foo", Token::Comment);
+        check_token("# foo", TokenKind::Comment);
     }
 
     #[test]
     fn lex_fn_keyword() {
-        check_token("fn", Token::Fn);
+        check_token("fn", TokenKind::Fn);
     }
 
     #[test]
     fn lex_let_keyword() {
-        check_token("let", Token::Let);
+        check_token("let", TokenKind::Let);
     }
 
     #[test]
     fn lex_if_keyword() {
-        check_token("if", Token::If);
+        check_token("if", TokenKind::If);
     }
 
     #[test]
     fn lex_then_keyword() {
-        check_token("then", Token::Then);
+        check_token("then", TokenKind::Then);
     }
 
     #[test]
     fn lex_else_keyword() {
-        check_token("else", Token::Else);
+        check_token("else", TokenKind::Else);
     }
 
     #[test]
     fn lex_match_keyword() {
-        check_token("match", Token::Match);
+        check_token("match", TokenKind::Match);
     }
 
     #[test]
     fn lex_case_keyword() {
-        check_token("case", Token::Case);
+        check_token("case", TokenKind::Case);
     }
 
     #[test]
     fn lex_type_keyword() {
-        check_token("type", Token::Type);
+        check_token("type", TokenKind::Type);
     }
 
     #[test]
     fn lex_enum_keyword() {
-        check_token("enum", Token::Enum);
+        check_token("enum", TokenKind::Enum);
     }
 
     #[test]
     fn lex_struct_keyword() {
-        check_token("struct", Token::Struct);
+        check_token("struct", TokenKind::Struct);
     }
 
     #[test]
     fn lex_prop_keyword() {
-        check_token("prop", Token::Prop);
+        check_token("prop", TokenKind::Prop);
     }
 
     #[test]
     fn lex_impl_keyword() {
-        check_token("impl", Token::Impl);
+        check_token("impl", TokenKind::Impl);
     }
 
     #[test]
     fn lex_trait_keyword() {
-        check_token("trait", Token::Trait);
+        check_token("trait", TokenKind::Trait);
     }
 
     #[test]
     fn lex_where_keyword() {
-        check_token("where", Token::Where);
+        check_token("where", TokenKind::Where);
     }
 
     #[test]
     fn lex_for_keyword() {
-        check_token("for", Token::For);
+        check_token("for", TokenKind::For);
     }
 
     #[test]
     fn lex_import_keyword() {
-        check_token("import", Token::Import);
+        check_token("import", TokenKind::Import);
     }
 
     #[test]
     fn lex_export_keyword() {
-        check_token("export", Token::Export);
+        check_token("export", TokenKind::Export);
     }
 
     #[test]
     fn lex_from_keyword() {
-        check_token("from", Token::From);
+        check_token("from", TokenKind::From);
     }
 
     #[test]
     fn lex_comma() {
-        check_token(",", Token::Comma);
+        check_token(",", TokenKind::Comma);
     }
 
     #[test]
     fn lex_colon() {
-        check_token(":", Token::Colon);
+        check_token(":", TokenKind::Colon);
     }
 
     #[test]
     fn lex_ellipses() {
-        check_token("...", Token::Ellipses);
+        check_token("...", TokenKind::Ellipses);
     }
 
     #[test]
     fn lex_dot() {
-        check_token(".", Token::Dot);
+        check_token(".", TokenKind::Dot);
     }
 
     #[test]
     fn lex_fat_arrow() {
-        check_token("=>", Token::FatArrow);
+        check_token("=>", TokenKind::FatArrow);
     }
 
     #[test]
     fn lex_plus() {
-        check_token("+", Token::Plus);
+        check_token("+", TokenKind::Plus);
     }
 
     #[test]
     fn lex_minus() {
-        check_token("-", Token::Minus);
+        check_token("-", TokenKind::Minus);
     }
 
     #[test]
     fn lex_star() {
-        check_token("*", Token::Multiply);
+        check_token("*", TokenKind::Multiply);
     }
 
     #[test]
     fn lex_slash() {
-        check_token("/", Token::Divide);
+        check_token("/", TokenKind::Divide);
     }
 
     #[test]
     fn lex_greater_equal() {
-        check_token(">=", Token::GreaterEqual);
+        check_token(">=", TokenKind::GreaterEqual);
     }
 
     #[test]
     fn lex_greater() {
-        check_token(">", Token::Greater);
+        check_token(">", TokenKind::Greater);
     }
 
     #[test]
     fn lex_less_equal() {
-        check_token("<=", Token::LessEqual);
+        check_token("<=", TokenKind::LessEqual);
     }
 
     #[test]
     fn lex_less() {
-        check_token("<", Token::Less);
+        check_token("<", TokenKind::Less);
     }
 
     #[test]
     fn lex_equal_equal() {
-        check_token("==", Token::EqualEqual);
+        check_token("==", TokenKind::EqualEqual);
     }
 
     #[test]
     fn lex_not_equal() {
-        check_token("!=", Token::NotEqual);
+        check_token("!=", TokenKind::NotEqual);
     }
 
     #[test]
     fn lex_equals() {
-        check_token("=", Token::Equal);
+        check_token("=", TokenKind::Equal);
     }
 
     #[test]
     fn lex_and_keyword() {
-        check_token("and", Token::And);
+        check_token("and", TokenKind::And);
     }
 
     #[test]
     fn lex_or_keyword() {
-        check_token("or", Token::Or);
+        check_token("or", TokenKind::Or);
     }
 
     #[test]
     fn lex_xor_keyword() {
-        check_token("xor", Token::Xor);
+        check_token("xor", TokenKind::Xor);
     }
 
     #[test]
     fn lex_not_keyword() {
-        check_token("not", Token::Not);
+        check_token("not", TokenKind::Not);
     }
 
     #[test]
     fn lex_rem_keyword() {
-        check_token("rem", Token::Rem);
+        check_token("rem", TokenKind::Rem);
     }
 }

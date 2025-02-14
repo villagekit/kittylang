@@ -1,6 +1,6 @@
 use std::mem;
 
-pub use kitty_lexer::Token as TokenKind;
+pub use kitty_lexer::TokenKind;
 
 pub type SyntaxBuilder = eventree::SyntaxBuilder<TreeConfig>;
 pub type SyntaxElement = eventree::SyntaxElement<TreeConfig>;

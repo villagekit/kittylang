@@ -2,58 +2,60 @@ mod indenter;
 mod token;
 
 use indenter::Indenter;
-use logos::{Logos, Span, SpannedIter};
+use logos::{Logos, SpannedIter};
 
-pub use crate::token::Token;
+pub use crate::token::{Token, TokenKind};
+
+pub fn lex(source: &str) -> impl Iterator<Item = Token> + '_ {
+    Lexer::new(source)
+}
 
 pub struct Lexer<'src> {
-    inner: Indenter<'src, SpannedIter<'src, Token>>,
+    inner: Indenter<'src, SpannedIter<'src, TokenKind>>,
 }
 
 impl<'src> Lexer<'src> {
     pub fn new(source: &'src str) -> Self {
-        let tokens = Token::lexer(source).spanned();
+        let tokens = TokenKind::lexer(source).spanned();
         let splitter = Indenter::new(source, tokens);
         Self { inner: splitter }
     }
 }
 
-impl<'src> Iterator for Lexer<'src> {
-    type Item = (Result<Token, <Token as Logos<'src>>::Error>, Span);
+impl Iterator for Lexer<'_> {
+    type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next()
+        match self.inner.next() {
+            Some((Ok(token), span)) => Some(Token::new(token, span)),
+            Some((Err(_), span)) => Some(Token::new(TokenKind::Error, span)),
+            None => None,
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::ops::Range;
+
     use super::*;
-    use crate::Lexer;
 
     #[test]
     fn run_tests() {
         kitty_test_utils::run_tests(|input| {
-            let lexer = Lexer::new(input);
-
-            let actual_tokens: Vec<(Token, Span)> =
-                lexer.map(|(tok, span)| (tok.unwrap(), span)).collect();
-
-            actual_tokens
-                .into_iter()
-                .map(|(token, span)| format!("{:?}@{:?}", token, span))
+            lex(input)
+                .map(|token| format!("{:?}@{:?}", token.kind, token.range))
                 .collect::<Vec<_>>()
                 .join("\n")
         });
     }
 
-    fn check_tokens(input: &str, expected_tokens: Vec<(Token, Span)>) {
-        let lexer = Lexer::new(input);
+    fn check_tokens(input: &str, expected: Vec<(TokenKind, Range<u32>)>) {
+        let actual: Vec<(TokenKind, Range<u32>)> = lex(input)
+            .map(|token| (token.kind, token.range.into()))
+            .collect();
 
-        let actual_tokens: Vec<(Token, Span)> =
-            lexer.map(|(tok, span)| (tok.unwrap(), span)).collect();
-
-        assert_eq!(expected_tokens, actual_tokens);
+        assert_eq!(expected, actual);
     }
 
     #[test]
@@ -63,7 +65,7 @@ fn foo()
   fn bar()
     baz
 ";
-        use Token::*;
+        use TokenKind::*;
         let expected = vec![
             (Newline, 0..1),
             (Fn, 1..3),
@@ -97,7 +99,7 @@ fn foo()
   baz
 
 ";
-        use Token::*;
+        use TokenKind::*;
         let expected = vec![
             (Newline, 0..1),
             (Fn, 1..3),
@@ -123,7 +125,7 @@ fn foo()
   baz
 foo()
 ";
-        use Token::*;
+        use TokenKind::*;
         let expected = vec![
             (Newline, 0..1),
             (Fn, 1..3),
