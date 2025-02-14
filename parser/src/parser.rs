@@ -55,7 +55,7 @@ impl<'tokens> Parser<'tokens> {
     }
 
     pub(crate) fn expect(&mut self, kind: TokenKind) {
-        self.expect_with_recovery_set(kind, TokenSet::default())
+        self.expect_with_recovery_set(kind, TokenSet::NONE)
     }
 
     pub(crate) fn expect_with_recovery_set(&mut self, kind: TokenKind, recovery_set: TokenSet) {
@@ -63,6 +63,18 @@ impl<'tokens> Parser<'tokens> {
             self.bump();
         } else {
             self.error_with_recovery_set(recovery_set);
+        }
+    }
+
+    pub(crate) fn expect_with_recovery_set_no_default(
+        &mut self,
+        kind: TokenKind,
+        recovery_set: TokenSet,
+    ) {
+        if self.at(kind) {
+            self.bump();
+        } else {
+            self.error_with_recovery_set_no_default(recovery_set);
         }
     }
 
@@ -81,8 +93,17 @@ impl<'tokens> Parser<'tokens> {
         self.error_with_recovery_set_no_default(recovery_set.union(DEFAULT_RECOVERY_SET))
     }
 
+    #[allow(unused)]
+    pub(crate) fn error(&mut self) -> Option<CompletedMarker> {
+        self.error_with_recovery_set_no_default(DEFAULT_RECOVERY_SET)
+    }
+
     pub(crate) fn error_with_no_skip(&mut self) -> Option<CompletedMarker> {
         self.error_with_recovery_set_no_default(TokenSet::ALL)
+    }
+
+    pub(crate) fn error_with_skip(&mut self) -> Option<CompletedMarker> {
+        self.error_with_recovery_set_no_default(TokenSet::NONE)
     }
 
     pub(crate) fn error_with_recovery_set_no_default(
@@ -106,18 +127,34 @@ impl<'tokens> Parser<'tokens> {
             return None;
         }
 
-        let found_token = self.tokens[self.token_idx];
+        let token = self.tokens[self.token_idx];
         self.errors.push(SyntaxError {
             expected_syntax,
-            kind: SyntaxErrorKind::Unexpected {
-                found: found_token.kind,
-                range: found_token.range,
+            kind: SyntaxErrorKind::UnexpectedToken {
+                found: token.kind,
+                range: token.range,
             },
         });
 
         let m = self.start();
         self.bump();
         Some(m.complete(self, NodeKind::Error))
+    }
+
+    pub(crate) fn mark_old_error(
+        &mut self,
+        found: NodeKind,
+        start_token_idx: usize,
+        end_token_idx: usize,
+        expected: ExpectedSyntax,
+    ) {
+        let start_token = self.tokens[start_token_idx];
+        let end_token = self.tokens[end_token_idx];
+        let range = start_token.range.cover(end_token.range);
+        self.errors.push(SyntaxError {
+            expected_syntax: expected,
+            kind: SyntaxErrorKind::UnexpectedNode { found, range },
+        });
     }
 
     #[must_use]
@@ -145,6 +182,42 @@ impl<'tokens> Parser<'tokens> {
         self.at_raw(kind)
     }
 
+    pub(crate) fn at_ahead(&mut self, offset: usize, set: TokenSet) -> bool {
+        let original_token_idx = self.token_idx;
+
+        for _ in 0..offset {
+            self.skip_trivia();
+            self.token_idx += 1;
+            if self.at_eof() {
+                self.token_idx = original_token_idx;
+                return false;
+            }
+        }
+        let res = self.at_set(set);
+
+        self.token_idx = original_token_idx;
+
+        res
+    }
+
+    pub(crate) fn at_eof_ahead(&mut self, offset: usize) -> bool {
+        let original_token_idx = self.token_idx;
+
+        for _ in 0..offset {
+            self.skip_trivia();
+            self.token_idx += 1;
+            if self.at_eof() {
+                self.token_idx = original_token_idx;
+                return true;
+            }
+        }
+        let res = self.at_eof();
+
+        self.token_idx = original_token_idx;
+
+        res
+    }
+
     pub(crate) fn at_eof(&mut self) -> bool {
         self.skip_trivia();
         self.token_idx >= self.tokens.len()
@@ -156,7 +229,12 @@ impl<'tokens> Parser<'tokens> {
 
     pub(crate) fn at_set(&mut self, set: TokenSet) -> bool {
         self.skip_trivia();
-        self.peek().map_or(false, |kind| set.contains(kind))
+        self.peek_raw().is_some_and(|kind| set.contains(kind))
+    }
+
+    pub(crate) fn kind(&mut self) -> Option<TokenKind> {
+        self.skip_trivia();
+        self.peek_raw()
     }
 
     pub(crate) fn bump(&mut self) {
@@ -172,13 +250,44 @@ impl<'tokens> Parser<'tokens> {
     }
 
     fn previous_token_range(&mut self) -> TextRange {
-        let mut previous_token_idx = self.token_idx - 1;
+        let mut previous_token_idx = if let Some(idx) = self.token_idx.checked_sub(1) {
+            idx
+        } else {
+            return self.tokens[self.token_idx].range;
+        };
 
-        while self.at_trivia() {
-            previous_token_idx -= 1;
+        while self.tokens[previous_token_idx].kind.is_trivia() {
+            previous_token_idx = if let Some(idx) = previous_token_idx.checked_sub(1) {
+                idx
+            } else {
+                return self.tokens[self.token_idx].range;
+            }
         }
 
-        self.get_range(previous_token_idx).unwrap()
+        self.tokens[previous_token_idx].range
+    }
+
+    pub(crate) fn previous_token_kind(&mut self) -> TokenKind {
+        let mut previous_token_idx = if let Some(idx) = self.token_idx.checked_sub(1) {
+            idx
+        } else {
+            return self.tokens[self.token_idx].kind;
+        };
+
+        while self.tokens[previous_token_idx].kind.is_trivia() {
+            previous_token_idx = if let Some(idx) = previous_token_idx.checked_sub(1) {
+                idx
+            } else {
+                return self.tokens[self.token_idx].kind;
+            }
+        }
+
+        self.tokens[previous_token_idx].kind
+    }
+
+    pub(crate) fn peek(&mut self) -> Option<TokenKind> {
+        self.skip_trivia();
+        self.peek_raw()
     }
 
     fn skip_trivia(&mut self) {
@@ -187,26 +296,16 @@ impl<'tokens> Parser<'tokens> {
         }
     }
 
-    fn at_raw(&self, kind: TokenKind) -> bool {
-        self.peek().map_or(false, |k| k == kind)
-    }
-
     fn at_trivia(&self) -> bool {
-        self.peek().map_or(false, |kind| kind.is_trivia())
+        self.peek_raw().map_or(false, |kind| kind.is_trivia())
     }
 
-    fn get_token(&self, token_idx: usize) -> Option<Token> {
-        self.tokens.get(token_idx).copied()
-    }
-    fn get_kind(&self, token_idx: usize) -> Option<TokenKind> {
-        self.get_token(token_idx).map(|tok| tok.kind)
-    }
-    fn get_range(&self, token_idx: usize) -> Option<TextRange> {
-        self.get_token(token_idx).map(|tok| tok.range)
+    fn at_raw(&self, kind: TokenKind) -> bool {
+        self.peek_raw().is_some_and(|k| k == kind)
     }
 
-    fn peek(&self) -> Option<TokenKind> {
-        self.get_kind(self.token_idx)
+    fn peek_raw(&self) -> Option<TokenKind> {
+        self.tokens.get(self.token_idx).map(|token| token.kind)
     }
 }
 

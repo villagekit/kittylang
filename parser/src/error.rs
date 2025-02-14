@@ -1,4 +1,4 @@
-use kitty_syntax::TokenKind;
+use kitty_syntax::{NodeKind, TokenKind};
 use std::fmt;
 use text_size::{TextRange, TextSize};
 
@@ -11,7 +11,8 @@ pub struct SyntaxError {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SyntaxErrorKind {
     Missing { offset: TextSize },
-    Unexpected { found: TokenKind, range: TextRange },
+    UnexpectedToken { found: TokenKind, range: TextRange },
+    UnexpectedNode { found: NodeKind, range: TextRange },
 }
 
 impl fmt::Debug for SyntaxError {
@@ -19,7 +20,13 @@ impl fmt::Debug for SyntaxError {
         write!(f, "error at ")?;
         match self.kind {
             SyntaxErrorKind::Missing { offset } => write!(f, "{}", u32::from(offset))?,
-            SyntaxErrorKind::Unexpected { range, .. } => write!(
+            SyntaxErrorKind::UnexpectedToken { range, .. } => write!(
+                f,
+                "{}..{}",
+                u32::from(range.start()),
+                u32::from(range.end())
+            )?,
+            SyntaxErrorKind::UnexpectedNode { range, .. } => write!(
                 f,
                 "{}..{}",
                 u32::from(range.start()),
@@ -38,7 +45,12 @@ impl fmt::Debug for SyntaxError {
                 write!(f, "missing ")?;
                 format_expected_syntax(f)?;
             }
-            SyntaxErrorKind::Unexpected { found, .. } => {
+            SyntaxErrorKind::UnexpectedToken { found, .. } => {
+                write!(f, "expected ")?;
+                format_expected_syntax(f)?;
+                write!(f, " but found {:?}", found)?;
+            }
+            SyntaxErrorKind::UnexpectedNode { found, .. } => {
                 write!(f, "expected ")?;
                 format_expected_syntax(f)?;
                 write!(f, " but found {:?}", found)?;
