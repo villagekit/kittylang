@@ -11,8 +11,8 @@ use kitty_lexer::{lex, Token};
 use kitty_syntax::SyntaxTreeBuf;
 use std::fmt;
 
-use crate::error::SyntaxError;
-use crate::event::{process_events, Event};
+use crate::error::ParseError;
+use crate::event::process_events;
 use crate::parser::Parser;
 
 pub fn parse(input: &str) -> Parse<Source> {
@@ -26,7 +26,7 @@ pub fn parse(input: &str) -> Parse<Source> {
 pub struct Parse<N: CstNode> {
     pub tree: SyntaxTreeBuf,
     pub node: N,
-    pub errors: Vec<SyntaxError>,
+    pub errors: Vec<ParseError>,
 }
 
 impl<N: CstNode> fmt::Debug for Parse<N> {
