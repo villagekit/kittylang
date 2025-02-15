@@ -3,6 +3,7 @@ mod event;
 mod grammar;
 mod marker;
 mod parser;
+mod source;
 mod token_set;
 
 use kitty_cst::{CstNode, Source};
