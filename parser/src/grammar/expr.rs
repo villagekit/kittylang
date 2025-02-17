@@ -1,7 +1,7 @@
 use kitty_syntax::{NodeKind, TokenKind};
 
 use super::*;
-use crate::marker::CompletedMarker;
+use crate::{marker::CompletedMarker, token_set::TokenSet};
 
 /// Entry point: parse an expression.
 #[allow(dead_code)]
@@ -36,16 +36,15 @@ fn parse_expr_with_bp(p: &mut Parser, min_bp: u8) -> Option<CompletedMarker> {
             break;
         }
 
-        println!("consume operator");
-        p.debug_source();
-
-        println!("lhs: {:?}", lhs);
-
         p.bump(); // Consume the operator.
 
         let m = lhs.precede(p);
-        parse_expr_with_bp(p, right_bp);
+        let rhs = parse_expr_with_bp(p, right_bp);
         lhs = m.complete(p, NodeKind::BinaryExpr);
+
+        if rhs.is_none() {
+            break;
+        }
     }
 
     Some(lhs)
@@ -65,14 +64,11 @@ fn parse_lhs(p: &mut Parser) -> Option<CompletedMarker> {
 
 /// Parse a primary expression.
 fn parse_primary(p: &mut Parser) -> Option<CompletedMarker> {
-    println!("parse_primary");
-    p.debug_source();
     let cm = if p.at(TokenKind::Identifier) {
         parse_kind(p, NodeKind::VariableRef)
     } else if p.at(TokenKind::Boolean) {
         parse_kind(p, NodeKind::BooleanLiteral)
     } else if p.at(TokenKind::Number) {
-        println!("how the fuck");
         parse_kind(p, NodeKind::NumberLiteral)
     } else if p.at(TokenKind::String) {
         parse_kind(p, NodeKind::StringLiteral)
@@ -179,8 +175,12 @@ fn parse_if_expr(p: &mut Parser) -> CompletedMarker {
 
 /// Return the binding power for a unary operator at the current token, if any.
 fn unary_binding_power(p: &mut Parser) -> Option<u8> {
-    if p.at(TokenKind::Minus) || p.at(TokenKind::Plus) || p.at(TokenKind::Not) {
-        Some(13)
+    if p.at_set(&TokenSet::new([
+        TokenKind::Minus,
+        TokenKind::Plus,
+        TokenKind::Not,
+    ])) {
+        Some(15)
     } else {
         None
     }
@@ -191,35 +191,44 @@ fn binary_binding_power(p: &mut Parser) -> Option<(u8, u8)> {
     // Binding power for binary operations, in order of highest to lowest.
     //
     // Multiplicative (Factor) operators
-    if p.at(TokenKind::Multiply) || p.at(TokenKind::Divide) || p.at(TokenKind::Rem) {
-        Some((11, 12))
+    if p.at_set(&TokenSet::new([
+        TokenKind::Multiply,
+        TokenKind::Divide,
+        TokenKind::Rem,
+    ])) {
+        Some((13, 14))
     }
     // Additive (Term) operators
-    else if p.at(TokenKind::Plus) || p.at(TokenKind::Minus) {
-        Some((9, 10))
+    else if p.at_set(&TokenSet::new([TokenKind::Plus, TokenKind::Minus])) {
+        Some((11, 12))
     }
     // Bitwise shift
     // Comparison
-    else if p.at(TokenKind::Less)
-        || p.at(TokenKind::LessEqual)
-        || p.at(TokenKind::Greater)
-        || p.at(TokenKind::GreaterEqual)
-    {
-        Some((7, 8))
+    else if p.at_set(&TokenSet::new([
+        TokenKind::Less,
+        TokenKind::LessEqual,
+        TokenKind::Greater,
+        TokenKind::GreaterEqual,
+    ])) {
+        Some((9, 10))
     }
     // Equality
-    else if p.at(TokenKind::EqualEqual) || p.at(TokenKind::NotEqual) {
-        Some((5, 6))
+    else if p.at_set(&TokenSet::new([TokenKind::EqualEqual, TokenKind::NotEqual])) {
+        Some((7, 8))
     }
     // Bitwise And
     // Bitwise Xor
     // Bitwise Or
     // Logical And
     else if p.at(TokenKind::And) {
+        Some((5, 6))
+    }
+    // Logical Xor
+    else if p.at(TokenKind::Xor) {
         Some((3, 4))
     }
     // Logical Or
-    else if p.at(TokenKind::Or) || p.at(TokenKind::Xor) {
+    else if p.at(TokenKind::Or) {
         Some((1, 2))
     } else {
         None
@@ -436,7 +445,7 @@ mod tests {
     }
 
     #[test]
-    fn do_not_parse_operator_if_gettting_rhs_failed() {
+    fn do_not_parse_operator_if_getting_rhs_failed() {
         check(
             "(1+",
             expect![[r#"
@@ -446,8 +455,8 @@ mod tests {
                     NumberLiteral@1..2
                       Number@1..2 "1"
                     Plus@2..3 "+"
-                ParseError { expected: [Minus, Plus, Not, Identifier, Boolean, Number, String, ParenOpen, Indent, Let, If], found: None, range: 2..3 }
-                ParseError { expected: [Minus, Plus, Not, Identifier, Boolean, Number, String, ParenOpen, Indent, Let, If, Indent, Dedent, ParenOpen, Dot, Multiply, Divide, Rem, Plus, Minus, Less, LessEqual, Greater, GreaterEqual, EqualEqual, NotEqual, And, Or, Xor, Comma, ParenClose], found: None, range: 2..3 }"#]],
+                error at 2..3: expected ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘let’ or ‘if’
+                error at 2..3: expected ‘)’"#]],
         );
     }
 
@@ -537,7 +546,7 @@ mod tests {
                   ParenOpen@0..1 "("
                   VariableRef@1..4
                     Identifier@1..4 "foo"
-                ParseError { expected: [ParenOpen, Dot, Multiply, Divide, Rem, Plus, Minus, Less, LessEqual, Greater, GreaterEqual, EqualEqual, NotEqual, And, Or, Xor, Comma, ParenClose], found: None, range: 1..4 }"#]],
+                error at 1..4: expected ‘)’"#]],
         );
     }
 }

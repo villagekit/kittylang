@@ -24,10 +24,6 @@ pub(crate) struct Parser<'t> {
 
 impl<'t> Parser<'t> {
     pub(crate) fn new(tokens: &'t [Token]) -> Self {
-        println!("\ntokens:");
-        for token in tokens {
-            println!("{:?}", token);
-        }
         let source = Source::new(tokens);
         Parser {
             source,
@@ -61,6 +57,7 @@ impl<'t> Parser<'t> {
     }
 
     pub(crate) fn expect_with_recovery(&mut self, kind: TokenKind, recovery: TokenSet) {
+        self.expected_kinds.clear();
         if self.at(kind) {
             self.bump();
         } else {
