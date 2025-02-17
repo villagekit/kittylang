@@ -1,3 +1,5 @@
+use std::sync::LazyLock;
+
 use kitty_lexer::Token;
 use kitty_syntax::{NodeKind, TokenKind};
 
@@ -9,8 +11,8 @@ use crate::{
     token_set::TokenSet,
 };
 
-const DEFAULT_RECOVERY_SET: TokenSet =
-    TokenSet::new([TokenKind::Newline, TokenKind::Indent, TokenKind::Dedent]);
+static DEFAULT_RECOVERY_SET: LazyLock<TokenSet> =
+    LazyLock::new(|| TokenSet::new([TokenKind::Newline, TokenKind::Indent, TokenKind::Dedent]));
 
 pub(crate) struct Parser<'t> {
     source: Source<'t>,
@@ -62,7 +64,7 @@ impl<'t> Parser<'t> {
     }
 
     pub(crate) fn error(&mut self) -> Option<CompletedMarker> {
-        self.error_with_recovery_raw(DEFAULT_RECOVERY_SET)
+        self.error_with_recovery(TokenSet::none())
     }
 
     pub(crate) fn error_with_recovery(

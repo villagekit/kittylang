@@ -33,7 +33,7 @@ pub enum TokenKind {
     Boolean,
     #[regex(r#""([^"\\]|\\t|\\u|\\n|\\")*""#)]
     String,
-    #[regex(r"-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?")]
+    #[regex(r"(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?")]
     Number,
 
     #[regex(r"[\p{XID_Start}_]\p{XID_Continue}*")]

@@ -5,7 +5,7 @@ use kitty_lexer::TokenKind;
 pub(crate) struct TokenSet(BTreeSet<TokenKind>);
 
 impl TokenSet {
-    pub(crate) const fn new<const LEN: usize>(items: [TokenKind; LEN]) -> Self {
+    pub(crate) fn new<const LEN: usize>(items: [TokenKind; LEN]) -> Self {
         Self(items.iter().cloned().collect())
     }
 

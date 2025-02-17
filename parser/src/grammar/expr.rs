@@ -181,9 +181,9 @@ fn unary_binding_power(p: &mut Parser) -> Option<u8> {
 
 /// Return the binding power for a binary operator at the current token, if any.
 fn binary_binding_power(p: &mut Parser) -> Option<(u8, u8)> {
-    if p.at(TokenKind::Plus) || p.at(TokenKind::Minus) {
+    if p.at(TokenKind::Multiply) || p.at(TokenKind::Divide) || p.at(TokenKind::Rem) {
         Some((11, 12))
-    } else if p.at(TokenKind::Multiply) || p.at(TokenKind::Divide) || p.at(TokenKind::Rem) {
+    } else if p.at(TokenKind::Plus) || p.at(TokenKind::Minus) {
         Some((9, 10))
     } else if p.at(TokenKind::Less)
         || p.at(TokenKind::LessEqual)
@@ -311,7 +311,7 @@ mod tests {
         check(
             "1+2*3-4",
             expect![[r#"
-                BinaryExpr@0..5
+                BinaryExpr@0..7
                   BinaryExpr@0..3
                     NumberLiteral@0..1
                       Number@0..1 "1"
@@ -319,8 +319,12 @@ mod tests {
                     NumberLiteral@2..3
                       Number@2..3 "2"
                   Multiply@3..4 "*"
-                  NumberLiteral@4..5
-                    Number@4..5 "3""#]],
+                  BinaryExpr@4..7
+                    NumberLiteral@4..5
+                      Number@4..5 "3"
+                    Minus@5..6 "-"
+                    NumberLiteral@6..7
+                      Number@6..7 "4""#]],
         );
     }
 
@@ -372,9 +376,9 @@ mod tests {
                   BinaryExpr@1..3
                     NumberLiteral@1..2
                       Number@1..2 "1"
-                    Plus@2..3 "+"ParseError { expected: [Minus, Plus, Not, Identifier, Boolean, Number, String, ParenOpen, Indent, Let, If], found: None, range: 2..3 }
-                ParseError { expected: [Minus, Plus, Not, Identifier, Boolean, Number, String, ParenOpen, Indent, Let, If, Comma, ParenClose], found: None, range: 2..3 }
-            "#]],
+                    Plus@2..3 "+"
+                ParseError { expected: [Minus, Plus, Not, Identifier, Boolean, Number, String, ParenOpen, Indent, Let, If], found: None, range: 2..3 }
+                ParseError { expected: [Minus, Plus, Not, Identifier, Boolean, Number, String, ParenOpen, Indent, Let, If, Newline, Indent, Dedent, Comma, ParenClose], found: None, range: 2..3 }"#]],
         );
     }
 
@@ -383,8 +387,10 @@ mod tests {
         check(
             "-10",
             expect![[r#"
-                NumberLiteral@0..3
-                  Number@0..3 "-10""#]],
+                UnaryExpr@0..3
+                  Minus@0..1 "-"
+                  NumberLiteral@1..3
+                    Number@1..3 "10""#]],
         );
     }
 
@@ -394,8 +400,10 @@ mod tests {
             "-20+20",
             expect![[r#"
                 BinaryExpr@0..6
-                  NumberLiteral@0..3
-                    Number@0..3 "-20"
+                  UnaryExpr@0..3
+                    Minus@0..1 "-"
+                    NumberLiteral@1..3
+                      Number@1..3 "20"
                   Plus@3..4 "+"
                   NumberLiteral@4..6
                     Number@4..6 "20""#]],
@@ -459,8 +467,8 @@ mod tests {
                 ParenExpr@0..4
                   ParenOpen@0..1 "("
                   VariableRef@1..4
-                    Identifier@1..4 "foo"ParseError { expected: [ParenOpen, Dot, Plus, Minus, Multiply, Divide, Rem, Less, LessEqual, Greater, GreaterEqual, EqualEqual, NotEqual, And, Or, Xor, Comma, ParenClose], found: None, range: 1..4 }
-            "#]],
+                    Identifier@1..4 "foo"
+                ParseError { expected: [ParenOpen, Dot, Plus, Minus, Multiply, Divide, Rem, Less, LessEqual, Greater, GreaterEqual, EqualEqual, NotEqual, And, Or, Xor, Comma, ParenClose], found: None, range: 1..4 }"#]],
         );
     }
 }
