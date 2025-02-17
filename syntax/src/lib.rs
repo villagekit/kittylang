@@ -41,8 +41,10 @@ pub enum NodeKind {
     Source,
 
     // Expressions
-    IdentifierExpr,
-    LiteralExpr,
+    VariableRef,
+    BooleanLiteral,
+    NumberLiteral,
+    StringLiteral,
     ParenExpr,
     BlockExpr,
     FunctionExpr,

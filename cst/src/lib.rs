@@ -53,14 +53,15 @@ macro_rules! define_compound_node {
 		impl CstNode for $name {
 			fn cast(syntax: SyntaxNode, tree: &SyntaxTree) -> Option<Self> {
 				match syntax.kind(tree) {
-					$( NodeKind::$kind => Some(Self::$kind($kind(syntax))), )+
+//					$( NodeKind::$kind => Some(Self::$kind($kind(syntax))), )+
+					$( NodeKind::$kind => $kind::cast(syntax, tree).map(Self::$kind), )+
 					_ => None
 				}
 			}
 
 			fn syntax(self) -> SyntaxNode {
 				match self {
-					$( Self::$kind($kind(s)) => s, )+
+					$( Self::$kind(s) => s.syntax(), )+
 				}
 			}
 		}
@@ -120,9 +121,10 @@ impl Source {
 }
 
 // Expressions
-define_node!(IdentifierExpr);
-define_node!(LiteralExpr);
-
+define_node!(VariableRef);
+define_node!(BooleanLiteral);
+define_node!(NumberLiteral);
+define_node!(StringLiteral);
 define_node!(ParenExpr);
 define_node!(BlockExpr);
 define_node!(LetExpr);
@@ -163,7 +165,25 @@ impl BinaryExpr {
     }
 }
 define_node!(GetExpr);
-define_compound_node!(Expr, kinds: [IdentifierExpr, LiteralExpr, ParenExpr, BlockExpr, LetExpr, IfExpr, MatchExpr, CallExpr, TupleExpr, UnaryExpr, BinaryExpr, GetExpr]);
+define_compound_node!(
+    Expr,
+    kinds: [
+        BooleanLiteral,
+        NumberLiteral,
+        StringLiteral,
+        VariableRef,
+        ParenExpr,
+        BlockExpr,
+        LetExpr,
+        IfExpr,
+        MatchExpr,
+        CallExpr,
+        TupleExpr,
+        UnaryExpr,
+        BinaryExpr,
+        GetExpr
+    ]
+);
 
 // Match
 define_node!(MatchExpr);
@@ -192,16 +212,10 @@ pub enum TypeAnnotation {
 impl CstNode for TypeAnnotation {
     fn cast(syntax: SyntaxNode, tree: &SyntaxTree) -> Option<Self> {
         match syntax.kind(tree) {
-            NodeKind::TypeName => Some(Self::TypePath(TypePath::TypeName(TypeName(syntax)))),
-            NodeKind::TypeGeneric => {
-                Some(Self::TypePath(TypePath::TypeGeneric(TypeGeneric(syntax))))
-            }
-            NodeKind::TypeProjection => Some(Self::TypePath(TypePath::TypeProjection(
-                TypeProjection(syntax),
-            ))),
-            NodeKind::TypeAssociation => Some(Self::TypePath(TypePath::TypeAssociation(
-                TypeAssociation(syntax),
-            ))),
+            NodeKind::TypeName
+            | NodeKind::TypeGeneric
+            | NodeKind::TypeProjection
+            | NodeKind::TypeAssociation => TypePath::cast(syntax, tree).map(Self::TypePath),
             NodeKind::TypeTuple => Some(Self::TypeTuple(TypeTuple(syntax))),
             NodeKind::TypeFunction => Some(Self::TypeFunction(TypeFunction(syntax))),
             NodeKind::TypeTrait => Some(Self::TypeTrait(TypeTrait(syntax))),
@@ -235,7 +249,6 @@ define_node!(TypeBounds);
 define_token!(Boolean);
 define_token!(Number);
 define_token!(String);
-define_compound_token!(Literal, kinds: [Boolean, Number, String]);
 
 // Identifier
 define_token!(Identifier);

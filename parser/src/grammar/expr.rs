@@ -59,13 +59,13 @@ fn parse_lhs(p: &mut Parser) -> Option<CompletedMarker> {
 /// Parse a primary expression.
 fn parse_primary(p: &mut Parser) -> Option<CompletedMarker> {
     if p.at(TokenKind::Identifier) {
-        let m = p.start();
-        p.bump();
-        return Some(m.complete(p, NodeKind::IdentifierExpr));
-    } else if p.at(TokenKind::Number) || p.at(TokenKind::String) || p.at(TokenKind::Boolean) {
-        let m = p.start();
-        p.bump();
-        return Some(m.complete(p, NodeKind::LiteralExpr));
+        return parse_kind(p, NodeKind::VariableRef);
+    } else if p.at(TokenKind::Boolean) {
+        return parse_kind(p, NodeKind::BooleanLiteral);
+    } else if p.at(TokenKind::Number) {
+        return parse_kind(p, NodeKind::NumberLiteral);
+    } else if p.at(TokenKind::String) {
+        return parse_kind(p, NodeKind::StringLiteral);
     } else if p.at(TokenKind::ParenOpen) {
         return parse_paren_expr(p);
     } else if p.at(TokenKind::Indent) {
@@ -77,6 +77,12 @@ fn parse_primary(p: &mut Parser) -> Option<CompletedMarker> {
     }
     p.error();
     None
+}
+
+fn parse_kind(p: &mut Parser, kind: NodeKind) -> Option<CompletedMarker> {
+    let m = p.start();
+    p.bump();
+    return Some(m.complete(p, kind));
 }
 
 /// Parse a call expression given an existing `lhs`.
@@ -211,7 +217,7 @@ mod tests {
         check(
             "123",
             expect![[r#"
-                LiteralExpr@0..3
+                NumberLiteral@0..3
                   Number@0..3 "123""#]],
         );
     }
@@ -221,7 +227,7 @@ mod tests {
         check(
             "   9876",
             expect![[r#"
-                LiteralExpr@0..7
+                NumberLiteral@0..7
                   Whitespace@0..3 "   "
                   Number@3..7 "9876""#]],
         );
@@ -232,7 +238,7 @@ mod tests {
         check(
             "999   ",
             expect![[r#"
-                LiteralExpr@0..6
+                NumberLiteral@0..6
                   Number@0..3 "999"
                   Whitespace@3..6 "   ""#]],
         );
@@ -243,7 +249,7 @@ mod tests {
         check(
             " 123     ",
             expect![[r#"
-                LiteralExpr@0..9
+                NumberLiteral@0..9
                   Whitespace@0..1 " "
                   Number@1..4 "123"
                   Whitespace@4..9 "     ""#]],
@@ -255,7 +261,7 @@ mod tests {
         check(
             "counter",
             expect![[r#"
-                IdentifierExpr@0..7
+                VariableRef@0..7
                   Identifier@0..7 "counter""#]],
         );
     }
@@ -266,10 +272,10 @@ mod tests {
             "1+2",
             expect![[r#"
                 BinaryExpr@0..3
-                  LiteralExpr@0..1
+                  NumberLiteral@0..1
                     Number@0..1 "1"
                   Plus@1..2 "+"
-                  LiteralExpr@2..3
+                  NumberLiteral@2..3
                     Number@2..3 "2""#]],
         );
     }
@@ -282,16 +288,16 @@ mod tests {
                 BinaryExpr@0..7
                   BinaryExpr@0..5
                     BinaryExpr@0..3
-                      LiteralExpr@0..1
+                      NumberLiteral@0..1
                         Number@0..1 "1"
                       Plus@1..2 "+"
-                      LiteralExpr@2..3
+                      NumberLiteral@2..3
                         Number@2..3 "2"
                     Plus@3..4 "+"
-                    LiteralExpr@4..5
+                    NumberLiteral@4..5
                       Number@4..5 "3"
                   Plus@5..6 "+"
-                  LiteralExpr@6..7
+                  NumberLiteral@6..7
                     Number@6..7 "4""#]],
         );
     }
@@ -303,13 +309,13 @@ mod tests {
             expect![[r#"
                 BinaryExpr@0..5
                   BinaryExpr@0..3
-                    LiteralExpr@0..1
+                    NumberLiteral@0..1
                       Number@0..1 "1"
                     Plus@1..2 "+"
-                    LiteralExpr@2..3
+                    NumberLiteral@2..3
                       Number@2..3 "2"
                   Multiply@3..4 "*"
-                  LiteralExpr@4..5
+                  NumberLiteral@4..5
                     Number@4..5 "3""#]],
         );
     }
@@ -322,16 +328,16 @@ mod tests {
                 BinaryExpr@0..12
                   Whitespace@0..1 " "
                   BinaryExpr@1..8
-                    LiteralExpr@1..2
+                    NumberLiteral@1..2
                       Number@1..2 "1"
                     Whitespace@2..3 " "
                     Plus@3..4 "+"
                     Whitespace@4..7 "   "
-                    LiteralExpr@7..8
+                    NumberLiteral@7..8
                       Number@7..8 "2"
                   Multiply@8..9 "*"
                   Whitespace@9..10 " "
-                  LiteralExpr@10..11
+                  NumberLiteral@10..11
                     Number@10..11 "3"
                   Whitespace@11..12 " ""#]],
         );
@@ -345,7 +351,7 @@ mod tests {
   + 1 # Add one
   + 10 # Add ten",
             expect![[r#"
-                LiteralExpr@0..3
+                NumberLiteral@0..3
                   Newline@0..1 "\n"
                   Number@1..2 "1"
                   Newline@2..3 "\n""#]],
@@ -374,7 +380,7 @@ error at 2..3: expected ‘)’"#]],
         check(
             "-10",
             expect![[r#"
-                LiteralExpr@0..3
+                NumberLiteral@0..3
                   Number@0..3 "-10""#]],
         );
     }
@@ -385,10 +391,10 @@ error at 2..3: expected ‘)’"#]],
             "-20+20",
             expect![[r#"
                 BinaryExpr@0..6
-                  LiteralExpr@0..3
+                  NumberLiteral@0..3
                     Number@0..3 "-20"
                   Plus@3..4 "+"
-                  LiteralExpr@4..6
+                  NumberLiteral@4..6
                     Number@4..6 "20""#]],
         );
     }
@@ -410,7 +416,7 @@ error at 2..3: expected ‘)’"#]],
                           ParenOpen@4..5 "("
                           ParenExpr@5..9
                             ParenOpen@5..6 "("
-                            LiteralExpr@6..8
+                            NumberLiteral@6..8
                               Number@6..8 "10"
                             ParenClose@8..9 ")"
                           ParenClose@9..10 ")"
@@ -427,16 +433,16 @@ error at 2..3: expected ‘)’"#]],
             "5*(2+1)",
             expect![[r#"
                 BinaryExpr@0..7
-                  LiteralExpr@0..1
+                  NumberLiteral@0..1
                     Number@0..1 "5"
                   Multiply@1..2 "*"
                   ParenExpr@2..7
                     ParenOpen@2..3 "("
                     BinaryExpr@3..6
-                      LiteralExpr@3..4
+                      NumberLiteral@3..4
                         Number@3..4 "2"
                       Plus@4..5 "+"
-                      LiteralExpr@5..6
+                      NumberLiteral@5..6
                         Number@5..6 "1"
                     ParenClose@6..7 ")""#]],
         );
@@ -449,7 +455,7 @@ error at 2..3: expected ‘)’"#]],
             expect![[r#"
                 ParenExpr@0..4
                   ParenOpen@0..1 "("
-                  IdentifierExpr@1..4
+                  VariableRef@1..4
                     Identifier@1..4 "foo"ParseError { expected: [ParenOpen, Dot, Plus, Minus, Multiply, Divide, Rem, Less, LessEqual, Greater, GreaterEqual, EqualEqual, NotEqual, And, Or, Xor, Comma, ParenClose], found: None, range: 1..4 }
             "#]],
         );
