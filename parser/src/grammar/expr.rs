@@ -3,15 +3,62 @@ use kitty_syntax::{NodeKind, TokenKind};
 use super::*;
 use crate::marker::CompletedMarker;
 
-/// Entry point: parse an expression.
-pub(super) fn expr(p: &mut Parser) -> Option<CompletedMarker> {
-    parse_expr(p, 0)
+// Operator precedence.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd)]
+#[repr(u8)]
+enum Precendence {
+    Lowest,
+    /// =
+    Assignment,
+    // if
+    Conditional,
+    /// or
+    Or,
+    /// and
+    And,
+    /// ==, !=
+    Equality,
+    /// <, >, <=, >=
+    Comparison,
+    /// +, -
+    Term,
+    /// *, /
+    Factor,
+    // ^
+    Exponent,
+    /// not, +, -
+    Unary,
+    /// .
+    Field,
+    /// ()
+    Call,
+    Primary,
 }
 
-/// Parse an expression with a given minimum binding power.
-fn parse_expr(p: &mut Parser, min_bp: u8) -> Option<CompletedMarker> {
-    // First, parse a prefix (or primary) expression.
-    let mut lhs = parse_prefix(p)?;
+struct BindingPower(u32);
+
+impl From<Precendence> for BindingPower {
+    fn from(value: Precendence) -> Self {
+        Self(value as u32 * 10)
+    }
+}
+
+impl BindingPower {
+    fn raise(mut self) -> Self {
+        self.0 = self.0.saturating_add(1);
+        self
+    }
+}
+
+/// Entry point: parse an expression.
+pub(super) fn parse_expr(p: &mut Parser) -> Option<CompletedMarker> {
+    parse_expr_with_bp(p, Precendence::Lowest.into())
+}
+
+/// Parse an expression with a given right binding power.
+fn parse_expr_with_bp(p: &mut Parser, min_bp: BindingPower) -> Option<CompletedMarker> {
+    // First, parse a left-hand side (prefix or primary) expression.
+    let mut lhs = parse_lhs(p)?;
 
     loop {
         // Check for postfix operators inline.
@@ -37,15 +84,15 @@ fn parse_expr(p: &mut Parser, min_bp: u8) -> Option<CompletedMarker> {
 
         p.bump(); // Consume the operator.
         let m = lhs.precede(p);
-        parse_expr(p, right_bp)?;
+        parse_expr_with_bp(p, right_bp)?;
         lhs = m.complete(p, NodeKind::BinaryExpr);
     }
 
     Some(lhs)
 }
 
-/// Parse a prefix expression, which may be a unary operator or simply a primary.
-fn parse_prefix(p: &mut Parser) -> Option<CompletedMarker> {
+/// Parse a left-hand side expression, which may be a prefix operator or a primary.
+fn parse_lhs(p: &mut Parser) -> Option<CompletedMarker> {
     if let Some(bp) = prefix_binding_power(p) {
         // A prefix operator is present.
         let m = p.start();
@@ -156,13 +203,21 @@ fn parse_if_expr(p: &mut Parser) -> Option<CompletedMarker> {
     Some(m.complete(p, NodeKind::IfExpr))
 }
 
+/// Return the binding power for a prefix operator at the current token, if any.
+fn prefix_binding_power(p: &mut Parser) -> Option<BindingPower> {
+    if p.at(TokenKind::Minus) || p.at(TokenKind::Plus) || p.at(TokenKind::Not) {
+        Some(BindingPower::Prefix)
+    } else {
+        None
+    }
+}
+
 /// Return the binding power for a binary operator at the current token, if any.
-/// The returned tuple is (left_binding_power, right_binding_power).
-fn binary_binding_power(p: &mut Parser) -> Option<(u8, u8)> {
+fn binary_binding_power(p: &mut Parser) -> Option<BindingPower> {
     if p.at(TokenKind::Plus) || p.at(TokenKind::Minus) {
-        Some((9, 10))
+        Some(BindingPower::Sum)
     } else if p.at(TokenKind::Multiply) || p.at(TokenKind::Divide) || p.at(TokenKind::Rem) {
-        Some((11, 12))
+        Some(BindingPower::Product)
     } else if p.at(TokenKind::Less)
         || p.at(TokenKind::LessEqual)
         || p.at(TokenKind::Greater)
@@ -175,15 +230,6 @@ fn binary_binding_power(p: &mut Parser) -> Option<(u8, u8)> {
         Some((3, 4))
     } else if p.at(TokenKind::Or) || p.at(TokenKind::Xor) {
         Some((1, 2))
-    } else {
-        None
-    }
-}
-
-/// Return the binding power for a prefix operator at the current token, if any.
-fn prefix_binding_power(p: &mut Parser) -> Option<u8> {
-    if p.at(TokenKind::Minus) || p.at(TokenKind::Plus) || p.at(TokenKind::Not) {
-        Some(13)
     } else {
         None
     }
