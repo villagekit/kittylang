@@ -3,7 +3,7 @@ use std::fmt;
 use text_size::TextRange;
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct ParseError {
+pub struct ParseError {
     pub(super) expected: Vec<TokenKind>,
     pub(super) found: Option<TokenKind>,
     pub(super) range: TextRange,
@@ -77,7 +77,7 @@ mod tests {
     #[test]
     fn one_expected_did_not_find() {
         check(
-            vec![TokenKind::ParenOpen],
+            vec![TokenKind::ParenClose],
             None,
             5..6,
             "error at 5..6: expected ‘)’",

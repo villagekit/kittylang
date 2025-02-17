@@ -3,60 +3,13 @@ use kitty_syntax::{NodeKind, TokenKind};
 use super::*;
 use crate::marker::CompletedMarker;
 
-// Operator precedence.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd)]
-#[repr(u8)]
-enum Precendence {
-    Lowest,
-    /// =
-    Assignment,
-    // if
-    Conditional,
-    /// or
-    Or,
-    /// and
-    And,
-    /// ==, !=
-    Equality,
-    /// <, >, <=, >=
-    Comparison,
-    /// +, -
-    Term,
-    /// *, /
-    Factor,
-    // ^
-    Exponent,
-    /// not, +, -
-    Unary,
-    /// .
-    Field,
-    /// ()
-    Call,
-    Primary,
-}
-
-struct BindingPower(u32);
-
-impl From<Precendence> for BindingPower {
-    fn from(value: Precendence) -> Self {
-        Self(value as u32 * 10)
-    }
-}
-
-impl BindingPower {
-    fn raise(mut self) -> Self {
-        self.0 = self.0.saturating_add(1);
-        self
-    }
-}
-
 /// Entry point: parse an expression.
 pub(super) fn parse_expr(p: &mut Parser) -> Option<CompletedMarker> {
-    parse_expr_with_bp(p, Precendence::Lowest.into())
+    parse_expr_with_bp(p, 0)
 }
 
 /// Parse an expression with a given right binding power.
-fn parse_expr_with_bp(p: &mut Parser, min_bp: BindingPower) -> Option<CompletedMarker> {
+fn parse_expr_with_bp(p: &mut Parser, min_bp: u8) -> Option<CompletedMarker> {
     // First, parse a left-hand side (prefix or primary) expression.
     let mut lhs = parse_lhs(p)?;
 
@@ -71,8 +24,8 @@ fn parse_expr_with_bp(p: &mut Parser, min_bp: BindingPower) -> Option<CompletedM
             continue;
         }
 
-        // Then, check if a binary operator follows.
-        let (left_bp, right_bp) = match binary_binding_power(p) {
+        // Then, check if a infix operator follows.
+        let (left_bp, right_bp) = match infix_binding_power(p) {
             Some(bp) => bp,
             None => break,
         };
@@ -97,7 +50,7 @@ fn parse_lhs(p: &mut Parser) -> Option<CompletedMarker> {
         // A prefix operator is present.
         let m = p.start();
         p.bump(); // Consume the prefix token.
-        parse_expr(p, bp)?;
+        parse_expr_with_bp(p, bp)?;
         return Some(m.complete(p, NodeKind::UnaryExpr));
     }
     parse_primary(p)
@@ -132,7 +85,7 @@ fn parse_call_expr(p: &mut Parser, lhs: CompletedMarker) -> CompletedMarker {
     p.bump(); // Consume '('.
     if !p.at(TokenKind::ParenClose) {
         loop {
-            expr(p);
+            parse_expr(p);
             if !p.at(TokenKind::Comma) {
                 break;
             }
@@ -155,12 +108,12 @@ fn parse_get_expr(p: &mut Parser, lhs: CompletedMarker) -> CompletedMarker {
 fn parse_paren_expr(p: &mut Parser) -> Option<CompletedMarker> {
     let m = p.start();
     p.expect(TokenKind::ParenOpen);
-    expr(p);
+    parse_expr(p);
     if p.at(TokenKind::Comma) {
         // More than one expression makes it a tuple.
         while p.at(TokenKind::Comma) {
             p.bump();
-            expr(p);
+            parse_expr(p);
         }
         p.expect(TokenKind::ParenClose);
         return Some(m.complete(p, NodeKind::TupleExpr));
@@ -174,7 +127,7 @@ fn parse_block_expr(p: &mut Parser) -> Option<CompletedMarker> {
     let m = p.start();
     p.expect(TokenKind::Indent);
     while !p.at(TokenKind::Dedent) && !p.at_end() {
-        expr(p);
+        parse_expr(p);
     }
     p.expect(TokenKind::Dedent);
     Some(m.complete(p, NodeKind::BlockExpr))
@@ -186,7 +139,11 @@ fn parse_let_expr(p: &mut Parser) -> Option<CompletedMarker> {
     p.expect(TokenKind::Let);
     p.expect(TokenKind::Identifier);
     p.expect(TokenKind::Equal);
-    expr(p);
+    // The value of the variable
+    parse_expr(p);
+    p.expect(TokenKind::Newline);
+    // After the let should be an expression, to be the body of the let scope.
+    parse_expr(p);
     Some(m.complete(p, NodeKind::LetExpr))
 }
 
@@ -194,7 +151,7 @@ fn parse_let_expr(p: &mut Parser) -> Option<CompletedMarker> {
 fn parse_if_expr(p: &mut Parser) -> Option<CompletedMarker> {
     let m = p.start();
     p.expect(TokenKind::If);
-    expr(p); // condition
+    parse_expr(p); // condition
     parse_block_expr(p); // then–block
     if p.at(TokenKind::Else) {
         p.bump(); // Consume 'else'.
@@ -204,20 +161,20 @@ fn parse_if_expr(p: &mut Parser) -> Option<CompletedMarker> {
 }
 
 /// Return the binding power for a prefix operator at the current token, if any.
-fn prefix_binding_power(p: &mut Parser) -> Option<BindingPower> {
+fn prefix_binding_power(p: &mut Parser) -> Option<u8> {
     if p.at(TokenKind::Minus) || p.at(TokenKind::Plus) || p.at(TokenKind::Not) {
-        Some(BindingPower::Prefix)
+        Some(13)
     } else {
         None
     }
 }
 
 /// Return the binding power for a binary operator at the current token, if any.
-fn binary_binding_power(p: &mut Parser) -> Option<BindingPower> {
+fn infix_binding_power(p: &mut Parser) -> Option<(u8, u8)> {
     if p.at(TokenKind::Plus) || p.at(TokenKind::Minus) {
-        Some(BindingPower::Sum)
+        Some((11, 12))
     } else if p.at(TokenKind::Multiply) || p.at(TokenKind::Divide) || p.at(TokenKind::Rem) {
-        Some(BindingPower::Product)
+        Some((9, 10))
     } else if p.at(TokenKind::Less)
         || p.at(TokenKind::LessEqual)
         || p.at(TokenKind::Greater)
@@ -232,5 +189,269 @@ fn binary_binding_power(p: &mut Parser) -> Option<BindingPower> {
         Some((1, 2))
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_expr, Parser};
+    use crate::check_grammar;
+    use expect_test::expect;
+    use kitty_cst::Expr;
+
+    fn check(input: &str, expected: expect_test::Expect) {
+        let grammar = |p: &mut Parser| {
+            parse_expr(p);
+        };
+        check_grammar::<Expr>(grammar, input, expected);
+    }
+
+    #[test]
+    fn parse_number() {
+        check(
+            "123",
+            expect![[r#"
+                LiteralExpr@0..3
+                  Number@0..3 "123""#]],
+        );
+    }
+
+    #[test]
+    fn parse_number_preceded_by_whitespace() {
+        check(
+            "   9876",
+            expect![[r#"
+                LiteralExpr@0..7
+                  Whitespace@0..3 "   "
+                  Number@3..7 "9876""#]],
+        );
+    }
+
+    #[test]
+    fn parse_number_followed_by_whitespace() {
+        check(
+            "999   ",
+            expect![[r#"
+                LiteralExpr@0..6
+                  Number@0..3 "999"
+                  Whitespace@3..6 "   ""#]],
+        );
+    }
+
+    #[test]
+    fn parse_number_surrounded_by_whitespace() {
+        check(
+            " 123     ",
+            expect![[r#"
+                LiteralExpr@0..9
+                  Whitespace@0..1 " "
+                  Number@1..4 "123"
+                  Whitespace@4..9 "     ""#]],
+        );
+    }
+
+    #[test]
+    fn parse_variable_ref() {
+        check(
+            "counter",
+            expect![[r#"
+                IdentifierExpr@0..7
+                  Identifier@0..7 "counter""#]],
+        );
+    }
+
+    #[test]
+    fn parse_simple_infix_expression() {
+        check(
+            "1+2",
+            expect![[r#"
+                BinaryExpr@0..3
+                  LiteralExpr@0..1
+                    Number@0..1 "1"
+                  Plus@1..2 "+"
+                  LiteralExpr@2..3
+                    Number@2..3 "2""#]],
+        );
+    }
+
+    #[test]
+    fn parse_left_associative_infix_expression() {
+        check(
+            "1+2+3+4",
+            expect![[r#"
+                BinaryExpr@0..7
+                  BinaryExpr@0..5
+                    BinaryExpr@0..3
+                      LiteralExpr@0..1
+                        Number@0..1 "1"
+                      Plus@1..2 "+"
+                      LiteralExpr@2..3
+                        Number@2..3 "2"
+                    Plus@3..4 "+"
+                    LiteralExpr@4..5
+                      Number@4..5 "3"
+                  Plus@5..6 "+"
+                  LiteralExpr@6..7
+                    Number@6..7 "4""#]],
+        );
+    }
+
+    #[test]
+    fn parse_infix_expression_with_mixed_binding_power() {
+        check(
+            "1+2*3-4",
+            expect![[r#"
+                BinaryExpr@0..5
+                  BinaryExpr@0..3
+                    LiteralExpr@0..1
+                      Number@0..1 "1"
+                    Plus@1..2 "+"
+                    LiteralExpr@2..3
+                      Number@2..3 "2"
+                  Multiply@3..4 "*"
+                  LiteralExpr@4..5
+                    Number@4..5 "3""#]],
+        );
+    }
+
+    #[test]
+    fn parse_infix_expression_with_whitespace() {
+        check(
+            " 1 +   2* 3 ",
+            expect![[r#"
+                BinaryExpr@0..12
+                  Whitespace@0..1 " "
+                  BinaryExpr@1..8
+                    LiteralExpr@1..2
+                      Number@1..2 "1"
+                    Whitespace@2..3 " "
+                    Plus@3..4 "+"
+                    Whitespace@4..7 "   "
+                    LiteralExpr@7..8
+                      Number@7..8 "2"
+                  Multiply@8..9 "*"
+                  Whitespace@9..10 " "
+                  LiteralExpr@10..11
+                    Number@10..11 "3"
+                  Whitespace@11..12 " ""#]],
+        );
+    }
+
+    #[test]
+    fn parse_infix_expression_interspersed_with_comments() {
+        check(
+            "
+1
+  + 1 # Add one
+  + 10 # Add ten",
+            expect![[r#"
+                LiteralExpr@0..3
+                  Newline@0..1 "\n"
+                  Number@1..2 "1"
+                  Newline@2..3 "\n""#]],
+        );
+    }
+
+    #[test]
+    fn do_not_parse_operator_if_gettting_rhs_failed() {
+        check(
+            "(1+",
+            expect![[r#"
+Root@0..3
+  ParenExpr@0..3
+    LParen@0..1 "("
+    InfixExpr@1..3
+      Literal@1..2
+        Number@1..2 "1"
+      Plus@2..3 "+"
+error at 2..3: expected number, identifier, ‘-’ or ‘(’
+error at 2..3: expected ‘)’"#]],
+        );
+    }
+
+    #[test]
+    fn parse_negation() {
+        check(
+            "-10",
+            expect![[r#"
+                LiteralExpr@0..3
+                  Number@0..3 "-10""#]],
+        );
+    }
+
+    #[test]
+    fn negation_has_higher_binding_power_than_binary_operators() {
+        check(
+            "-20+20",
+            expect![[r#"
+                BinaryExpr@0..6
+                  LiteralExpr@0..3
+                    Number@0..3 "-20"
+                  Plus@3..4 "+"
+                  LiteralExpr@4..6
+                    Number@4..6 "20""#]],
+        );
+    }
+
+    #[test]
+    fn parse_nested_parentheses() {
+        check(
+            "((((((10))))))",
+            expect![[r#"
+                ParenExpr@0..14
+                  ParenOpen@0..1 "("
+                  ParenExpr@1..13
+                    ParenOpen@1..2 "("
+                    ParenExpr@2..12
+                      ParenOpen@2..3 "("
+                      ParenExpr@3..11
+                        ParenOpen@3..4 "("
+                        ParenExpr@4..10
+                          ParenOpen@4..5 "("
+                          ParenExpr@5..9
+                            ParenOpen@5..6 "("
+                            LiteralExpr@6..8
+                              Number@6..8 "10"
+                            ParenClose@8..9 ")"
+                          ParenClose@9..10 ")"
+                        ParenClose@10..11 ")"
+                      ParenClose@11..12 ")"
+                    ParenClose@12..13 ")"
+                  ParenClose@13..14 ")""#]],
+        );
+    }
+
+    #[test]
+    fn parentheses_affect_precedence() {
+        check(
+            "5*(2+1)",
+            expect![[r#"
+                BinaryExpr@0..7
+                  LiteralExpr@0..1
+                    Number@0..1 "5"
+                  Multiply@1..2 "*"
+                  ParenExpr@2..7
+                    ParenOpen@2..3 "("
+                    BinaryExpr@3..6
+                      LiteralExpr@3..4
+                        Number@3..4 "2"
+                      Plus@4..5 "+"
+                      LiteralExpr@5..6
+                        Number@5..6 "1"
+                    ParenClose@6..7 ")""#]],
+        );
+    }
+
+    #[test]
+    fn parse_unclosed_parentheses() {
+        check(
+            "(foo",
+            expect![[r#"
+                ParenExpr@0..4
+                  ParenOpen@0..1 "("
+                  IdentifierExpr@1..4
+                    Identifier@1..4 "foo"ParseError { expected: [ParenOpen, Dot, Plus, Minus, Multiply, Divide, Rem, Less, LessEqual, Greater, GreaterEqual, EqualEqual, NotEqual, And, Or, Xor, Comma, ParenClose], found: None, range: 1..4 }
+            "#]],
+        );
     }
 }

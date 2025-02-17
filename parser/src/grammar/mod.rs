@@ -9,7 +9,7 @@ pub(crate) fn source(p: &mut Parser<'_>) {
     let m = p.start();
 
     while !p.at_end() {
-        parse_decl(p);
+        // parse_decl(p);
     }
 
     m.complete(p, NodeKind::Source);

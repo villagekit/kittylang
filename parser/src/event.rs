@@ -1,4 +1,4 @@
-use kitty_lexer::{Token, TokenKind};
+use kitty_lexer::Token;
 use kitty_syntax::{NodeKind, SyntaxBuilder, SyntaxTreeBuf};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
