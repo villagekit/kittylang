@@ -4,13 +4,13 @@ use super::*;
 use crate::marker::CompletedMarker;
 
 /// Entry point: parse an expression.
-pub(super) fn parse_expr(p: &mut Parser) -> Option<CompletedMarker> {
+pub(crate) fn parse_expr(p: &mut Parser) -> Option<CompletedMarker> {
     parse_expr_with_bp(p, 0)
 }
 
 /// Parse an expression with a given right binding power.
 fn parse_expr_with_bp(p: &mut Parser, min_bp: u8) -> Option<CompletedMarker> {
-    // First, parse a left-hand side (prefix or primary) expression.
+    // First, parse a left-hand side (unary operator or primary) expression.
     let mut lhs = parse_lhs(p)?;
 
     loop {
@@ -24,8 +24,8 @@ fn parse_expr_with_bp(p: &mut Parser, min_bp: u8) -> Option<CompletedMarker> {
             continue;
         }
 
-        // Then, check if a infix operator follows.
-        let (left_bp, right_bp) = match infix_binding_power(p) {
+        // Then, check if a binary operator follows.
+        let (left_bp, right_bp) = match binary_binding_power(p) {
             Some(bp) => bp,
             None => break,
         };
@@ -37,19 +37,23 @@ fn parse_expr_with_bp(p: &mut Parser, min_bp: u8) -> Option<CompletedMarker> {
 
         p.bump(); // Consume the operator.
         let m = lhs.precede(p);
-        parse_expr_with_bp(p, right_bp)?;
+        let parsed_rhs = parse_expr_with_bp(p, right_bp).is_some();
         lhs = m.complete(p, NodeKind::BinaryExpr);
+
+        if !parsed_rhs {
+            break;
+        }
     }
 
     Some(lhs)
 }
 
-/// Parse a left-hand side expression, which may be a prefix operator or a primary.
+/// Parse a left-hand side expression, which may be a unary operator or a primary.
 fn parse_lhs(p: &mut Parser) -> Option<CompletedMarker> {
-    if let Some(bp) = prefix_binding_power(p) {
-        // A prefix operator is present.
+    if let Some(bp) = unary_binding_power(p) {
+        // A unary operator is present.
         let m = p.start();
-        p.bump(); // Consume the prefix token.
+        p.bump(); // Consume the unary operator token.
         parse_expr_with_bp(p, bp)?;
         return Some(m.complete(p, NodeKind::UnaryExpr));
     }
@@ -82,7 +86,7 @@ fn parse_primary(p: &mut Parser) -> Option<CompletedMarker> {
 fn parse_kind(p: &mut Parser, kind: NodeKind) -> Option<CompletedMarker> {
     let m = p.start();
     p.bump();
-    return Some(m.complete(p, kind));
+    Some(m.complete(p, kind))
 }
 
 /// Parse a call expression given an existing `lhs`.
@@ -166,8 +170,8 @@ fn parse_if_expr(p: &mut Parser) -> Option<CompletedMarker> {
     Some(m.complete(p, NodeKind::IfExpr))
 }
 
-/// Return the binding power for a prefix operator at the current token, if any.
-fn prefix_binding_power(p: &mut Parser) -> Option<u8> {
+/// Return the binding power for a unary operator at the current token, if any.
+fn unary_binding_power(p: &mut Parser) -> Option<u8> {
     if p.at(TokenKind::Minus) || p.at(TokenKind::Plus) || p.at(TokenKind::Not) {
         Some(13)
     } else {
@@ -176,7 +180,7 @@ fn prefix_binding_power(p: &mut Parser) -> Option<u8> {
 }
 
 /// Return the binding power for a binary operator at the current token, if any.
-fn infix_binding_power(p: &mut Parser) -> Option<(u8, u8)> {
+fn binary_binding_power(p: &mut Parser) -> Option<(u8, u8)> {
     if p.at(TokenKind::Plus) || p.at(TokenKind::Minus) {
         Some((11, 12))
     } else if p.at(TokenKind::Multiply) || p.at(TokenKind::Divide) || p.at(TokenKind::Rem) {
@@ -363,15 +367,14 @@ mod tests {
         check(
             "(1+",
             expect![[r#"
-Root@0..3
-  ParenExpr@0..3
-    LParen@0..1 "("
-    InfixExpr@1..3
-      Literal@1..2
-        Number@1..2 "1"
-      Plus@2..3 "+"
-error at 2..3: expected number, identifier, ‘-’ or ‘(’
-error at 2..3: expected ‘)’"#]],
+                ParenExpr@0..3
+                  ParenOpen@0..1 "("
+                  BinaryExpr@1..3
+                    NumberLiteral@1..2
+                      Number@1..2 "1"
+                    Plus@2..3 "+"ParseError { expected: [Minus, Plus, Not, Identifier, Boolean, Number, String, ParenOpen, Indent, Let, If], found: None, range: 2..3 }
+                ParseError { expected: [Minus, Plus, Not, Identifier, Boolean, Number, String, ParenOpen, Indent, Let, If, Comma, ParenClose], found: None, range: 2..3 }
+            "#]],
         );
     }
 
