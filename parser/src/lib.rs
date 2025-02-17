@@ -27,7 +27,6 @@ pub(crate) fn parse_grammar<Node: CstNode>(
     let (events, errors) = Parser::new(&tokens).parse(grammar);
     println!("events: {:?}", events);
     let tree = process_events(input, &events, &tokens);
-    println!("tree: {:?}", tree);
     let node = Node::cast(tree.root(), &tree).unwrap();
     Parse { tree, node, errors }
 }

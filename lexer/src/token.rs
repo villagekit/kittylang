@@ -62,6 +62,8 @@ pub enum TokenKind {
     Fn,
     #[token("let")]
     Let,
+    #[token("in")]
+    In,
     #[token("if")]
     If,
     #[token("then")]
@@ -172,6 +174,7 @@ impl fmt::Display for TokenKind {
             Self::Comment => "comment",
             Self::Fn => "‘fn’",
             Self::Let => "‘let’",
+            Self::In => "‘in’",
             Self::If => "‘if’",
             Self::Then => "‘then’",
             Self::Else => "‘else’",

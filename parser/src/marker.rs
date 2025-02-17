@@ -5,6 +5,7 @@ use std::mem;
 use crate::event::Event;
 use crate::Parser;
 
+#[derive(Debug)]
 pub(crate) struct Marker {
     pos: usize,
     bomb: DropBomb,
@@ -28,6 +29,7 @@ impl Marker {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct CompletedMarker {
     pos: usize,
 }

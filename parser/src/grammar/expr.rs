@@ -4,6 +4,7 @@ use super::*;
 use crate::marker::CompletedMarker;
 
 /// Entry point: parse an expression.
+#[allow(dead_code)]
 pub(crate) fn parse_expr(p: &mut Parser) -> Option<CompletedMarker> {
     parse_expr_with_bp(p, 0)
 }
@@ -35,14 +36,16 @@ fn parse_expr_with_bp(p: &mut Parser, min_bp: u8) -> Option<CompletedMarker> {
             break;
         }
 
-        p.bump(); // Consume the operator.
-        let m = lhs.precede(p);
-        let parsed_rhs = parse_expr_with_bp(p, right_bp).is_some();
-        lhs = m.complete(p, NodeKind::BinaryExpr);
+        println!("consume operator");
+        p.debug_source();
 
-        if !parsed_rhs {
-            break;
-        }
+        println!("lhs: {:?}", lhs);
+
+        p.bump(); // Consume the operator.
+
+        let m = lhs.precede(p);
+        parse_expr_with_bp(p, right_bp);
+        lhs = m.complete(p, NodeKind::BinaryExpr);
     }
 
     Some(lhs)
@@ -62,31 +65,36 @@ fn parse_lhs(p: &mut Parser) -> Option<CompletedMarker> {
 
 /// Parse a primary expression.
 fn parse_primary(p: &mut Parser) -> Option<CompletedMarker> {
-    if p.at(TokenKind::Identifier) {
-        return parse_kind(p, NodeKind::VariableRef);
+    println!("parse_primary");
+    p.debug_source();
+    let cm = if p.at(TokenKind::Identifier) {
+        parse_kind(p, NodeKind::VariableRef)
     } else if p.at(TokenKind::Boolean) {
-        return parse_kind(p, NodeKind::BooleanLiteral);
+        parse_kind(p, NodeKind::BooleanLiteral)
     } else if p.at(TokenKind::Number) {
-        return parse_kind(p, NodeKind::NumberLiteral);
+        println!("how the fuck");
+        parse_kind(p, NodeKind::NumberLiteral)
     } else if p.at(TokenKind::String) {
-        return parse_kind(p, NodeKind::StringLiteral);
+        parse_kind(p, NodeKind::StringLiteral)
     } else if p.at(TokenKind::ParenOpen) {
-        return parse_paren_expr(p);
+        parse_paren_expr(p)
     } else if p.at(TokenKind::Indent) {
-        return parse_block_expr(p);
+        parse_block_expr(p)
     } else if p.at(TokenKind::Let) {
-        return parse_let_expr(p);
+        parse_let_expr(p)
     } else if p.at(TokenKind::If) {
-        return parse_if_expr(p);
-    }
-    p.error();
-    None
+        parse_if_expr(p)
+    } else {
+        p.error();
+        return None;
+    };
+    Some(cm)
 }
 
-fn parse_kind(p: &mut Parser, kind: NodeKind) -> Option<CompletedMarker> {
+fn parse_kind(p: &mut Parser, kind: NodeKind) -> CompletedMarker {
     let m = p.start();
     p.bump();
-    Some(m.complete(p, kind))
+    m.complete(p, kind)
 }
 
 /// Parse a call expression given an existing `lhs`.
@@ -115,7 +123,7 @@ fn parse_get_expr(p: &mut Parser, lhs: CompletedMarker) -> CompletedMarker {
 }
 
 /// Parse a parenthesized expression (or tuple expression).
-fn parse_paren_expr(p: &mut Parser) -> Option<CompletedMarker> {
+fn parse_paren_expr(p: &mut Parser) -> CompletedMarker {
     let m = p.start();
     p.expect(TokenKind::ParenOpen);
     parse_expr(p);
@@ -126,48 +134,47 @@ fn parse_paren_expr(p: &mut Parser) -> Option<CompletedMarker> {
             parse_expr(p);
         }
         p.expect(TokenKind::ParenClose);
-        return Some(m.complete(p, NodeKind::TupleExpr));
+        return m.complete(p, NodeKind::TupleExpr);
     }
     p.expect(TokenKind::ParenClose);
-    Some(m.complete(p, NodeKind::ParenExpr))
+    m.complete(p, NodeKind::ParenExpr)
 }
 
-/// Parse a block expression: `{ ... }`
-fn parse_block_expr(p: &mut Parser) -> Option<CompletedMarker> {
+/// Parse a block expression: `{ ... }` but with indents
+fn parse_block_expr(p: &mut Parser) -> CompletedMarker {
     let m = p.start();
     p.expect(TokenKind::Indent);
-    while !p.at(TokenKind::Dedent) && !p.at_end() {
-        parse_expr(p);
-    }
+    parse_expr(p);
     p.expect(TokenKind::Dedent);
-    Some(m.complete(p, NodeKind::BlockExpr))
+    m.complete(p, NodeKind::BlockExpr)
 }
 
-/// Parse a let–expression: `let <identifier> = <expr>`
-fn parse_let_expr(p: &mut Parser) -> Option<CompletedMarker> {
+/// Parse a let–expression: `let <identifier> = <expr> in <body>`
+fn parse_let_expr(p: &mut Parser) -> CompletedMarker {
     let m = p.start();
     p.expect(TokenKind::Let);
     p.expect(TokenKind::Identifier);
     p.expect(TokenKind::Equal);
     // The value of the variable
     parse_expr(p);
-    p.expect(TokenKind::Newline);
-    // After the let should be an expression, to be the body of the let scope.
+    p.expect(TokenKind::In);
+    // The body of the let scope
     parse_expr(p);
-    Some(m.complete(p, NodeKind::LetExpr))
+    m.complete(p, NodeKind::LetExpr)
 }
 
 /// Parse an if–expression: `if <cond> { ... } [else { ... }]`
-fn parse_if_expr(p: &mut Parser) -> Option<CompletedMarker> {
+fn parse_if_expr(p: &mut Parser) -> CompletedMarker {
     let m = p.start();
     p.expect(TokenKind::If);
     parse_expr(p); // condition
-    parse_block_expr(p); // then–block
+    p.expect(TokenKind::Then);
+    parse_expr(p); // then body
     if p.at(TokenKind::Else) {
         p.bump(); // Consume 'else'.
-        parse_block_expr(p); // else–block
+        parse_expr(p); // else body
     }
-    Some(m.complete(p, NodeKind::IfExpr))
+    m.complete(p, NodeKind::IfExpr)
 }
 
 /// Return the binding power for a unary operator at the current token, if any.
@@ -181,21 +188,38 @@ fn unary_binding_power(p: &mut Parser) -> Option<u8> {
 
 /// Return the binding power for a binary operator at the current token, if any.
 fn binary_binding_power(p: &mut Parser) -> Option<(u8, u8)> {
+    // Binding power for binary operations, in order of highest to lowest.
+    //
+    // Multiplicative (Factor) operators
     if p.at(TokenKind::Multiply) || p.at(TokenKind::Divide) || p.at(TokenKind::Rem) {
         Some((11, 12))
-    } else if p.at(TokenKind::Plus) || p.at(TokenKind::Minus) {
+    }
+    // Additive (Term) operators
+    else if p.at(TokenKind::Plus) || p.at(TokenKind::Minus) {
         Some((9, 10))
-    } else if p.at(TokenKind::Less)
+    }
+    // Bitwise shift
+    // Comparison
+    else if p.at(TokenKind::Less)
         || p.at(TokenKind::LessEqual)
         || p.at(TokenKind::Greater)
         || p.at(TokenKind::GreaterEqual)
     {
         Some((7, 8))
-    } else if p.at(TokenKind::EqualEqual) || p.at(TokenKind::NotEqual) {
+    }
+    // Equality
+    else if p.at(TokenKind::EqualEqual) || p.at(TokenKind::NotEqual) {
         Some((5, 6))
-    } else if p.at(TokenKind::And) {
+    }
+    // Bitwise And
+    // Bitwise Xor
+    // Bitwise Or
+    // Logical And
+    else if p.at(TokenKind::And) {
         Some((3, 4))
-    } else if p.at(TokenKind::Or) || p.at(TokenKind::Xor) {
+    }
+    // Logical Or
+    else if p.at(TokenKind::Or) || p.at(TokenKind::Xor) {
         Some((1, 2))
     } else {
         None
@@ -312,19 +336,19 @@ mod tests {
             "1+2*3-4",
             expect![[r#"
                 BinaryExpr@0..7
-                  BinaryExpr@0..3
+                  BinaryExpr@0..5
                     NumberLiteral@0..1
                       Number@0..1 "1"
                     Plus@1..2 "+"
-                    NumberLiteral@2..3
-                      Number@2..3 "2"
-                  Multiply@3..4 "*"
-                  BinaryExpr@4..7
-                    NumberLiteral@4..5
-                      Number@4..5 "3"
-                    Minus@5..6 "-"
-                    NumberLiteral@6..7
-                      Number@6..7 "4""#]],
+                    BinaryExpr@2..5
+                      NumberLiteral@2..3
+                        Number@2..3 "2"
+                      Multiply@3..4 "*"
+                      NumberLiteral@4..5
+                        Number@4..5 "3"
+                  Minus@5..6 "-"
+                  NumberLiteral@6..7
+                    Number@6..7 "4""#]],
         );
     }
 
@@ -335,34 +359,77 @@ mod tests {
             expect![[r#"
                 BinaryExpr@0..12
                   Whitespace@0..1 " "
-                  BinaryExpr@1..8
-                    NumberLiteral@1..2
-                      Number@1..2 "1"
-                    Whitespace@2..3 " "
-                    Plus@3..4 "+"
-                    Whitespace@4..7 "   "
+                  NumberLiteral@1..2
+                    Number@1..2 "1"
+                  Whitespace@2..3 " "
+                  Plus@3..4 "+"
+                  Whitespace@4..7 "   "
+                  BinaryExpr@7..11
                     NumberLiteral@7..8
                       Number@7..8 "2"
-                  Multiply@8..9 "*"
-                  Whitespace@9..10 " "
-                  NumberLiteral@10..11
-                    Number@10..11 "3"
+                    Multiply@8..9 "*"
+                    Whitespace@9..10 " "
+                    NumberLiteral@10..11
+                      Number@10..11 "3"
                   Whitespace@11..12 " ""#]],
         );
     }
 
     #[test]
-    fn parse_infix_expression_interspersed_with_comments() {
+    fn parse_infix_expression_interspersed_with_newlines() {
         check(
             "
+1 +
 1
-  + 1 # Add one
-  + 10 # Add ten",
++ 1",
             expect![[r#"
-                NumberLiteral@0..3
+                BinaryExpr@0..10
                   Newline@0..1 "\n"
-                  Number@1..2 "1"
-                  Newline@2..3 "\n""#]],
+                  BinaryExpr@1..6
+                    NumberLiteral@1..2
+                      Number@1..2 "1"
+                    Whitespace@2..3 " "
+                    Plus@3..4 "+"
+                    Newline@4..5 "\n"
+                    NumberLiteral@5..6
+                      Number@5..6 "1"
+                  Newline@6..7 "\n"
+                  Plus@7..8 "+"
+                  Whitespace@8..9 " "
+                  NumberLiteral@9..10
+                    Number@9..10 "1""#]],
+        );
+    }
+
+    #[test]
+    fn parse_infix_expression_interspersed_with_blocks_and_comments() {
+        check(
+            "
+1 +
+  1 # Add one
+  + 10 # Add ten",
+            expect![[r##"
+                BinaryExpr@0..26
+                  Newline@0..1 "\n"
+                  NumberLiteral@1..2
+                    Number@1..2 "1"
+                  Whitespace@2..3 " "
+                  Plus@3..4 "+"
+                  Newline@4..5 "\n"
+                  BlockExpr@5..25
+                    Indent@5..7 "  "
+                    BinaryExpr@7..22
+                      NumberLiteral@7..8
+                        Number@7..8 "1"
+                      Whitespace@8..9 " "
+                      Comment@9..18 "# Add one"
+                      Newline@18..19 "\n"
+                      NumberLiteral@19..22
+                        Whitespace@19..21 "  "
+                        Plus@21..22 "+"
+                    Whitespace@22..23 " "
+                    Number@23..25 "10"
+                  Whitespace@25..26 " ""##]],
         );
     }
 
@@ -378,7 +445,7 @@ mod tests {
                       Number@1..2 "1"
                     Plus@2..3 "+"
                 ParseError { expected: [Minus, Plus, Not, Identifier, Boolean, Number, String, ParenOpen, Indent, Let, If], found: None, range: 2..3 }
-                ParseError { expected: [Minus, Plus, Not, Identifier, Boolean, Number, String, ParenOpen, Indent, Let, If, Newline, Indent, Dedent, Comma, ParenClose], found: None, range: 2..3 }"#]],
+                ParseError { expected: [Minus, Plus, Not, Identifier, Boolean, Number, String, ParenOpen, Indent, Let, If, Indent, Dedent, ParenOpen, Dot, Multiply, Divide, Rem, Plus, Minus, Less, LessEqual, Greater, GreaterEqual, EqualEqual, NotEqual, And, Or, Xor, Comma, ParenClose], found: None, range: 2..3 }"#]],
         );
     }
 
@@ -468,7 +535,7 @@ mod tests {
                   ParenOpen@0..1 "("
                   VariableRef@1..4
                     Identifier@1..4 "foo"
-                ParseError { expected: [ParenOpen, Dot, Plus, Minus, Multiply, Divide, Rem, Less, LessEqual, Greater, GreaterEqual, EqualEqual, NotEqual, And, Or, Xor, Comma, ParenClose], found: None, range: 1..4 }"#]],
+                ParseError { expected: [ParenOpen, Dot, Multiply, Divide, Rem, Plus, Minus, Less, LessEqual, Greater, GreaterEqual, EqualEqual, NotEqual, And, Or, Xor, Comma, ParenClose], found: None, range: 1..4 }"#]],
         );
     }
 }

@@ -12,7 +12,8 @@ use crate::{
 };
 
 static DEFAULT_RECOVERY_SET: LazyLock<TokenSet> =
-    LazyLock::new(|| TokenSet::new([TokenKind::Newline, TokenKind::Indent, TokenKind::Dedent]));
+    // LazyLock::new(|| TokenSet::new([TokenKind::Indent, TokenKind::Dedent]));
+    LazyLock::new(|| TokenSet::new([TokenKind::Indent, TokenKind::Dedent]));
 
 pub(crate) struct Parser<'t> {
     source: Source<'t>,
@@ -23,6 +24,10 @@ pub(crate) struct Parser<'t> {
 
 impl<'t> Parser<'t> {
     pub(crate) fn new(tokens: &'t [Token]) -> Self {
+        println!("\ntokens:");
+        for token in tokens {
+            println!("{:?}", token);
+        }
         let source = Source::new(tokens);
         Parser {
             source,
@@ -106,7 +111,7 @@ impl<'t> Parser<'t> {
 
     pub(crate) fn bump(&mut self) {
         self.expected_kinds.clear();
-        self.source.next_token();
+        self.source.bump();
         self.events.push(Some(Event::AddToken));
     }
 
@@ -127,5 +132,9 @@ impl<'t> Parser<'t> {
 
     fn peek(&mut self) -> Option<TokenKind> {
         self.source.peek_token().map(|token| token.kind)
+    }
+
+    pub(crate) fn debug_source(&self) {
+        self.source.debug()
     }
 }
