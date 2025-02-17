@@ -1,8 +1,8 @@
 mod error;
-mod event;
 mod grammar;
 mod marker;
 mod parser;
+mod sink;
 mod source;
 mod token_set;
 
@@ -12,8 +12,8 @@ use kitty_syntax::SyntaxTreeBuf;
 use std::fmt;
 
 pub use crate::error::ParseError;
-use crate::event::process_events;
 use crate::parser::Parser;
+use crate::sink::Sink;
 
 pub fn parse(input: &str) -> Parse<Source> {
     parse_grammar(grammar::source, input)
@@ -26,7 +26,7 @@ pub(crate) fn parse_grammar<Node: CstNode>(
     let tokens: Vec<Token> = lex(input).collect();
     let (events, errors) = Parser::new(&tokens).parse(grammar);
     println!("events: {:?}", events);
-    let tree = process_events(input, &events, &tokens);
+    let tree = Sink::new(input, &tokens).process(&events);
     let node = Node::cast(tree.root(), &tree).unwrap();
     Parse { tree, node, errors }
 }

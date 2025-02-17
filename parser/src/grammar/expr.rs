@@ -409,27 +409,29 @@ mod tests {
   1 # Add one
   + 10 # Add ten",
             expect![[r##"
-                BinaryExpr@0..26
+                BinaryExpr@0..35
                   Newline@0..1 "\n"
                   NumberLiteral@1..2
                     Number@1..2 "1"
                   Whitespace@2..3 " "
                   Plus@3..4 "+"
                   Newline@4..5 "\n"
-                  BlockExpr@5..25
+                  BlockExpr@5..35
                     Indent@5..7 "  "
-                    BinaryExpr@7..22
+                    BinaryExpr@7..25
                       NumberLiteral@7..8
                         Number@7..8 "1"
                       Whitespace@8..9 " "
                       Comment@9..18 "# Add one"
                       Newline@18..19 "\n"
-                      NumberLiteral@19..22
-                        Whitespace@19..21 "  "
-                        Plus@21..22 "+"
-                    Whitespace@22..23 " "
-                    Number@23..25 "10"
-                  Whitespace@25..26 " ""##]],
+                      Whitespace@19..21 "  "
+                      Plus@21..22 "+"
+                      Whitespace@22..23 " "
+                      NumberLiteral@23..25
+                        Number@23..25 "10"
+                    Whitespace@25..26 " "
+                    Comment@26..35 "# Add ten"
+                    Dedent@35..35 """##]],
         );
     }
 

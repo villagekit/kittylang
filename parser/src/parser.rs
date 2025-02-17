@@ -5,8 +5,8 @@ use kitty_syntax::{NodeKind, TokenKind};
 
 use crate::{
     error::ParseError,
-    event::Event,
     marker::{CompletedMarker, Marker},
+    sink::Event,
     source::Source,
     token_set::TokenSet,
 };

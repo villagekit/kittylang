@@ -2,7 +2,7 @@ use drop_bomb::DropBomb;
 use kitty_syntax::NodeKind;
 use std::mem;
 
-use crate::event::Event;
+use crate::sink::Event;
 use crate::Parser;
 
 #[derive(Debug)]
