@@ -50,7 +50,7 @@ impl<'t> Parser<'t> {
     }
 
     pub(crate) fn expect(&mut self, kind: TokenKind) {
-        self.expect_with_recovery(kind, TokenSet::NONE)
+        self.expect_with_recovery(kind, TokenSet::none())
     }
 
     pub(crate) fn expect_with_recovery(&mut self, kind: TokenKind, recovery: TokenSet) {
@@ -69,7 +69,7 @@ impl<'t> Parser<'t> {
         &mut self,
         recovery_set: TokenSet,
     ) -> Option<CompletedMarker> {
-        self.error_with_recovery_raw(recovery_set.union(DEFAULT_RECOVERY_SET))
+        self.error_with_recovery_raw(recovery_set.union(&DEFAULT_RECOVERY_SET))
     }
 
     pub(crate) fn error_with_recovery_raw(
@@ -114,7 +114,9 @@ impl<'t> Parser<'t> {
     }
 
     pub(crate) fn at_set(&mut self, set: &TokenSet) -> bool {
-        self.peek().map_or(false, |k| set.contains(k))
+        self.expected_kinds
+            .extend(Into::<Vec<TokenKind>>::into(set).iter());
+        self.peek().map_or(false, |k| set.contains(&k))
     }
 
     pub(crate) fn at_end(&mut self) -> bool {
