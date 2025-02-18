@@ -108,7 +108,7 @@ pub enum TokenKind {
     #[token("...")]
     Ellipses,
     #[token(".[")]
-    DotBraceOpen,
+    DotBracketOpen,
     #[token(".")]
     Dot,
     #[token("->")]
@@ -201,7 +201,7 @@ impl fmt::Display for TokenKind {
             Self::Comma => "‘,’",
             Self::Colon => "‘:’",
             Self::Ellipses => "‘...’",
-            Self::DotBraceOpen => "‘.[’",
+            Self::DotBracketOpen => "‘.[’",
             Self::Dot => "‘.’",
             Self::Arrow => "‘->’",
             Self::FatArrow => "‘=>’",
