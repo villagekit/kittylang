@@ -60,6 +60,8 @@ pub enum TokenKind {
 
     #[token("fn")]
     Fn,
+    #[token("Fn")]
+    FnUpper,
     #[token("let")]
     Let,
     #[token("in")]
@@ -105,8 +107,12 @@ pub enum TokenKind {
     Colon,
     #[token("...")]
     Ellipses,
+    #[token(".[")]
+    DotBraceOpen,
     #[token(".")]
     Dot,
+    #[token("->")]
+    Arrow,
     #[token("=>")]
     FatArrow,
 
@@ -173,6 +179,7 @@ impl fmt::Display for TokenKind {
             Self::BracketClose => "‘]’",
             Self::Comment => "comment",
             Self::Fn => "‘fn’",
+            Self::FnUpper => "‘Fn’",
             Self::Let => "‘let’",
             Self::In => "‘in’",
             Self::If => "‘if’",
@@ -194,7 +201,9 @@ impl fmt::Display for TokenKind {
             Self::Comma => "‘,’",
             Self::Colon => "‘:’",
             Self::Ellipses => "‘...’",
+            Self::DotBraceOpen => "‘.[’",
             Self::Dot => "‘.’",
+            Self::Arrow => "‘->’",
             Self::FatArrow => "‘=>’",
             Self::Plus => "‘+’",
             Self::Minus => "‘-’",

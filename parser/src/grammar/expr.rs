@@ -1,28 +1,28 @@
 use kitty_syntax::{NodeKind, TokenKind};
 
-use super::*;
-use crate::{marker::CompletedMarker, token_set::TokenSet};
+use super::r#type::type_annotation;
+use crate::{marker::CompletedMarker, token_set::TokenSet, Parser};
 
 /// Parse an expression.
 #[allow(dead_code)]
-pub(crate) fn parse_expr(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
-    parse_expr_pratt(p, recovery, 0)
+pub(crate) fn expr(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
+    expr_pratt(p, recovery, 0)
 }
 
 /// Parse an expression with a given minimum binding power.
 /// (Also known as a Pratt parser.)
-fn parse_expr_pratt(p: &mut Parser, recovery: TokenSet, min_bp: u8) -> Option<CompletedMarker> {
+fn expr_pratt(p: &mut Parser, recovery: TokenSet, min_bp: u8) -> Option<CompletedMarker> {
     // First, parse a left-hand side (unary operator or primary) expression.
-    let mut lhs = parse_lhs(p, recovery)?;
+    let mut lhs = lhs(p, recovery)?;
 
     loop {
         // Check for postfix operators inline.
         if p.at(TokenKind::ParenOpen) {
-            lhs = parse_call_expr(p, lhs, recovery);
+            lhs = call_expr(p, lhs, recovery);
             continue;
         }
         if p.at(TokenKind::Dot) {
-            lhs = parse_get_expr(p, lhs, recovery);
+            lhs = get_expr(p, lhs, recovery);
             continue;
         }
 
@@ -40,7 +40,7 @@ fn parse_expr_pratt(p: &mut Parser, recovery: TokenSet, min_bp: u8) -> Option<Co
         p.bump(); // Consume the operator.
 
         let m = lhs.precede(p);
-        let rhs = parse_expr_pratt(p, recovery, right_bp);
+        let rhs = expr_pratt(p, recovery, right_bp);
         lhs = m.complete(p, NodeKind::BinaryExpr);
 
         if rhs.is_none() {
@@ -52,35 +52,35 @@ fn parse_expr_pratt(p: &mut Parser, recovery: TokenSet, min_bp: u8) -> Option<Co
 }
 
 /// Parse a left-hand side expression, which may be a unary operator or a primary.
-fn parse_lhs(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
+fn lhs(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
     if let Some(bp) = unary_binding_power(p) {
         // A unary operator is present.
         let m = p.start();
         p.bump(); // Consume the unary operator token.
-        parse_expr_pratt(p, recovery, bp)?;
+        expr_pratt(p, recovery, bp)?;
         return Some(m.complete(p, NodeKind::UnaryExpr));
     }
-    parse_primary(p, recovery)
+    primary(p, recovery)
 }
 
 /// Parse a primary expression.
-fn parse_primary(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
+fn primary(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
     let cm = if p.at(TokenKind::Identifier) {
-        parse_kind(p, NodeKind::VariableRef)
+        p.mark_kind(NodeKind::VariableRef)
     } else if p.at(TokenKind::Boolean) {
-        parse_kind(p, NodeKind::BooleanLiteral)
+        p.mark_kind(NodeKind::BooleanLiteral)
     } else if p.at(TokenKind::Number) {
-        parse_kind(p, NodeKind::NumberLiteral)
+        p.mark_kind(NodeKind::NumberLiteral)
     } else if p.at(TokenKind::String) {
-        parse_kind(p, NodeKind::StringLiteral)
+        p.mark_kind(NodeKind::StringLiteral)
     } else if p.at(TokenKind::ParenOpen) {
-        parse_paren_expr(p, recovery)
+        paren_expr(p, recovery)
     } else if p.at(TokenKind::Indent) {
-        parse_block_expr(p, recovery)
+        block_expr(p, recovery)
     } else if p.at(TokenKind::Let) {
-        parse_let_expr(p, recovery)
+        let_expr(p, recovery)
     } else if p.at(TokenKind::If) {
-        parse_if_expr(p, recovery)
+        if_expr(p, recovery)
     } else {
         p.error(recovery);
         return None;
@@ -88,20 +88,14 @@ fn parse_primary(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> 
     Some(cm)
 }
 
-fn parse_kind(p: &mut Parser, kind: NodeKind) -> CompletedMarker {
-    let m = p.start();
-    p.bump();
-    m.complete(p, kind)
-}
-
 /// Parse a call expression given an existing `lhs`.
-fn parse_call_expr(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> CompletedMarker {
+fn call_expr(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> CompletedMarker {
     assert!(p.at(TokenKind::ParenOpen));
     let m = lhs.precede(p);
     p.bump(); // Consume '('.
     if !p.at_end() && !p.at(TokenKind::ParenClose) {
         loop {
-            parse_expr(p, recovery);
+            expr(p, recovery);
             if !p.at(TokenKind::Comma) {
                 break;
             }
@@ -113,7 +107,7 @@ fn parse_call_expr(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> 
 }
 
 /// Parse a field access (get expression) given an existing `lhs`.
-fn parse_get_expr(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> CompletedMarker {
+fn get_expr(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> CompletedMarker {
     assert!(p.at(TokenKind::Dot));
     let m = lhs.precede(p);
     p.bump(); // Consume '.'.
@@ -122,15 +116,15 @@ fn parse_get_expr(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> C
 }
 
 /// Parse a parenthesized expression (or tuple expression).
-fn parse_paren_expr(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+fn paren_expr(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
     p.expect(TokenKind::ParenOpen, recovery);
-    parse_expr(p, recovery);
+    expr(p, recovery);
     if p.at(TokenKind::Comma) {
         // More than one expression makes it a tuple.
         while p.at(TokenKind::Comma) {
             p.bump();
-            parse_expr(p, recovery);
+            expr(p, recovery);
         }
         p.expect(TokenKind::ParenClose, recovery);
         return m.complete(p, NodeKind::TupleExpr);
@@ -140,42 +134,46 @@ fn parse_paren_expr(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 }
 
 /// Parse a block expression: `{ ... }` but with indents
-fn parse_block_expr(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+fn block_expr(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let recovery_block = recovery.union([TokenKind::Indent, TokenKind::Dedent]);
     let m = p.start();
     p.expect(TokenKind::Indent, recovery_block);
-    parse_expr(p, recovery_block);
+    expr(p, recovery_block);
     p.expect(TokenKind::Dedent, recovery_block);
     m.complete(p, NodeKind::BlockExpr)
 }
 
 /// Parse a let–expression: `let <identifier> = <expr> in <body>`
-fn parse_let_expr(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+fn let_expr(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
     p.expect(TokenKind::Let, recovery);
     p.expect(
         TokenKind::Identifier,
         recovery.union([TokenKind::Equal, TokenKind::In]),
     );
+    if p.at(TokenKind::Colon) {
+        p.bump(); // Consume ':'.
+        type_annotation(p, recovery);
+    }
     p.expect(TokenKind::Equal, recovery.union([TokenKind::In]));
     // The value of the variable
-    parse_expr(p, recovery);
+    expr(p, recovery);
     p.expect(TokenKind::In, recovery);
     // The body of the let scope
-    parse_expr(p, recovery);
+    expr(p, recovery);
     m.complete(p, NodeKind::LetExpr)
 }
 
 /// Parse an if–expression: `if <cond> { ... } [else { ... }]`
-fn parse_if_expr(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+fn if_expr(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
     p.expect(TokenKind::If, recovery);
-    parse_expr(p, recovery.union([TokenKind::Then])); // condition
+    expr(p, recovery.union([TokenKind::Then])); // condition
     p.expect(TokenKind::Then, recovery);
-    parse_expr(p, recovery.union([TokenKind::Else])); // then body
+    expr(p, recovery.union([TokenKind::Else])); // then body
     if p.at(TokenKind::Else) {
         p.bump(); // Consume 'else'.
-        parse_expr(p, recovery); // else body
+        expr(p, recovery); // else body
     }
     m.complete(p, NodeKind::IfExpr)
 }
@@ -236,20 +234,20 @@ fn binary_binding_power(p: &mut Parser) -> Option<(u8, u8)> {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_expr, Parser, TokenSet};
+    use super::{expr, Parser, TokenSet};
     use crate::check_grammar;
     use expect_test::expect;
     use kitty_cst::Expr;
 
     fn check(input: &str, expected: expect_test::Expect) {
         let grammar = |p: &mut Parser| {
-            parse_expr(p, TokenSet::NONE);
+            expr(p, TokenSet::NONE);
         };
         check_grammar::<Expr>(grammar, input, expected);
     }
 
     #[test]
-    fn parse_number() {
+    fn number() {
         check(
             "123",
             expect![[r#"
@@ -259,7 +257,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_number_preceded_by_whitespace() {
+    fn number_preceded_by_whitespace() {
         check(
             "   9876",
             expect![[r#"
@@ -270,7 +268,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_number_followed_by_whitespace() {
+    fn number_followed_by_whitespace() {
         check(
             "999   ",
             expect![[r#"
@@ -281,7 +279,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_number_surrounded_by_whitespace() {
+    fn number_surrounded_by_whitespace() {
         check(
             " 123     ",
             expect![[r#"
@@ -293,7 +291,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_variable_ref() {
+    fn variable_ref() {
         check(
             "counter",
             expect![[r#"
@@ -303,7 +301,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_simple_infix_expression() {
+    fn simple_infix_expression() {
         check(
             "1+2",
             expect![[r#"
@@ -317,7 +315,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_left_associative_infix_expression() {
+    fn left_associative_infix_expression() {
         check(
             "1+2+3+4",
             expect![[r#"
@@ -339,7 +337,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_infix_expression_with_mixed_binding_power() {
+    fn infix_expression_with_mixed_binding_power() {
         check(
             "1+2*3-4",
             expect![[r#"
@@ -361,7 +359,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_infix_expression_with_whitespace() {
+    fn infix_expression_with_whitespace() {
         check(
             " 1 +   2* 3 ",
             expect![[r#"
@@ -384,7 +382,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_infix_expression_interspersed_with_newlines() {
+    fn infix_expression_interspersed_with_newlines() {
         check(
             "
 1 +
@@ -410,7 +408,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_infix_expression_interspersed_with_blocks_and_comments() {
+    fn infix_expression_interspersed_with_blocks_and_comments() {
         check(
             "
 1 +
@@ -444,7 +442,7 @@ mod tests {
     }
 
     #[test]
-    fn do_not_parse_operator_if_getting_rhs_failed() {
+    fn do_not_operator_if_getting_rhs_failed() {
         check(
             "(1+",
             expect![[r#"
@@ -462,7 +460,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_negation() {
+    fn negation() {
         check(
             "-10",
             expect![[r#"
@@ -490,7 +488,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_nested_parentheses() {
+    fn nested_parentheses() {
         check(
             "((((((10))))))",
             expect![[r#"
@@ -781,6 +779,38 @@ mod tests {
                     Number@13..14 "2"
                 error at 6..7: expected ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘let’, or ‘if’, but found ‘)’
                 error at 8: missing ‘)’"#]],
+        );
+    }
+
+    #[test]
+    fn let_expr_type() {
+        check(
+            "let x: Number = 10 in x + 20",
+            expect![[r#"
+                LetExpr@0..28
+                  Let@0..3 "let"
+                  Whitespace@3..4 " "
+                  Identifier@4..5 "x"
+                  Colon@5..6 ":"
+                  Whitespace@6..7 " "
+                  TypeName@7..13
+                    Identifier@7..13 "Number"
+                  Whitespace@13..14 " "
+                  Equal@14..15 "="
+                  Whitespace@15..16 " "
+                  NumberLiteral@16..18
+                    Number@16..18 "10"
+                  Whitespace@18..19 " "
+                  In@19..21 "in"
+                  Whitespace@21..22 " "
+                  BinaryExpr@22..28
+                    VariableRef@22..23
+                      Identifier@22..23 "x"
+                    Whitespace@23..24 " "
+                    Plus@24..25 "+"
+                    Whitespace@25..26 " "
+                    NumberLiteral@26..28
+                      Number@26..28 "20""#]],
         );
     }
 }

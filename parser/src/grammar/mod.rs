@@ -1,5 +1,6 @@
 mod decl;
 mod expr;
+mod r#type;
 
 use kitty_syntax::NodeKind;
 

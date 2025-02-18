@@ -85,11 +85,14 @@ impl<'t> Parser<'t> {
                 range,
             });
 
-            let marker = self.start();
-            self.bump();
-            let completed = marker.complete(self, NodeKind::Error);
-            Some(completed)
+            Some(self.mark_kind(NodeKind::Error))
         }
+    }
+
+    pub(crate) fn mark_kind(&mut self, kind: NodeKind) -> CompletedMarker {
+        let m = self.start();
+        self.bump();
+        m.complete(self, kind)
     }
 
     pub(crate) fn bump(&mut self) {
