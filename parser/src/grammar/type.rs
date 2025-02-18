@@ -427,7 +427,6 @@ mod tests {
     #[test]
     fn type_function_missing_return_type() {
         // Unhappy path: function type with no return type after the argument list.
-        // TODO handle this better
         check_type_annotation(
             "Fn(Number, String)",
             expect![[r#"
@@ -444,7 +443,7 @@ mod tests {
                   Missing@18..18
                   Missing@18..18
                 error at 18: missing ‘->’
-                error at 18: missing ‘->’, identifier, ‘(’, ‘Fn’, or ‘impl’"#]],
+                error at 18: missing identifier, ‘(’, ‘Fn’, or ‘impl’"#]],
         );
     }
 

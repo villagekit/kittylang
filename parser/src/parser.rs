@@ -56,6 +56,9 @@ impl<'t> Parser<'t> {
     }
 
     pub(crate) fn error(&mut self, recovery_set: TokenSet) -> Option<CompletedMarker> {
+        let expected = self.expected_kinds.clone();
+        self.expected_kinds.clear();
+
         if self.at_set_raw(&recovery_set) || self.at_end() {
             let current_token = self.source.peek_token();
             let offset = if let Some(Token { range, .. }) = current_token {
@@ -63,14 +66,9 @@ impl<'t> Parser<'t> {
             } else {
                 self.source.last_token_range().unwrap().end()
             };
-            self.errors.push(ParseError::Missing {
-                expected: self.expected_kinds.clone(),
-                offset,
-            });
+            self.errors.push(ParseError::Missing { expected, offset });
 
-            let marker = self.start();
-            let completed = marker.complete(self, NodeKind::Missing);
-            Some(completed)
+            Some(self.mark_kind_empty(NodeKind::Missing))
         } else {
             let current_token = self.source.peek_token();
             let (found, range) = if let Some(Token { kind, range, .. }) = current_token {
@@ -80,7 +78,7 @@ impl<'t> Parser<'t> {
                 (None, self.source.last_token_range().unwrap())
             };
             self.errors.push(ParseError::Unexpected {
-                expected: self.expected_kinds.clone(),
+                expected,
                 found,
                 range,
             });
@@ -92,6 +90,11 @@ impl<'t> Parser<'t> {
     pub(crate) fn mark_kind(&mut self, kind: NodeKind) -> CompletedMarker {
         let m = self.start();
         self.bump();
+        m.complete(self, kind)
+    }
+
+    pub(crate) fn mark_kind_empty(&mut self, kind: NodeKind) -> CompletedMarker {
+        let m = self.start();
         m.complete(self, kind)
     }
 
