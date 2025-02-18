@@ -3,6 +3,8 @@ use kitty_syntax::NodeKind;
 
 use crate::{marker::CompletedMarker, parser::Parser, token_set::TokenSet};
 
+const TYPE_PATH_FIRST: [TokenKind; 1] = [TokenKind::Identifier];
+
 /// A qualified type
 pub(crate) fn type_path(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
     let mut lhs = type_name(p, recovery);
@@ -32,7 +34,9 @@ fn type_name(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 /// Parametrized type with type arguments (e.g. `List[Number]`, same as `Vec<f64>` in Rust)
 fn type_generic(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> CompletedMarker {
     assert!(p.at(TokenKind::BracketOpen));
-    let recovery_generic = recovery.union([TokenKind::BracketClose]);
+    let recovery_generic = recovery
+        .union(TYPE_PATH_FIRST)
+        .union([TokenKind::BracketClose]);
     let m = lhs.precede(p);
     p.bump(); // Consume '['.
     if !p.at_end() && !p.at(TokenKind::BracketClose) {
@@ -68,6 +72,13 @@ fn type_association(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) ->
     m.complete(p, NodeKind::TypeAssociation)
 }
 
+const TYPE_ANNOTATION_FIRST: [TokenKind; 4] = [
+    TokenKind::Identifier,
+    TokenKind::ParenOpen,
+    TokenKind::FnUpper,
+    TokenKind::Impl,
+];
+
 /// A type description.
 pub(crate) fn type_annotation(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
     let cm = if p.at(TokenKind::Identifier) {
@@ -88,7 +99,9 @@ pub(crate) fn type_annotation(p: &mut Parser, recovery: TokenSet) -> Option<Comp
 /// A tuple type (e.g. `(Number, String)`)
 fn type_tuple(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     assert!(p.at(TokenKind::ParenOpen));
-    let recovery_tuple = recovery.union([TokenKind::ParenClose]);
+    let recovery_tuple = recovery
+        .union(TYPE_ANNOTATION_FIRST)
+        .union([TokenKind::ParenClose]);
     let m = p.start();
     p.bump(); // Consume '('
     if !p.at(TokenKind::ParenClose) {
@@ -105,30 +118,41 @@ fn type_tuple(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 /// A function type (e.g. `Fn (Number, String) -> Boolean`)
 fn type_function(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     assert!(p.at(TokenKind::FnUpper));
+    let recovery_function = recovery.union(TYPE_ANNOTATION_FIRST);
     let m = p.start();
     p.bump(); // Consume 'Fn"
     p.expect(
         TokenKind::ParenOpen,
-        recovery.union([TokenKind::ParenClose, TokenKind::Arrow]),
+        recovery_function.union([TokenKind::ParenClose, TokenKind::Arrow]),
     );
     if !p.at(TokenKind::ParenClose) {
-        type_annotation(p, recovery.union([TokenKind::ParenClose, TokenKind::Arrow]));
+        type_annotation(
+            p,
+            recovery_function.union([TokenKind::ParenClose, TokenKind::Arrow]),
+        );
         while p.at(TokenKind::Comma) {
             p.bump();
-            type_annotation(p, recovery.union([TokenKind::ParenClose, TokenKind::Arrow]));
+            type_annotation(
+                p,
+                recovery_function.union([TokenKind::ParenClose, TokenKind::Arrow]),
+            );
         }
     }
-    p.expect(TokenKind::ParenClose, recovery.union([TokenKind::Arrow]));
-    p.expect(TokenKind::Arrow, recovery);
-    type_annotation(p, recovery);
+    p.expect(
+        TokenKind::ParenClose,
+        recovery_function.union([TokenKind::Arrow]),
+    );
+    p.expect(TokenKind::Arrow, recovery_function);
+    type_annotation(p, recovery_function);
     m.complete(p, NodeKind::TypeFunction)
 }
 
 fn type_trait(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     assert!(p.at(TokenKind::Impl));
+    let recovery_trait = recovery.union(TYPE_PATH_FIRST);
     let m = p.start();
     p.bump(); // Consume 'impl'
-    type_path(p, recovery);
+    type_path(p, recovery_trait);
     m.complete(p, NodeKind::TypeTrait)
 }
 
@@ -427,7 +451,6 @@ mod tests {
     #[test]
     fn type_function_missing_argument() {
         // Unhappy path: function type with an empty argument list where an argument is expected.
-        // TODO handle this better
         check_type_annotation(
             "Fn()Boolean",
             expect![[r#"
@@ -435,23 +458,24 @@ mod tests {
                   FnUpper@0..2 "Fn"
                   ParenOpen@2..3 "("
                   ParenClose@3..4 ")"
-                  Error@4..11
+                  Missing@4..4
+                  TypeName@4..11
                     Identifier@4..11 "Boolean"
-                  Missing@11..11
-                error at 4..11: expected ‘->’, but found identifier
-                error at 11: missing identifier, ‘(’, ‘Fn’, or ‘impl’"#]],
+                error at 4: missing ‘->’"#]],
         );
     }
 
     #[test]
     fn type_trait_missing_type_path() {
         // Unhappy path: trait type missing the type after the 'Impl' keyword.
-        // TODO handle this better
         check_type_annotation(
-            "Impl",
+            "impl",
             expect![[r#"
-                TypeName@0..4
-                  Identifier@0..4 "Impl""#]],
+                TypeTrait@0..4
+                  Impl@0..4 "impl"
+                  TypeName@4..4
+                    Missing@4..4
+                error at 4: missing identifier"#]],
         );
     }
 
