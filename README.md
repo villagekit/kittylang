@@ -23,6 +23,10 @@
   - https://github.com/capy-language/capy
 - https://github.com/naalit/pika/
 
+- Used
+  - https://lunacookies.github.io/lang/
+  - https://matklad.github.io/2023/05/21/resilient-ll-parsing-tutorial.html
+
 ## TODO
 
 - rename to Ako ("to learn" in Maori)?

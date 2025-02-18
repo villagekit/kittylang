@@ -72,7 +72,7 @@ impl<'t> Parser<'t> {
             range,
         });
 
-        if !self.at_set(&recovery_set) && !self.at_end() {
+        if !self.at_set_raw(&recovery_set) && !self.at_end() {
             let marker = self.start();
             self.bump();
             let completed = marker.complete(self, NodeKind::Error);
@@ -93,9 +93,13 @@ impl<'t> Parser<'t> {
         self.peek() == Some(kind)
     }
 
-    pub(crate) fn at_set(&mut self, set: &[TokenKind]) -> bool {
-        self.expected_kinds.extend_from_slice(set);
-        self.peek().map_or(false, |k| set.contains(&k))
+    pub(crate) fn at_set<const LEN: usize>(&mut self, set: [TokenKind; LEN]) -> bool {
+        self.expected_kinds.extend_from_slice(&set);
+        self.at_set_raw(&TokenSet::new(set))
+    }
+
+    fn at_set_raw(&mut self, set: &TokenSet) -> bool {
+        self.peek().map_or(false, |k| set.contains(k))
     }
 
     pub(crate) fn at_end(&mut self) -> bool {

@@ -13,16 +13,16 @@ pub(crate) fn parse_expr(p: &mut Parser, recovery: TokenSet) -> Option<Completed
 /// (Also known as a Pratt parser.)
 fn parse_expr_pratt(p: &mut Parser, recovery: TokenSet, min_bp: u8) -> Option<CompletedMarker> {
     // First, parse a left-hand side (unary operator or primary) expression.
-    let mut lhs = parse_lhs(p, recovery.clone())?;
+    let mut lhs = parse_lhs(p, recovery)?;
 
     loop {
         // Check for postfix operators inline.
         if p.at(TokenKind::ParenOpen) {
-            lhs = parse_call_expr(p, lhs, recovery.clone());
+            lhs = parse_call_expr(p, lhs, recovery);
             continue;
         }
         if p.at(TokenKind::Dot) {
-            lhs = parse_get_expr(p, lhs, recovery.clone());
+            lhs = parse_get_expr(p, lhs, recovery);
             continue;
         }
 
@@ -40,7 +40,7 @@ fn parse_expr_pratt(p: &mut Parser, recovery: TokenSet, min_bp: u8) -> Option<Co
         p.bump(); // Consume the operator.
 
         let m = lhs.precede(p);
-        let rhs = parse_expr_pratt(p, recovery.clone(), right_bp);
+        let rhs = parse_expr_pratt(p, recovery, right_bp);
         lhs = m.complete(p, NodeKind::BinaryExpr);
 
         if rhs.is_none() {
@@ -82,7 +82,7 @@ fn parse_primary(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> 
     } else if p.at(TokenKind::If) {
         parse_if_expr(p, recovery)
     } else {
-        p.error(recovery.clone());
+        p.error(recovery);
         return None;
     };
     Some(cm)
@@ -101,7 +101,7 @@ fn parse_call_expr(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> 
     p.bump(); // Consume '('.
     if !p.at(TokenKind::ParenClose) {
         loop {
-            parse_expr(p, recovery.clone());
+            parse_expr(p, recovery);
             if !p.at(TokenKind::Comma) {
                 break;
             }
@@ -141,24 +141,24 @@ fn parse_paren_expr(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 
 /// Parse a block expression: `{ ... }` but with indents
 fn parse_block_expr(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    let recovery = recovery.union(&TokenSet::new([TokenKind::Indent, TokenKind::Dedent]));
+    let recovery_block = recovery.union([TokenKind::Indent, TokenKind::Dedent]);
     let m = p.start();
-    p.expect(TokenKind::Indent, recovery);
-    parse_expr(p, recovery);
-    p.expect(TokenKind::Dedent, recovery);
+    p.expect(TokenKind::Indent, recovery_block);
+    parse_expr(p, recovery_block);
+    p.expect(TokenKind::Dedent, recovery_block);
     m.complete(p, NodeKind::BlockExpr)
 }
 
 /// Parse a let–expression: `let <identifier> = <expr> in <body>`
 fn parse_let_expr(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    let recovery = recovery.union(&TokenSet::new([TokenKind::Let, TokenKind::In]));
+    let recovery_let = recovery.union([TokenKind::In]);
     let m = p.start();
     p.expect(TokenKind::Let, recovery);
-    p.expect(TokenKind::Identifier, recovery);
-    p.expect(TokenKind::Equal, recovery);
+    p.expect(TokenKind::Identifier, recovery_let);
+    p.expect(TokenKind::Equal, recovery_let);
     // The value of the variable
     parse_expr(p, recovery);
-    p.expect(TokenKind::In, recovery);
+    p.expect(TokenKind::In, recovery_let);
     // The body of the let scope
     parse_expr(p, recovery);
     m.complete(p, NodeKind::LetExpr)
@@ -166,30 +166,21 @@ fn parse_let_expr(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 
 /// Parse an if–expression: `if <cond> { ... } [else { ... }]`
 fn parse_if_expr(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    let recovery = recovery.union(&TokenSet::new([
-        TokenKind::If,
-        TokenKind::Then,
-        TokenKind::Else,
-    ]));
     let m = p.start();
-    p.expect(TokenKind::If, recovery.clone());
-    parse_expr(p, recovery.clone()); // condition
+    p.expect(TokenKind::If, recovery);
+    parse_expr(p, recovery.union([TokenKind::Then])); // condition
     p.expect(TokenKind::Then, recovery);
-    parse_expr(p, recovery.clone()); // then body
+    parse_expr(p, recovery.union([TokenKind::Else])); // then body
     if p.at(TokenKind::Else) {
         p.bump(); // Consume 'else'.
-        parse_expr(p, recovery.clone()); // else body
+        parse_expr(p, recovery); // else body
     }
     m.complete(p, NodeKind::IfExpr)
 }
 
 /// Return the binding power for a unary operator at the current token, if any.
 fn unary_binding_power(p: &mut Parser) -> Option<u8> {
-    if p.at_set(&TokenSet::new([
-        TokenKind::Minus,
-        TokenKind::Plus,
-        TokenKind::Not,
-    ])) {
+    if p.at_set([TokenKind::Plus, TokenKind::Minus, TokenKind::Not]) {
         Some(15)
     } else {
         None
@@ -201,29 +192,25 @@ fn binary_binding_power(p: &mut Parser) -> Option<(u8, u8)> {
     // Binding power for binary operations, in order of highest to lowest.
     //
     // Multiplicative (Factor) operators
-    if p.at_set(&TokenSet::new([
-        TokenKind::Multiply,
-        TokenKind::Divide,
-        TokenKind::Rem,
-    ])) {
+    if p.at_set([TokenKind::Multiply, TokenKind::Divide, TokenKind::Rem]) {
         Some((13, 14))
     }
     // Additive (Term) operators
-    else if p.at_set(&TokenSet::new([TokenKind::Plus, TokenKind::Minus])) {
+    else if p.at_set([TokenKind::Plus, TokenKind::Minus]) {
         Some((11, 12))
     }
     // Bitwise shift
     // Comparison
-    else if p.at_set(&TokenSet::new([
+    else if p.at_set([
         TokenKind::Less,
         TokenKind::LessEqual,
         TokenKind::Greater,
         TokenKind::GreaterEqual,
-    ])) {
+    ]) {
         Some((9, 10))
     }
     // Equality
-    else if p.at_set(&TokenSet::new([TokenKind::EqualEqual, TokenKind::NotEqual])) {
+    else if p.at_set([TokenKind::EqualEqual, TokenKind::NotEqual]) {
         Some((7, 8))
     }
     // Bitwise And
@@ -254,7 +241,7 @@ mod tests {
 
     fn check(input: &str, expected: expect_test::Expect) {
         let grammar = |p: &mut Parser| {
-            parse_expr(p, TokenSet::none());
+            parse_expr(p, TokenSet::NONE);
         };
         check_grammar::<Expr>(grammar, input, expected);
     }
