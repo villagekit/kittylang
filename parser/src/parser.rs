@@ -1,5 +1,3 @@
-use std::sync::LazyLock;
-
 use kitty_lexer::Token;
 use kitty_syntax::{NodeKind, TokenKind};
 
@@ -10,10 +8,6 @@ use crate::{
     source::Source,
     token_set::TokenSet,
 };
-
-static DEFAULT_RECOVERY_SET: LazyLock<TokenSet> =
-    // LazyLock::new(|| TokenSet::new([TokenKind::Indent, TokenKind::Dedent]));
-    LazyLock::new(|| TokenSet::new([TokenKind::Indent, TokenKind::Dedent]));
 
 pub(crate) struct Parser<'t> {
     source: Source<'t>,
@@ -52,34 +46,16 @@ impl<'t> Parser<'t> {
         Marker::new(pos)
     }
 
-    pub(crate) fn expect(&mut self, kind: TokenKind) {
-        self.expect_with_recovery(kind, TokenSet::none())
-    }
-
-    pub(crate) fn expect_with_recovery(&mut self, kind: TokenKind, recovery: TokenSet) {
+    pub(crate) fn expect(&mut self, kind: TokenKind, recovery: TokenSet) {
         self.expected_kinds.clear();
         if self.at(kind) {
             self.bump();
         } else {
-            self.error_with_recovery(recovery);
+            self.error(recovery);
         }
     }
 
-    pub(crate) fn error(&mut self) -> Option<CompletedMarker> {
-        self.error_with_recovery(TokenSet::none())
-    }
-
-    pub(crate) fn error_with_recovery(
-        &mut self,
-        recovery_set: TokenSet,
-    ) -> Option<CompletedMarker> {
-        self.error_with_recovery_raw(recovery_set.union(&DEFAULT_RECOVERY_SET))
-    }
-
-    pub(crate) fn error_with_recovery_raw(
-        &mut self,
-        recovery_set: TokenSet,
-    ) -> Option<CompletedMarker> {
+    pub(crate) fn error(&mut self, recovery_set: TokenSet) -> Option<CompletedMarker> {
         let current_token = self.source.peek_token();
 
         let (found, range) = if let Some(Token { kind, range, .. }) = current_token {
@@ -117,9 +93,8 @@ impl<'t> Parser<'t> {
         self.peek() == Some(kind)
     }
 
-    pub(crate) fn at_set(&mut self, set: &TokenSet) -> bool {
-        self.expected_kinds
-            .extend(Into::<Vec<TokenKind>>::into(set).iter());
+    pub(crate) fn at_set(&mut self, set: &[TokenKind]) -> bool {
+        self.expected_kinds.extend_from_slice(set);
         self.peek().map_or(false, |k| set.contains(&k))
     }
 

@@ -3,25 +3,26 @@ use kitty_syntax::{NodeKind, TokenKind};
 use super::*;
 use crate::{marker::CompletedMarker, token_set::TokenSet};
 
-/// Entry point: parse an expression.
+/// Parse an expression.
 #[allow(dead_code)]
-pub(crate) fn parse_expr(p: &mut Parser) -> Option<CompletedMarker> {
-    parse_expr_with_bp(p, 0)
+pub(crate) fn parse_expr(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
+    parse_expr_pratt(p, recovery, 0)
 }
 
-/// Parse an expression with a given right binding power.
-fn parse_expr_with_bp(p: &mut Parser, min_bp: u8) -> Option<CompletedMarker> {
+/// Parse an expression with a given minimum binding power.
+/// (Also known as a Pratt parser.)
+fn parse_expr_pratt(p: &mut Parser, recovery: TokenSet, min_bp: u8) -> Option<CompletedMarker> {
     // First, parse a left-hand side (unary operator or primary) expression.
-    let mut lhs = parse_lhs(p)?;
+    let mut lhs = parse_lhs(p, recovery.clone())?;
 
     loop {
         // Check for postfix operators inline.
         if p.at(TokenKind::ParenOpen) {
-            lhs = parse_call_expr(p, lhs);
+            lhs = parse_call_expr(p, lhs, recovery.clone());
             continue;
         }
         if p.at(TokenKind::Dot) {
-            lhs = parse_get_expr(p, lhs);
+            lhs = parse_get_expr(p, lhs, recovery.clone());
             continue;
         }
 
@@ -39,7 +40,7 @@ fn parse_expr_with_bp(p: &mut Parser, min_bp: u8) -> Option<CompletedMarker> {
         p.bump(); // Consume the operator.
 
         let m = lhs.precede(p);
-        let rhs = parse_expr_with_bp(p, right_bp);
+        let rhs = parse_expr_pratt(p, recovery.clone(), right_bp);
         lhs = m.complete(p, NodeKind::BinaryExpr);
 
         if rhs.is_none() {
@@ -51,19 +52,19 @@ fn parse_expr_with_bp(p: &mut Parser, min_bp: u8) -> Option<CompletedMarker> {
 }
 
 /// Parse a left-hand side expression, which may be a unary operator or a primary.
-fn parse_lhs(p: &mut Parser) -> Option<CompletedMarker> {
+fn parse_lhs(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
     if let Some(bp) = unary_binding_power(p) {
         // A unary operator is present.
         let m = p.start();
         p.bump(); // Consume the unary operator token.
-        parse_expr_with_bp(p, bp)?;
+        parse_expr_pratt(p, recovery, bp)?;
         return Some(m.complete(p, NodeKind::UnaryExpr));
     }
-    parse_primary(p)
+    parse_primary(p, recovery)
 }
 
 /// Parse a primary expression.
-fn parse_primary(p: &mut Parser) -> Option<CompletedMarker> {
+fn parse_primary(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
     let cm = if p.at(TokenKind::Identifier) {
         parse_kind(p, NodeKind::VariableRef)
     } else if p.at(TokenKind::Boolean) {
@@ -73,15 +74,15 @@ fn parse_primary(p: &mut Parser) -> Option<CompletedMarker> {
     } else if p.at(TokenKind::String) {
         parse_kind(p, NodeKind::StringLiteral)
     } else if p.at(TokenKind::ParenOpen) {
-        parse_paren_expr(p)
+        parse_paren_expr(p, recovery)
     } else if p.at(TokenKind::Indent) {
-        parse_block_expr(p)
+        parse_block_expr(p, recovery)
     } else if p.at(TokenKind::Let) {
-        parse_let_expr(p)
+        parse_let_expr(p, recovery)
     } else if p.at(TokenKind::If) {
-        parse_if_expr(p)
+        parse_if_expr(p, recovery)
     } else {
-        p.error();
+        p.error(recovery.clone());
         return None;
     };
     Some(cm)
@@ -94,81 +95,90 @@ fn parse_kind(p: &mut Parser, kind: NodeKind) -> CompletedMarker {
 }
 
 /// Parse a call expression given an existing `lhs`.
-fn parse_call_expr(p: &mut Parser, lhs: CompletedMarker) -> CompletedMarker {
+fn parse_call_expr(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> CompletedMarker {
+    assert!(p.at(TokenKind::ParenOpen));
     let m = lhs.precede(p);
     p.bump(); // Consume '('.
     if !p.at(TokenKind::ParenClose) {
         loop {
-            parse_expr(p);
+            parse_expr(p, recovery.clone());
             if !p.at(TokenKind::Comma) {
                 break;
             }
             p.bump(); // Consume comma.
         }
     }
-    p.expect(TokenKind::ParenClose);
+    p.expect(TokenKind::ParenClose, recovery);
     m.complete(p, NodeKind::CallExpr)
 }
 
 /// Parse a field access (get expression) given an existing `lhs`.
-fn parse_get_expr(p: &mut Parser, lhs: CompletedMarker) -> CompletedMarker {
+fn parse_get_expr(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> CompletedMarker {
+    assert!(p.at(TokenKind::Dot));
     let m = lhs.precede(p);
     p.bump(); // Consume '.'.
-    p.expect(TokenKind::Identifier);
+    p.expect(TokenKind::Identifier, recovery);
     m.complete(p, NodeKind::GetExpr)
 }
 
 /// Parse a parenthesized expression (or tuple expression).
-fn parse_paren_expr(p: &mut Parser) -> CompletedMarker {
+fn parse_paren_expr(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
-    p.expect(TokenKind::ParenOpen);
-    parse_expr(p);
+    p.expect(TokenKind::ParenOpen, recovery);
+    parse_expr(p, recovery);
     if p.at(TokenKind::Comma) {
         // More than one expression makes it a tuple.
         while p.at(TokenKind::Comma) {
             p.bump();
-            parse_expr(p);
+            parse_expr(p, recovery);
         }
-        p.expect(TokenKind::ParenClose);
+        p.expect(TokenKind::ParenClose, recovery);
         return m.complete(p, NodeKind::TupleExpr);
     }
-    p.expect(TokenKind::ParenClose);
+    p.expect(TokenKind::ParenClose, recovery);
     m.complete(p, NodeKind::ParenExpr)
 }
 
 /// Parse a block expression: `{ ... }` but with indents
-fn parse_block_expr(p: &mut Parser) -> CompletedMarker {
+fn parse_block_expr(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+    let recovery = recovery.union(&TokenSet::new([TokenKind::Indent, TokenKind::Dedent]));
     let m = p.start();
-    p.expect(TokenKind::Indent);
-    parse_expr(p);
-    p.expect(TokenKind::Dedent);
+    p.expect(TokenKind::Indent, recovery);
+    parse_expr(p, recovery);
+    p.expect(TokenKind::Dedent, recovery);
     m.complete(p, NodeKind::BlockExpr)
 }
 
 /// Parse a let–expression: `let <identifier> = <expr> in <body>`
-fn parse_let_expr(p: &mut Parser) -> CompletedMarker {
+fn parse_let_expr(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+    let recovery = recovery.union(&TokenSet::new([TokenKind::Let, TokenKind::In]));
     let m = p.start();
-    p.expect(TokenKind::Let);
-    p.expect(TokenKind::Identifier);
-    p.expect(TokenKind::Equal);
+    p.expect(TokenKind::Let, recovery);
+    p.expect(TokenKind::Identifier, recovery);
+    p.expect(TokenKind::Equal, recovery);
     // The value of the variable
-    parse_expr(p);
-    p.expect(TokenKind::In);
+    parse_expr(p, recovery);
+    p.expect(TokenKind::In, recovery);
     // The body of the let scope
-    parse_expr(p);
+    parse_expr(p, recovery);
     m.complete(p, NodeKind::LetExpr)
 }
 
 /// Parse an if–expression: `if <cond> { ... } [else { ... }]`
-fn parse_if_expr(p: &mut Parser) -> CompletedMarker {
+fn parse_if_expr(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+    let recovery = recovery.union(&TokenSet::new([
+        TokenKind::If,
+        TokenKind::Then,
+        TokenKind::Else,
+    ]));
     let m = p.start();
-    p.expect(TokenKind::If);
-    parse_expr(p); // condition
-    p.expect(TokenKind::Then);
-    parse_expr(p); // then body
+    p.expect(TokenKind::If, recovery.clone());
+    parse_expr(p, recovery.clone()); // condition
+    p.expect(TokenKind::Then, recovery);
+    parse_expr(p, recovery.clone()); // then body
     if p.at(TokenKind::Else) {
         p.bump(); // Consume 'else'.
-        parse_expr(p); // else body
+        parse_expr(p, recovery.clone()); // else body
     }
     m.complete(p, NodeKind::IfExpr)
 }
@@ -237,14 +247,14 @@ fn binary_binding_power(p: &mut Parser) -> Option<(u8, u8)> {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_expr, Parser};
+    use super::{parse_expr, Parser, TokenSet};
     use crate::check_grammar;
     use expect_test::expect;
     use kitty_cst::Expr;
 
     fn check(input: &str, expected: expect_test::Expect) {
         let grammar = |p: &mut Parser| {
-            parse_expr(p);
+            parse_expr(p, TokenSet::none());
         };
         check_grammar::<Expr>(grammar, input, expected);
     }

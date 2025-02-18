@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 
 use kitty_lexer::TokenKind;
 
+#[derive(Debug, Clone)]
 pub(crate) struct TokenSet(BTreeSet<TokenKind>);
 
 impl TokenSet {
