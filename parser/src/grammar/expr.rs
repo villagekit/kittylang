@@ -99,7 +99,7 @@ fn parse_call_expr(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> 
     assert!(p.at(TokenKind::ParenOpen));
     let m = lhs.precede(p);
     p.bump(); // Consume '('.
-    if !p.at(TokenKind::ParenClose) {
+    if !p.at_end() && !p.at(TokenKind::ParenClose) {
         loop {
             parse_expr(p, recovery);
             if !p.at(TokenKind::Comma) {
@@ -151,14 +151,16 @@ fn parse_block_expr(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 
 /// Parse a let–expression: `let <identifier> = <expr> in <body>`
 fn parse_let_expr(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    let recovery_let = recovery.union([TokenKind::In]);
     let m = p.start();
     p.expect(TokenKind::Let, recovery);
-    p.expect(TokenKind::Identifier, recovery_let);
-    p.expect(TokenKind::Equal, recovery_let);
+    p.expect(
+        TokenKind::Identifier,
+        recovery.union([TokenKind::Equal, TokenKind::In]),
+    );
+    p.expect(TokenKind::Equal, recovery.union([TokenKind::In]));
     // The value of the variable
     parse_expr(p, recovery);
-    p.expect(TokenKind::In, recovery_let);
+    p.expect(TokenKind::In, recovery);
     // The body of the let scope
     parse_expr(p, recovery);
     m.complete(p, NodeKind::LetExpr)
@@ -452,8 +454,10 @@ mod tests {
                     NumberLiteral@1..2
                       Number@1..2 "1"
                     Plus@2..3 "+"
-                error at 2..3: expected ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘let’ or ‘if’
-                error at 2..3: expected ‘)’"#]],
+                    Missing@3..3
+                  Missing@3..3
+                error at 3: missing ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘let’, or ‘if’
+                error at 3: missing ‘)’"#]],
         );
     }
 
@@ -535,7 +539,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_unclosed_parentheses() {
+    fn paren_expr_missing_closing_paren() {
         check(
             "(foo",
             expect![[r#"
@@ -543,7 +547,240 @@ mod tests {
                   ParenOpen@0..1 "("
                   VariableRef@1..4
                     Identifier@1..4 "foo"
-                error at 1..4: expected ‘)’"#]],
+                  Missing@4..4
+                error at 4: missing ‘)’"#]],
+        );
+    }
+
+    #[test]
+    fn call_expr_missing_closing_paren() {
+        // "foo(" is parsed as a call expression with a missing closing ')'
+        check(
+            "foo(",
+            expect![[r#"
+                CallExpr@0..4
+                  VariableRef@0..3
+                    Identifier@0..3 "foo"
+                  ParenOpen@3..4 "("
+                  Missing@4..4
+                error at 4: missing ‘)’"#]],
+        );
+    }
+
+    #[test]
+    fn get_expr_missing_identifier() {
+        // "foo." is parsed as a get expression missing the identifier after the dot.
+        check(
+            "foo.",
+            expect![[r#"
+                GetExpr@0..4
+                  VariableRef@0..3
+                    Identifier@0..3 "foo"
+                  Dot@3..4 "."
+                  Missing@4..4
+                error at 4: missing identifier"#]],
+        );
+    }
+
+    #[test]
+    fn let_expr_missing_identifier() {
+        // "let = 1 in 2" is missing an identifier after the 'let' keyword.
+        check(
+            "let = 1 in 2",
+            expect![[r#"
+                LetExpr@0..12
+                  Let@0..3 "let"
+                  Whitespace@3..4 " "
+                  Missing@4..4
+                  Equal@4..5 "="
+                  Whitespace@5..6 " "
+                  NumberLiteral@6..7
+                    Number@6..7 "1"
+                  Whitespace@7..8 " "
+                  In@8..10 "in"
+                  Whitespace@10..11 " "
+                  NumberLiteral@11..12
+                    Number@11..12 "2"
+                error at 4: missing identifier"#]],
+        );
+    }
+
+    #[test]
+    fn let_expr_missing_equal() {
+        // "let x 1 in 2" is missing the '=' token.
+        check(
+            "let x 1 in 2",
+            expect![[r#"
+                LetExpr@0..12
+                  Let@0..3 "let"
+                  Whitespace@3..4 " "
+                  Identifier@4..5 "x"
+                  Whitespace@5..6 " "
+                  Error@6..7
+                    Number@6..7 "1"
+                  Whitespace@7..8 " "
+                  Error@8..10
+                    In@8..10 "in"
+                  Whitespace@10..11 " "
+                  Error@11..12
+                    Number@11..12 "2"
+                  Missing@12..12
+                error at 6..7: expected ‘=’, but found number
+                error at 8..10: expected ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘let’, or ‘if’, but found ‘in’
+                error at 11..12: expected ‘in’, but found number
+                error at 12: missing ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘let’, or ‘if’"#]],
+        );
+    }
+
+    #[test]
+    fn let_expr_missing_expression() {
+        // "let x =  in 2" is missing an expression after the '='.
+        check(
+            "let x =  in 2",
+            expect![[r#"
+                LetExpr@0..13
+                  Let@0..3 "let"
+                  Whitespace@3..4 " "
+                  Identifier@4..5 "x"
+                  Whitespace@5..6 " "
+                  Equal@6..7 "="
+                  Whitespace@7..9 "  "
+                  Error@9..11
+                    In@9..11 "in"
+                  Whitespace@11..12 " "
+                  Error@12..13
+                    Number@12..13 "2"
+                  Missing@13..13
+                error at 9..11: expected ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘let’, or ‘if’, but found ‘in’
+                error at 12..13: expected ‘in’, but found number
+                error at 13: missing ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘let’, or ‘if’"#]],
+        );
+    }
+
+    #[test]
+    fn let_expr_missing_in() {
+        // "let x = 1 2" is missing the 'in' keyword.
+        check(
+            "let x = 1 2",
+            expect![[r#"
+                LetExpr@0..11
+                  Let@0..3 "let"
+                  Whitespace@3..4 " "
+                  Identifier@4..5 "x"
+                  Whitespace@5..6 " "
+                  Equal@6..7 "="
+                  Whitespace@7..8 " "
+                  NumberLiteral@8..9
+                    Number@8..9 "1"
+                  Whitespace@9..10 " "
+                  Error@10..11
+                    Number@10..11 "2"
+                  Missing@11..11
+                error at 10..11: expected ‘in’, but found number
+                error at 11: missing ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘let’, or ‘if’"#]],
+        );
+    }
+
+    #[test]
+    fn if_expr_missing_condition() {
+        // "if then 1 else 2" is missing the condition between 'if' and 'then'
+        check(
+            "if then 1 else 2",
+            expect![[r#"
+                IfExpr@0..16
+                  If@0..2 "if"
+                  Whitespace@2..3 " "
+                  Missing@3..3
+                  Then@3..7 "then"
+                  Whitespace@7..8 " "
+                  NumberLiteral@8..9
+                    Number@8..9 "1"
+                  Whitespace@9..10 " "
+                  Else@10..14 "else"
+                  Whitespace@14..15 " "
+                  NumberLiteral@15..16
+                    Number@15..16 "2"
+                error at 3: missing ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘let’, or ‘if’"#]],
+        );
+    }
+
+    #[test]
+    fn if_expr_missing_then_body() {
+        // "if 1 then" is missing the then–body (and there is no else branch).
+        check(
+            "if 1 then",
+            expect![[r#"
+                IfExpr@0..9
+                  If@0..2 "if"
+                  Whitespace@2..3 " "
+                  NumberLiteral@3..4
+                    Number@3..4 "1"
+                  Whitespace@4..5 " "
+                  Then@5..9 "then"
+                  Missing@9..9
+                error at 9: missing ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘let’, or ‘if’"#]],
+        );
+    }
+
+    #[test]
+    fn call_expr_trailing_comma() {
+        // "foo(1,)" has a trailing comma with no expression following it.
+        check(
+            "foo(1,)",
+            expect![[r#"
+                CallExpr@0..7
+                  VariableRef@0..3
+                    Identifier@0..3 "foo"
+                  ParenOpen@3..4 "("
+                  NumberLiteral@4..5
+                    Number@4..5 "1"
+                  Comma@5..6 ","
+                  Error@6..7
+                    ParenClose@6..7 ")"
+                  Missing@7..7
+                error at 6..7: expected ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘let’, or ‘if’, but found ‘)’
+                error at 7: missing ‘)’"#]],
+        );
+    }
+
+    /*
+    #[test]
+    fn invalid_token() {
+        // "@" is not a valid token to start an expression.
+        check(
+            "@",
+            expect![[r#"
+            error at 0..1: expected ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘let’ or ‘if’
+        "#]],
+        );
+    }
+    */
+
+    #[test]
+    fn if_expr_with_nested_error() {
+        // "if (1+) then 2" contains a binary expression error inside the if–condition.
+        check(
+            "if (1+) then 2",
+            expect![[r#"
+                IfExpr@0..14
+                  If@0..2 "if"
+                  Whitespace@2..3 " "
+                  ParenExpr@3..8
+                    ParenOpen@3..4 "("
+                    BinaryExpr@4..7
+                      NumberLiteral@4..5
+                        Number@4..5 "1"
+                      Plus@5..6 "+"
+                      Error@6..7
+                        ParenClose@6..7 ")"
+                    Whitespace@7..8 " "
+                    Missing@8..8
+                  Then@8..12 "then"
+                  Whitespace@12..13 " "
+                  NumberLiteral@13..14
+                    Number@13..14 "2"
+                error at 6..7: expected ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘let’, or ‘if’, but found ‘)’
+                error at 8: missing ‘)’"#]],
         );
     }
 }

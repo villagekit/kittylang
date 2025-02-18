@@ -25,7 +25,7 @@ impl<'t> Sink<'t> {
     pub(crate) fn process(mut self, events: &[Event]) -> SyntaxTreeBuf {
         // the first event always starts the root node,
         // and the last event always finishes that node
-        assert!(matches!(events.get(0), Some(Event::StartNode { .. })));
+        assert!(matches!(events.first(), Some(Event::StartNode { .. })));
         assert!(matches!(events.last(), Some(Event::FinishNode)));
 
         // We want to avoid nodes having trailing trivia:

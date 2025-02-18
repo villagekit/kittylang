@@ -132,6 +132,7 @@ pub enum NodeKind {
     ImplTraitFunction,
     ImplTraitConstant,
 
-    // Misc catch-all for error recovery
+    // Resilient syntax trees
     Error,
+    Missing,
 }

@@ -114,6 +114,9 @@ macro_rules! define_compound_token {
 
 define_node!(Source);
 
+define_node!(Error);
+define_node!(Missing);
+
 impl Source {
     pub fn declarations(self, tree: &SyntaxTree) -> impl Iterator<Item = Decl> + '_ {
         nodes(self, tree)
@@ -168,6 +171,7 @@ define_node!(GetExpr);
 define_compound_node!(
     Expr,
     kinds: [
+        Missing,
         BooleanLiteral,
         NumberLiteral,
         StringLiteral,

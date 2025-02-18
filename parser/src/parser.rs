@@ -56,29 +56,39 @@ impl<'t> Parser<'t> {
     }
 
     pub(crate) fn error(&mut self, recovery_set: TokenSet) -> Option<CompletedMarker> {
-        let current_token = self.source.peek_token();
+        if self.at_set_raw(&recovery_set) || self.at_end() {
+            let current_token = self.source.peek_token();
+            let offset = if let Some(Token { range, .. }) = current_token {
+                range.start()
+            } else {
+                self.source.last_token_range().unwrap().end()
+            };
+            self.errors.push(ParseError::Missing {
+                expected: self.expected_kinds.clone(),
+                offset,
+            });
 
-        let (found, range) = if let Some(Token { kind, range, .. }) = current_token {
-            (Some(*kind), *range)
+            let marker = self.start();
+            let completed = marker.complete(self, NodeKind::Missing);
+            Some(completed)
         } else {
-            // If we’re at the end of the input we use the range of the very last token in the
-            // input.
-            (None, self.source.last_token_range().unwrap())
-        };
+            let current_token = self.source.peek_token();
+            let (found, range) = if let Some(Token { kind, range, .. }) = current_token {
+                (Some(*kind), *range)
+            } else {
+                // If we’re at the end of the input we use the range of the very last token in the input.
+                (None, self.source.last_token_range().unwrap())
+            };
+            self.errors.push(ParseError::Unexpected {
+                expected: self.expected_kinds.clone(),
+                found,
+                range,
+            });
 
-        self.errors.push(ParseError {
-            expected: self.expected_kinds.clone(),
-            found,
-            range,
-        });
-
-        if !self.at_set_raw(&recovery_set) && !self.at_end() {
             let marker = self.start();
             self.bump();
             let completed = marker.complete(self, NodeKind::Error);
             Some(completed)
-        } else {
-            None
         }
     }
 
