@@ -26,6 +26,15 @@ impl<'t> Source<'t> {
         self.peek_token_raw()
     }
 
+    pub(crate) fn lookahead_kind(&mut self, nth: usize) -> Option<TokenKind> {
+        self.tokens[self.cursor..]
+            .iter()
+            .map(|Token { kind, .. }| kind)
+            .filter(|kind| !kind.is_trivia())
+            .nth(nth)
+            .cloned()
+    }
+
     fn eat_trivia(&mut self) {
         while self.at_trivia() {
             self.cursor += 1;

@@ -239,15 +239,16 @@ impl CstNode for TypeAnnotation {
 
 // Generic Parameters
 define_node!(GenericParam);
-define_node!(GenericParams);
+define_node!(GenericParamList);
 
 // Type Arguments
-define_node!(GenericArg);
-define_node!(GenericArgs);
+define_node!(GenericArgPositional);
+define_node!(GenericArgLabelled);
+define_node!(GenericArgList);
 
 // Type Bounds
 define_node!(TypeBound);
-define_node!(TypeBounds);
+define_node!(TypeBoundList);
 
 // Literals
 define_token!(Boolean);
@@ -316,8 +317,9 @@ define_node!(ConstantDecl);
 // Function Declarations.
 define_node!(FunctionDecl);
 define_node!(FunctionParam);
-define_node!(FunctionParams);
-define_node!(FunctionArg);
+define_node!(FunctionParamList);
+define_node!(FunctionArgPositional);
+define_node!(FunctionArgLabelled);
 define_node!(FunctionArgs);
 define_node!(FunctionBody);
 

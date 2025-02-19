@@ -73,15 +73,16 @@ pub enum NodeKind {
 
     // Generic Parameters
     GenericParam,
-    GenericParams,
+    GenericParamList,
 
     // Type Arguments
-    GenericArg,
-    GenericArgs,
+    GenericArgPositional,
+    GenericArgLabelled,
+    GenericArgList,
 
     // Type Bounds
     TypeBound,
-    TypeBounds,
+    TypeBoundList,
 
     // Operators.
     UnaryOperator,
@@ -103,8 +104,9 @@ pub enum NodeKind {
     // Function Declarations
     FunctionDecl,
     FunctionParam,
-    FunctionParams,
-    FunctionArg,
+    FunctionParamList,
+    FunctionArgPositional,
+    FunctionArgLabelled,
     FunctionArgs,
     FunctionBody,
 

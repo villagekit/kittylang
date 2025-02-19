@@ -104,6 +104,14 @@ impl<'t> Parser<'t> {
         self.events.push(Some(Event::AddToken));
     }
 
+    pub(crate) fn bump_if_at(&mut self, kind: TokenKind) -> bool {
+        let is_at_kind = self.at(kind);
+        if is_at_kind {
+            self.bump();
+        }
+        is_at_kind
+    }
+
     pub(crate) fn at(&mut self, kind: TokenKind) -> bool {
         self.expected_kinds.push(kind);
         self.peek() == Some(kind)
@@ -112,6 +120,13 @@ impl<'t> Parser<'t> {
     pub(crate) fn at_set<const LEN: usize>(&mut self, set: [TokenKind; LEN]) -> bool {
         self.expected_kinds.extend_from_slice(&set);
         self.at_set_raw(&TokenSet::new(set))
+    }
+
+    pub(crate) fn lookahead_at(&mut self, nth: usize, kind: TokenKind) -> bool {
+        self.source.lookahead_kind(nth) == Some(kind)
+    }
+    pub(crate) fn lookahead(&mut self, nth: usize) -> Option<TokenKind> {
+        self.source.lookahead_kind(nth)
     }
 
     fn at_set_raw(&mut self, set: &TokenSet) -> bool {
@@ -123,7 +138,7 @@ impl<'t> Parser<'t> {
     }
 
     fn peek(&mut self) -> Option<TokenKind> {
-        self.source.peek_token().map(|token| token.kind)
+        self.source.peek_kind()
     }
 
     pub(crate) fn debug_source(&self) {
