@@ -1,7 +1,9 @@
 use kitty_syntax::{NodeKind, TokenKind};
 
 use super::r#type::type_annotation;
-use crate::{marker::CompletedMarker, token_set::TokenSet, Parser};
+use crate::{
+    grammar::function::function_arg_list, marker::CompletedMarker, token_set::TokenSet, Parser,
+};
 
 /// Parse an expression.
 #[allow(dead_code)]
@@ -92,17 +94,7 @@ fn primary(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
 fn call_expr(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> CompletedMarker {
     assert!(p.at(TokenKind::ParenOpen));
     let m = lhs.precede(p);
-    p.bump(); // Consume '('.
-    if !p.at_end() && !p.at(TokenKind::ParenClose) {
-        loop {
-            expr(p, recovery);
-            if !p.at(TokenKind::Comma) {
-                break;
-            }
-            p.bump(); // Consume comma.
-        }
-    }
-    p.expect(TokenKind::ParenClose, recovery);
+    function_arg_list(p, recovery);
     m.complete(p, NodeKind::CallExpr)
 }
 

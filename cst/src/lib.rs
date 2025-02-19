@@ -321,7 +321,6 @@ define_node!(FunctionParamList);
 define_node!(FunctionArgPositional);
 define_node!(FunctionArgLabelled);
 define_node!(FunctionArgList);
-define_node!(FunctionBody);
 
 // Enum Declarations.
 define_node!(EnumDecl);
@@ -331,27 +330,17 @@ define_node!(PropDecl);
 
 // Struct Declarations.
 define_node!(StructDecl);
-// define_node!(StructFunction);
-// define_node!(StructConstant);
-define_compound_node!(StructItem, kinds: [PropDecl, FunctionDecl, ConstantDecl]);
+define_compound_node!(StructItem, kinds: [ConstantDecl, PropDecl, FunctionDecl]);
 
 // Traits
 define_node!(TraitDecl);
-define_node!(TraitType);
-define_node!(TraitProp);
-define_node!(TraitFunction);
-define_node!(TraitConstant);
-define_compound_node!(TraitItem, kinds: [TraitType, TraitProp, TraitFunction, TraitConstant]);
+define_compound_node!(TraitItem, kinds: [TypeDecl, ConstantDecl, PropDecl, FunctionDecl]);
 
 // Impl
 define_node!(ImplTraitDecl);
-define_node!(ImplTraitType);
-define_node!(ImplTraitProp);
-define_node!(ImplTraitFunction);
-define_node!(ImplTraitConstant);
-define_compound_node!(ImplTraitItem, kinds: [ImplTraitType, ImplTraitProp, ImplTraitFunction, ImplTraitConstant]);
+define_compound_node!(ImplTraitItem, kinds: [TypeDecl, ConstantDecl, PropDecl, FunctionDecl]);
 
-define_compound_node!(Decl, kinds: [TypeDecl, ConstantDecl, FunctionDecl, EnumDecl, StructDecl, TraitDecl, ImplTraitDecl]);
+define_compound_node!(TopItem, kinds: [TypeDecl, ConstantDecl, FunctionDecl, EnumDecl, StructDecl, TraitDecl, ImplTraitDecl]);
 
 impl StructDecl {
     pub fn name(self, tree: &SyntaxTree) -> Option<Identifier> {

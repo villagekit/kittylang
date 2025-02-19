@@ -5,13 +5,21 @@ use crate::{marker::CompletedMarker, parser::Parser, token_set::TokenSet};
 use super::{expr::expr, r#type::type_annotation};
 
 pub(crate) fn function_param_list(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+    function_param_list_optional_types(p, recovery, true)
+}
+
+pub(crate) fn function_param_list_optional_types(
+    p: &mut Parser,
+    recovery: TokenSet,
+    has_types: bool,
+) -> CompletedMarker {
     assert!(p.at(TokenKind::ParenOpen));
     let recovery_param_list = recovery.union([TokenKind::Comma, TokenKind::ParenClose]);
     let m = p.start();
     p.bump(); // Consume '('
     if !p.at(TokenKind::ParenClose) {
         loop {
-            function_param(p, recovery_param_list);
+            function_param(p, recovery_param_list, has_types);
             if !p.bump_if_at(TokenKind::Comma) {
                 break;
             }
@@ -22,13 +30,15 @@ pub(crate) fn function_param_list(p: &mut Parser, recovery: TokenSet) -> Complet
     m.complete(p, NodeKind::FunctionParamList)
 }
 
-fn function_param(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+fn function_param(p: &mut Parser, recovery: TokenSet, has_types: bool) -> CompletedMarker {
     let m = p.start();
     // Parse name
     p.expect(TokenKind::Identifier, recovery);
-    // Parse type
-    p.expect(TokenKind::Colon, recovery);
-    type_annotation(p, recovery);
+    if has_types || p.at(TokenKind::Colon) {
+        // Parse type
+        p.expect(TokenKind::Colon, recovery);
+        type_annotation(p, recovery);
+    }
     // Parse default value
     if p.at(TokenKind::Equal) {
         p.bump(); // Consume '='
