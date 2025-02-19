@@ -118,7 +118,7 @@ define_node!(Error);
 define_node!(Missing);
 
 impl Source {
-    pub fn declarations(self, tree: &SyntaxTree) -> impl Iterator<Item = Decl> + '_ {
+    pub fn items(self, tree: &SyntaxTree) -> impl Iterator<Item = TopItem> + '_ {
         nodes(self, tree)
     }
 }

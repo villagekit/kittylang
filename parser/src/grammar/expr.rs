@@ -551,8 +551,12 @@ mod tests {
                 CallExpr@0..4
                   VariableRef@0..3
                     Identifier@0..3 "foo"
-                  ParenOpen@3..4 "("
-                  Missing@4..4
+                  FunctionArgList@3..4
+                    ParenOpen@3..4 "("
+                    FunctionArgPositional@4..4
+                      Missing@4..4
+                    Missing@4..4
+                error at 4: missing ‘)’, identifier, ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘let’, or ‘if’
                 error at 4: missing ‘)’"#]],
         );
     }
@@ -721,15 +725,16 @@ mod tests {
                 CallExpr@0..7
                   VariableRef@0..3
                     Identifier@0..3 "foo"
-                  ParenOpen@3..4 "("
-                  NumberLiteral@4..5
-                    Number@4..5 "1"
-                  Comma@5..6 ","
-                  Error@6..7
+                  FunctionArgList@3..7
+                    ParenOpen@3..4 "("
+                    FunctionArgPositional@4..5
+                      NumberLiteral@4..5
+                        Number@4..5 "1"
+                    Comma@5..6 ","
+                    FunctionArgPositional@6..6
+                      Missing@6..6
                     ParenClose@6..7 ")"
-                  Missing@7..7
-                error at 6..7: expected ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘let’, or ‘if’, but found ‘)’
-                error at 7: missing ‘)’"#]],
+                error at 6: missing identifier, ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘let’, or ‘if’"#]],
         );
     }
 

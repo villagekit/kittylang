@@ -3,7 +3,7 @@ use kitty_syntax::{NodeKind, TokenKind};
 use crate::{
     grammar::{
         function::{function_body, function_param_list_optional_types},
-        r#type::{type_bound_list, type_path},
+        r#type::{generic_param_list, type_bound_list, type_path},
     },
     marker::CompletedMarker,
     parser::Parser,
@@ -50,6 +50,9 @@ fn type_decl(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
     p.bump(); // Consume 'type'
     p.expect(TokenKind::Identifier, recovery);
+    if p.at(TokenKind::BracketOpen) {
+        generic_param_list(p, recovery);
+    }
     p.expect(TokenKind::Equal, recovery);
     type_annotation(p, recovery);
     m.complete(p, NodeKind::TypeDecl)
@@ -96,6 +99,9 @@ fn function_decl_optional_types_body(
     let m = p.start();
     p.bump(); // Consume 'fn'
     p.expect(TokenKind::Identifier, recovery);
+    if p.at(TokenKind::BracketOpen) {
+        generic_param_list(p, recovery);
+    }
     function_param_list_optional_types(p, recovery, has_types);
     if has_body || p.at(TokenKind::FatArrow) {
         p.expect(TokenKind::FatArrow, recovery);
@@ -111,6 +117,9 @@ fn struct_decl(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
     p.bump(); // Consume 'struct'
     p.expect(TokenKind::Identifier, recovery);
+    if p.at(TokenKind::BracketOpen) {
+        generic_param_list(p, recovery);
+    }
     p.expect(TokenKind::Indent, recovery);
     while p.at_set(STRUCT_ITEM_FIRST) {
         struct_item(p, recovery_struct);
@@ -166,6 +175,9 @@ fn enum_decl(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
     p.bump(); // Consume 'struct'
     p.expect(TokenKind::Identifier, recovery);
+    if p.at(TokenKind::BracketOpen) {
+        generic_param_list(p, recovery);
+    }
     p.expect(TokenKind::Indent, recovery);
     while p.at_set(ENUM_ITEM_FIRST) {
         enum_item(p, recovery_enum);
@@ -195,8 +207,10 @@ fn enum_case_decl(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
     p.bump(); // Consume 'case'
     p.expect(TokenKind::Identifier, recovery);
-    p.expect(TokenKind::Colon, recovery);
-    type_annotation(p, recovery);
+    if p.at(TokenKind::Colon) {
+        p.bump(); // Consume ':'
+        type_annotation(p, recovery);
+    }
     m.complete(p, NodeKind::EnumCase)
 }
 
@@ -206,6 +220,9 @@ fn trait_decl(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
     p.bump(); // Consume 'struct'
     p.expect(TokenKind::Identifier, recovery);
+    if p.at(TokenKind::BracketOpen) {
+        generic_param_list(p, recovery);
+    }
     p.expect(TokenKind::Indent, recovery);
     while p.at_set(TRAIT_ITEM_FIRST) {
         trait_item(p, recovery_trait);
@@ -237,6 +254,9 @@ fn trait_type(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
     p.bump(); // Consume 'type'
     p.expect(TokenKind::Identifier, recovery);
+    if p.at(TokenKind::BracketOpen) {
+        generic_param_list(p, recovery);
+    }
     p.expect(TokenKind::Colon, recovery);
     type_bound_list(p, recovery);
     if p.at(TokenKind::Equal) {
@@ -261,6 +281,9 @@ fn impl_trait_decl(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
         .union([TokenKind::Dedent]);
     let m = p.start();
     p.bump(); // Consume 'impl'
+    if p.at(TokenKind::BracketOpen) {
+        generic_param_list(p, recovery);
+    }
     type_path(p, recovery);
     p.expect(TokenKind::For, recovery);
     type_annotation(p, recovery);
@@ -307,17 +330,97 @@ mod tests {
     use super::{top_item, Parser, TokenSet};
     use crate::check_grammar;
     use expect_test::expect;
-    use kitty_cst::Decl;
+    use indoc::indoc;
+    use kitty_cst::TopItem;
 
     fn check(input: &str, expected: expect_test::Expect) {
         let grammar = |p: &mut Parser| {
             top_item(p, TokenSet::NONE);
         };
-        check_grammar::<Decl>(grammar, input, expected);
+        check_grammar::<TopItem>(grammar, input, expected);
+    }
+
+    #[test]
+    fn top_type() {
+        check(
+            "type ThingList = List[Thing]",
+            expect![[r#"
+                TypeDecl@0..28
+                  Type@0..4 "type"
+                  Whitespace@4..5 " "
+                  Identifier@5..14 "ThingList"
+                  Whitespace@14..15 " "
+                  Equal@15..16 "="
+                  Whitespace@16..17 " "
+                  TypeGeneric@17..28
+                    TypeName@17..21
+                      Identifier@17..21 "List"
+                    GenericArgList@21..28
+                      BracketOpen@21..22 "["
+                      GenericArgPositional@22..27
+                        TypeName@22..27
+                          Identifier@22..27 "Thing"
+                      BracketClose@27..28 "]""#]],
+        );
     }
 
     #[test]
     fn top_const() {
-        check("const x: Number = 42", expect![[r#" "#]]);
+        check(
+            "const x: Number = 42",
+            expect![[r#"
+                ConstantDecl@0..20
+                  Const@0..5 "const"
+                  Whitespace@5..6 " "
+                  Identifier@6..7 "x"
+                  Colon@7..8 ":"
+                  Whitespace@8..9 " "
+                  TypeName@9..15
+                    Identifier@9..15 "Number"
+                  Whitespace@15..16 " "
+                  Equal@16..17 "="
+                  Whitespace@17..18 " "
+                  NumberLiteral@18..20
+                    Number@18..20 "42""#]],
+        );
+    }
+
+    #[test]
+    fn top_enum() {
+        check(
+            indoc! {"
+                enum Option[T]
+                    case Some: T
+                    case None
+            "},
+            expect![[r#"
+                EnumDecl@0..46
+                  Enum@0..4 "enum"
+                  Whitespace@4..5 " "
+                  Identifier@5..11 "Option"
+                  GenericParamList@11..14
+                    BracketOpen@11..12 "["
+                    GenericParam@12..13
+                      Identifier@12..13 "T"
+                    BracketClose@13..14 "]"
+                  Newline@14..15 "\n"
+                  Indent@15..19 "    "
+                  EnumCase@19..31
+                    Case@19..23 "case"
+                    Whitespace@23..24 " "
+                    Identifier@24..28 "Some"
+                    Colon@28..29 ":"
+                    Whitespace@29..30 " "
+                    TypeName@30..31
+                      Identifier@30..31 "T"
+                  Newline@31..32 "\n"
+                  Whitespace@32..36 "    "
+                  EnumCase@36..45
+                    Case@36..40 "case"
+                    Whitespace@40..41 " "
+                    Identifier@41..45 "None"
+                  Newline@45..46 "\n"
+                  Dedent@46..46 """#]],
+        );
     }
 }

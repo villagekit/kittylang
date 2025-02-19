@@ -712,14 +712,16 @@ mod tests {
         check_generic_param_list(
             "[T: Display]",
             expect![[r#"
-                GenericParamList@0..2
-                  GenericParam@0..1
-                    Error@0..1
-                      BracketOpen@0..1 "["
-                  Error@1..2
+                GenericParamList@0..12
+                  BracketOpen@0..1 "["
+                  GenericParam@1..11
                     Identifier@1..2 "T"
-                error at 0..1: expected identifier, but found ‘[’
-                error at 1..2: expected ‘]’, but found identifier"#]],
+                    Colon@2..3 ":"
+                    Whitespace@3..4 " "
+                    TypeBoundList@4..11
+                      TypeBound@4..11
+                        Identifier@4..11 "Display"
+                  BracketClose@11..12 "]""#]],
         );
     }
 
@@ -730,14 +732,27 @@ mod tests {
         check_generic_param_list(
             "[T: Display, U = Number]",
             expect![[r#"
-                GenericParamList@0..2
-                  GenericParam@0..1
-                    Error@0..1
-                      BracketOpen@0..1 "["
-                  Error@1..2
+                GenericParamList@0..23
+                  BracketOpen@0..1 "["
+                  GenericParam@1..11
                     Identifier@1..2 "T"
-                error at 0..1: expected identifier, but found ‘[’
-                error at 1..2: expected ‘]’, but found identifier"#]],
+                    Colon@2..3 ":"
+                    Whitespace@3..4 " "
+                    TypeBoundList@4..11
+                      TypeBound@4..11
+                        Identifier@4..11 "Display"
+                  Comma@11..12 ","
+                  Whitespace@12..13 " "
+                  Identifier@13..14 "U"
+                  Whitespace@14..15 " "
+                  GenericParam@15..16
+                    Error@15..16
+                      Equal@15..16 "="
+                  Whitespace@16..17 " "
+                  Error@17..23
+                    Identifier@17..23 "Number"
+                error at 15..16: expected identifier, but found ‘=’
+                error at 17..23: expected ‘]’, but found identifier"#]],
         );
     }
 
@@ -747,14 +762,14 @@ mod tests {
         check_generic_param_list(
             "[T=Number]",
             expect![[r#"
-                GenericParamList@0..2
-                  GenericParam@0..1
-                    Error@0..1
-                      BracketOpen@0..1 "["
-                  Error@1..2
+                GenericParamList@0..10
+                  BracketOpen@0..1 "["
+                  GenericParam@1..9
                     Identifier@1..2 "T"
-                error at 0..1: expected identifier, but found ‘[’
-                error at 1..2: expected ‘]’, but found identifier"#]],
+                    Equal@2..3 "="
+                    TypeName@3..9
+                      Identifier@3..9 "Number"
+                  BracketClose@9..10 "]""#]],
         );
     }
 
@@ -764,14 +779,16 @@ mod tests {
         check_generic_param_list(
             "[T:]",
             expect![[r#"
-                GenericParamList@0..2
-                  GenericParam@0..1
-                    Error@0..1
-                      BracketOpen@0..1 "["
-                  Error@1..2
+                GenericParamList@0..4
+                  BracketOpen@0..1 "["
+                  GenericParam@1..3
                     Identifier@1..2 "T"
-                error at 0..1: expected identifier, but found ‘[’
-                error at 1..2: expected ‘]’, but found identifier"#]],
+                    Colon@2..3 ":"
+                    TypeBoundList@3..3
+                      TypeBound@3..3
+                        Missing@3..3
+                  BracketClose@3..4 "]"
+                error at 3: missing identifier"#]],
         );
     }
 
@@ -781,14 +798,15 @@ mod tests {
         check_generic_param_list(
             "[T=]",
             expect![[r#"
-                GenericParamList@0..2
-                  GenericParam@0..1
-                    Error@0..1
-                      BracketOpen@0..1 "["
-                  Error@1..2
+                GenericParamList@0..4
+                  BracketOpen@0..1 "["
+                  GenericParam@1..3
                     Identifier@1..2 "T"
-                error at 0..1: expected identifier, but found ‘[’
-                error at 1..2: expected ‘]’, but found identifier"#]],
+                    Equal@2..3 "="
+                    TypeName@3..3
+                      Missing@3..3
+                  BracketClose@3..4 "]"
+                error at 3: missing identifier"#]],
         );
     }
 
