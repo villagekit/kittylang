@@ -34,15 +34,8 @@ fn type_name(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 /// Parametrized type with type arguments (e.g. `List[Number]`, same as `Vec<f64>` in Rust)
 fn type_generic(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> CompletedMarker {
     assert!(p.at(TokenKind::BracketOpen));
-    let recovery_generic = recovery
-        .union(TYPE_PATH_FIRST)
-        .union([TokenKind::BracketClose]);
     let m = lhs.precede(p);
-    p.bump(); // Consume '['.
-    if !p.at(TokenKind::BracketClose) {
-        generic_arg_list(p, recovery_generic);
-    }
-    p.expect(TokenKind::BracketClose, recovery);
+    generic_arg_list(p, recovery);
     m.complete(p, NodeKind::TypeGeneric)
 }
 
@@ -150,14 +143,21 @@ fn type_impl_trait(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 }
 
 pub(crate) fn generic_param_list(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+    assert!(p.at(TokenKind::BracketOpen));
+    let recovery_param_list = recovery
+        .union(TYPE_PATH_FIRST)
+        .union([TokenKind::Comma, TokenKind::BracketClose]);
     let m = p.start();
-    loop {
-        generic_param(p, recovery);
-        if !p.at(TokenKind::Comma) {
-            break;
+    if !p.at(TokenKind::BracketClose) {
+        loop {
+            generic_param(p, recovery_param_list);
+            if !p.bump_if_at(TokenKind::Comma) {
+                break;
+            }
+            p.bump(); // Consume ','
         }
-        p.bump(); // Consume ','
     }
+    p.expect(TokenKind::BracketClose, recovery);
     m.complete(p, NodeKind::GenericParamList)
 }
 
@@ -179,21 +179,19 @@ fn generic_param(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 }
 
 pub(crate) fn generic_arg_list(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+    assert!(p.at(TokenKind::BracketOpen));
     let recovery_arg_list = recovery
-        .union(TYPE_ANNOTATION_FIRST)
-        .union([TokenKind::Comma]);
+        .union(TYPE_PATH_FIRST)
+        .union([TokenKind::Comma, TokenKind::BracketClose]);
     let m = p.start();
+    p.bump(); // Consume '['.
     'all: {
+        if p.at(TokenKind::BracketClose) {
+            break 'all; // End all args
+        }
         // First process positional args
         'positional: loop {
-            println!(
-                "break positional: {:?}, {:?}, {:?}",
-                p.lookahead(0),
-                p.lookahead(1),
-                p.lookahead(2)
-            );
             if p.at(TokenKind::Identifier) && p.lookahead_at(1, TokenKind::Colon) {
-                println!("break positional!!!");
                 break 'positional; // End positional args
             }
 
@@ -214,6 +212,7 @@ pub(crate) fn generic_arg_list(p: &mut Parser, recovery: TokenSet) -> CompletedM
             p.bump(); // Consume ','
         }
     }
+    p.expect(TokenKind::BracketClose, recovery);
     m.complete(p, NodeKind::GenericArgList)
 }
 
@@ -306,12 +305,12 @@ mod tests {
                 TypeGeneric@0..12
                   TypeName@0..4
                     Identifier@0..4 "List"
-                  BracketOpen@4..5 "["
-                  GenericArgList@5..11
+                  GenericArgList@4..12
+                    BracketOpen@4..5 "["
                     GenericArgPositional@5..11
                       TypeName@5..11
                         Identifier@5..11 "Number"
-                  BracketClose@11..12 "]""#]],
+                    BracketClose@11..12 "]""#]],
         );
     }
 
@@ -324,8 +323,8 @@ mod tests {
                 TypeGeneric@0..15
                   TypeName@0..3
                     Identifier@0..3 "Map"
-                  BracketOpen@3..4 "["
-                  GenericArgList@4..14
+                  GenericArgList@3..15
+                    BracketOpen@3..4 "["
                     GenericArgPositional@4..7
                       TypeName@4..7
                         Identifier@4..7 "Key"
@@ -334,7 +333,7 @@ mod tests {
                     GenericArgPositional@9..14
                       TypeName@9..14
                         Identifier@9..14 "Value"
-                  BracketClose@14..15 "]""#]],
+                    BracketClose@14..15 "]""#]],
         );
     }
 
@@ -377,8 +376,8 @@ mod tests {
                   TypeGeneric@0..15
                     TypeName@0..6
                       Identifier@0..6 "Result"
-                    BracketOpen@6..7 "["
-                    GenericArgList@7..14
+                    GenericArgList@6..15
+                      BracketOpen@6..7 "["
                       GenericArgPositional@7..9
                         TypeName@7..9
                           Identifier@7..9 "Ok"
@@ -387,7 +386,7 @@ mod tests {
                       GenericArgPositional@11..14
                         TypeName@11..14
                           Identifier@11..14 "Err"
-                    BracketClose@14..15 "]"
+                      BracketClose@14..15 "]"
                   Dot@15..16 "."
                   Identifier@16..21 "Error""#]],
         );
@@ -458,12 +457,12 @@ mod tests {
                 TypeGeneric@0..11
                   TypeName@0..4
                     Identifier@0..4 "List"
-                  BracketOpen@4..5 "["
-                  GenericArgList@5..11
+                  GenericArgList@4..11
+                    BracketOpen@4..5 "["
                     GenericArgPositional@5..11
                       TypeName@5..11
                         Identifier@5..11 "Number"
-                  Missing@11..11
+                    Missing@11..11
                 error at 11: missing ‘]’"#]],
         );
     }
@@ -598,14 +597,14 @@ mod tests {
                   TypeGeneric@0..30
                     TypeName@0..6
                       Identifier@0..6 "Option"
-                    BracketOpen@6..7 "["
-                    GenericArgList@7..29
+                    GenericArgList@6..30
+                      BracketOpen@6..7 "["
                       GenericArgPositional@7..29
                         TypeGeneric@7..29
                           TypeName@7..13
                             Identifier@7..13 "Result"
-                          BracketOpen@13..14 "["
-                          GenericArgList@14..28
+                          GenericArgList@13..29
+                            BracketOpen@13..14 "["
                             GenericArgPositional@14..20
                               TypeName@14..20
                                 Identifier@14..20 "Number"
@@ -614,8 +613,8 @@ mod tests {
                             GenericArgPositional@22..28
                               TypeName@22..28
                                 Identifier@22..28 "String"
-                          BracketClose@28..29 "]"
-                    BracketClose@29..30 "]"
+                            BracketClose@28..29 "]"
+                      BracketClose@29..30 "]"
                   Dot@30..31 "."
                   Identifier@31..35 "Item""#]],
         );
@@ -634,24 +633,24 @@ mod tests {
                       TypeName@1..6
                         Identifier@1..6 "Outer"
                       Whitespace@6..7 " "
-                      BracketOpen@7..8 "["
-                      Whitespace@8..9 " "
-                      GenericArgList@9..25
+                      GenericArgList@7..27
+                        BracketOpen@7..8 "["
+                        Whitespace@8..9 " "
                         GenericArgPositional@9..25
                           TypeGeneric@9..25
                             TypeName@9..14
                               Identifier@9..14 "Inner"
                             Whitespace@14..15 " "
-                            BracketOpen@15..16 "["
-                            Whitespace@16..17 " "
-                            GenericArgList@17..23
+                            GenericArgList@15..25
+                              BracketOpen@15..16 "["
+                              Whitespace@16..17 " "
                               GenericArgPositional@17..23
                                 TypeName@17..23
                                   Identifier@17..23 "Number"
-                            Whitespace@23..24 " "
-                            BracketClose@24..25 "]"
-                      Whitespace@25..26 " "
-                      BracketClose@26..27 "]"
+                              Whitespace@23..24 " "
+                              BracketClose@24..25 "]"
+                        Whitespace@25..26 " "
+                        BracketClose@26..27 "]"
                     Whitespace@27..28 " "
                     DotBracketOpen@28..30 ".["
                     Whitespace@30..31 " "
@@ -689,8 +688,8 @@ mod tests {
                   TypeGeneric@0..15
                     TypeName@0..3
                       Identifier@0..3 "Map"
-                    BracketOpen@3..4 "["
-                    GenericArgList@4..14
+                    GenericArgList@3..15
+                      BracketOpen@3..4 "["
                       GenericArgPositional@4..7
                         TypeName@4..7
                           Identifier@4..7 "Key"
@@ -699,7 +698,7 @@ mod tests {
                       GenericArgPositional@9..14
                         TypeName@9..14
                           Identifier@9..14 "Value"
-                    BracketClose@14..15 "]"
+                      BracketClose@14..15 "]"
                   Dot@15..16 "."
                   Missing@16..16
                 error at 16: missing identifier"#]],
@@ -710,16 +709,16 @@ mod tests {
     fn generic_param_single_bound() {
         // A generic parameter with a single type bound.
         check_generic_param_list(
-            "T: Display",
+            "[T: Display]",
             expect![[r#"
-                GenericParamList@0..10
-                  GenericParam@0..10
-                    Identifier@0..1 "T"
-                    Colon@1..2 ":"
-                    Whitespace@2..3 " "
-                    TypeBoundList@3..10
-                      TypeBound@3..10
-                        Identifier@3..10 "Display""#]],
+                GenericParamList@0..2
+                  GenericParam@0..1
+                    Error@0..1
+                      BracketOpen@0..1 "["
+                  Error@1..2
+                    Identifier@1..2 "T"
+                error at 0..1: expected identifier, but found ‘[’
+                error at 1..2: expected ‘]’, but found identifier"#]],
         );
     }
 
@@ -728,25 +727,16 @@ mod tests {
         // A generic parameter list with one parameter that has a bound
         // and another that provides a default concrete type.
         check_generic_param_list(
-            "T: Display, U = Number",
+            "[T: Display, U = Number]",
             expect![[r#"
-                GenericParamList@0..22
-                  GenericParam@0..10
-                    Identifier@0..1 "T"
-                    Colon@1..2 ":"
-                    Whitespace@2..3 " "
-                    TypeBoundList@3..10
-                      TypeBound@3..10
-                        Identifier@3..10 "Display"
-                  Comma@10..11 ","
-                  Whitespace@11..12 " "
-                  GenericParam@12..22
-                    Identifier@12..13 "U"
-                    Whitespace@13..14 " "
-                    Equal@14..15 "="
-                    Whitespace@15..16 " "
-                    TypeName@16..22
-                      Identifier@16..22 "Number""#]],
+                GenericParamList@0..2
+                  GenericParam@0..1
+                    Error@0..1
+                      BracketOpen@0..1 "["
+                  Error@1..2
+                    Identifier@1..2 "T"
+                error at 0..1: expected identifier, but found ‘[’
+                error at 1..2: expected ‘]’, but found identifier"#]],
         );
     }
 
@@ -754,14 +744,16 @@ mod tests {
     fn generic_param_default_only() {
         // A generic parameter that only provides a default type.
         check_generic_param_list(
-            "T=Number",
+            "[T=Number]",
             expect![[r#"
-                GenericParamList@0..8
-                  GenericParam@0..8
-                    Identifier@0..1 "T"
-                    Equal@1..2 "="
-                    TypeName@2..8
-                      Identifier@2..8 "Number""#]],
+                GenericParamList@0..2
+                  GenericParam@0..1
+                    Error@0..1
+                      BracketOpen@0..1 "["
+                  Error@1..2
+                    Identifier@1..2 "T"
+                error at 0..1: expected identifier, but found ‘[’
+                error at 1..2: expected ‘]’, but found identifier"#]],
         );
     }
 
@@ -769,16 +761,16 @@ mod tests {
     fn generic_param_missing_bound() {
         // Error case: the parameter has a colon but no bound.
         check_generic_param_list(
-            "T:",
+            "[T:]",
             expect![[r#"
                 GenericParamList@0..2
-                  GenericParam@0..2
-                    Identifier@0..1 "T"
-                    Colon@1..2 ":"
-                    TypeBoundList@2..2
-                      TypeBound@2..2
-                        Missing@2..2
-                error at 2: missing identifier"#]],
+                  GenericParam@0..1
+                    Error@0..1
+                      BracketOpen@0..1 "["
+                  Error@1..2
+                    Identifier@1..2 "T"
+                error at 0..1: expected identifier, but found ‘[’
+                error at 1..2: expected ‘]’, but found identifier"#]],
         );
     }
 
@@ -786,15 +778,16 @@ mod tests {
     fn generic_param_missing_default() {
         // Error case: the parameter has an equal sign but no default type.
         check_generic_param_list(
-            "T=",
+            "[T=]",
             expect![[r#"
                 GenericParamList@0..2
-                  GenericParam@0..2
-                    Identifier@0..1 "T"
-                    Equal@1..2 "="
-                    TypeName@2..2
-                      Missing@2..2
-                error at 2: missing identifier"#]],
+                  GenericParam@0..1
+                    Error@0..1
+                      BracketOpen@0..1 "["
+                  Error@1..2
+                    Identifier@1..2 "T"
+                error at 0..1: expected identifier, but found ‘[’
+                error at 1..2: expected ‘]’, but found identifier"#]],
         );
     }
 
@@ -807,15 +800,15 @@ mod tests {
                 TypeGeneric@0..16
                   TypeName@0..3
                     Identifier@0..3 "Foo"
-                  BracketOpen@3..4 "["
-                  GenericArgList@4..15
+                  GenericArgList@3..16
+                    BracketOpen@3..4 "["
                     GenericArgLabelled@4..15
                       Identifier@4..7 "bar"
                       Colon@7..8 ":"
                       Whitespace@8..9 " "
                       TypeName@9..15
                         Identifier@9..15 "Number"
-                  BracketClose@15..16 "]""#]],
+                    BracketClose@15..16 "]""#]],
         );
     }
 
@@ -828,8 +821,8 @@ mod tests {
                 TypeGeneric@0..24
                   TypeName@0..3
                     Identifier@0..3 "Foo"
-                  BracketOpen@3..4 "["
-                  GenericArgList@4..23
+                  GenericArgList@3..24
+                    BracketOpen@3..4 "["
                     GenericArgPositional@4..10
                       TypeName@4..10
                         Identifier@4..10 "Number"
@@ -841,7 +834,7 @@ mod tests {
                       Whitespace@16..17 " "
                       TypeName@17..23
                         Identifier@17..23 "String"
-                  BracketClose@23..24 "]""#]],
+                    BracketClose@23..24 "]""#]],
         );
     }
 
@@ -854,14 +847,14 @@ mod tests {
                 TypeGeneric@0..14
                   TypeName@0..3
                     Identifier@0..3 "Foo"
-                  BracketOpen@3..4 "["
-                  GenericArgList@4..7
+                  GenericArgList@3..14
+                    BracketOpen@3..4 "["
                     GenericArgPositional@4..7
                       TypeName@4..7
                         Identifier@4..7 "bar"
-                  Whitespace@7..8 " "
-                  Error@8..14
-                    Identifier@8..14 "Number"
+                    Whitespace@7..8 " "
+                    Error@8..14
+                      Identifier@8..14 "Number"
                 error at 8..14: expected ‘]’, but found identifier"#]],
         );
     }
