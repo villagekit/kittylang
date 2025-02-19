@@ -148,6 +148,7 @@ pub(crate) fn generic_param_list(p: &mut Parser, recovery: TokenSet) -> Complete
         .union(TYPE_PATH_FIRST)
         .union([TokenKind::Comma, TokenKind::BracketClose]);
     let m = p.start();
+    p.bump(); // Consume '['
     if !p.at(TokenKind::BracketClose) {
         loop {
             generic_param(p, recovery_param_list);

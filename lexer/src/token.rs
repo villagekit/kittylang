@@ -79,6 +79,8 @@ pub enum TokenKind {
 
     #[token("type")]
     Type,
+    #[token("const")]
+    Const,
     #[token("enum")]
     Enum,
     #[token("struct")]
@@ -188,6 +190,7 @@ impl fmt::Display for TokenKind {
             Self::Match => "‘match’",
             Self::Case => "‘case’",
             Self::Type => "‘type’",
+            Self::Const => "‘const’",
             Self::Enum => "‘enum’",
             Self::Struct => "‘struct’",
             Self::Prop => "‘prop’",

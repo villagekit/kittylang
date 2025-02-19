@@ -320,19 +320,20 @@ define_node!(FunctionParam);
 define_node!(FunctionParamList);
 define_node!(FunctionArgPositional);
 define_node!(FunctionArgLabelled);
-define_node!(FunctionArgs);
+define_node!(FunctionArgList);
 define_node!(FunctionBody);
 
 // Enum Declarations.
 define_node!(EnumDecl);
 define_node!(EnumCase);
 
+define_node!(PropDecl);
+
 // Struct Declarations.
 define_node!(StructDecl);
-define_node!(StructProp);
-define_node!(StructFunction);
-define_node!(StructConstant);
-define_compound_node!(StructItem, kinds: [StructProp, StructFunction, StructConstant]);
+// define_node!(StructFunction);
+// define_node!(StructConstant);
+define_compound_node!(StructItem, kinds: [PropDecl, FunctionDecl, ConstantDecl]);
 
 // Traits
 define_node!(TraitDecl);
@@ -357,12 +358,12 @@ impl StructDecl {
         token(self, tree)
     }
 
-    pub fn properties(self, tree: &SyntaxTree) -> impl Iterator<Item = StructProp> + '_ {
+    pub fn properties(self, tree: &SyntaxTree) -> impl Iterator<Item = PropDecl> + '_ {
         nodes(self, tree)
     }
 }
 
-impl StructProp {
+impl PropDecl {
     pub fn name(self, tree: &SyntaxTree) -> Option<Identifier> {
         token(self, tree)
     }

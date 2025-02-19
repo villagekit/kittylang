@@ -107,7 +107,7 @@ pub enum NodeKind {
     FunctionParamList,
     FunctionArgPositional,
     FunctionArgLabelled,
-    FunctionArgs,
+    FunctionArgList,
     FunctionBody,
 
     // Enum Declarations
@@ -116,9 +116,7 @@ pub enum NodeKind {
 
     // Struct Declarations
     StructDecl,
-    StructProp,
-    StructFunction,
-    StructConstant,
+    PropDecl,
 
     // Traits
     TraitDecl,
