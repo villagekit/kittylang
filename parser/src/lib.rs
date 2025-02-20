@@ -86,8 +86,8 @@ mod tests {
         check(
             indoc! {"
                 export fn main() =>
-                  let add = fn (x, y) => x + y in
-                  let mul = fn (x, y) => x * y in
+                  let add = fn (x: Number, y: Number) => x + y in
+                  let mul = fn (x: Number, y: Number) => x * y in
                   let x = mul(add(5, 42), 2) in
                   add(x, 3.5)
             "},
