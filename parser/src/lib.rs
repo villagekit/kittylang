@@ -92,11 +92,11 @@ mod tests {
                   add(x, 3.5)
             "},
             expect![[r#"
-                Module@0..134
-                  ExportItem@0..134
+                Module@0..166
+                  ExportItem@0..166
                     Export@0..6 "export"
                     Whitespace@6..7 " "
-                    FunctionDecl@7..134
+                    FunctionDecl@7..166
                       Fn@7..9 "fn"
                       Whitespace@9..10 " "
                       Identifier@10..14 "main"
@@ -106,148 +106,148 @@ mod tests {
                       Whitespace@16..17 " "
                       FatArrow@17..19 "=>"
                       Newline@19..20 "\n"
-                      FunctionBody@20..134
-                        BlockExpr@20..134
+                      FunctionBody@20..166
+                        BlockExpr@20..166
                           Indent@20..22 "  "
-                          LetExpr@22..133
+                          LetExpr@22..165
                             Let@22..25 "let"
                             Whitespace@25..26 " "
                             Identifier@26..29 "add"
                             Whitespace@29..30 " "
                             Equal@30..31 "="
                             Whitespace@31..32 " "
-                            FunctionDecl@32..50
+                            FunctionDecl@32..66
                               Fn@32..34 "fn"
                               Whitespace@34..35 " "
-                              FunctionParamList@35..41
+                              FunctionParamList@35..57
                                 ParenOpen@35..36 "("
-                                FunctionParam@36..37
+                                FunctionParam@36..45
                                   Identifier@36..37 "x"
-                                  Missing@37..37
-                                  Missing@37..37
-                                Comma@37..38 ","
-                                Whitespace@38..39 " "
-                                FunctionParam@39..40
-                                  Identifier@39..40 "y"
-                                  Missing@40..40
-                                  Missing@40..40
-                                ParenClose@40..41 ")"
-                              Whitespace@41..42 " "
-                              FatArrow@42..44 "=>"
-                              Whitespace@44..45 " "
-                              FunctionBody@45..50
-                                BinaryExpr@45..50
-                                  VariableRef@45..46
-                                    Identifier@45..46 "x"
-                                  Whitespace@46..47 " "
-                                  Plus@47..48 "+"
-                                  Whitespace@48..49 " "
-                                  VariableRef@49..50
-                                    Identifier@49..50 "y"
-                            Whitespace@50..51 " "
-                            In@51..53 "in"
-                            Newline@53..54 "\n"
-                            Whitespace@54..56 "  "
-                            LetExpr@56..133
-                              Let@56..59 "let"
-                              Whitespace@59..60 " "
-                              Identifier@60..63 "mul"
-                              Whitespace@63..64 " "
-                              Equal@64..65 "="
-                              Whitespace@65..66 " "
-                              FunctionDecl@66..84
-                                Fn@66..68 "fn"
-                                Whitespace@68..69 " "
-                                FunctionParamList@69..75
-                                  ParenOpen@69..70 "("
-                                  FunctionParam@70..71
-                                    Identifier@70..71 "x"
-                                    Missing@71..71
-                                    Missing@71..71
-                                  Comma@71..72 ","
-                                  Whitespace@72..73 " "
-                                  FunctionParam@73..74
-                                    Identifier@73..74 "y"
-                                    Missing@74..74
-                                    Missing@74..74
-                                  ParenClose@74..75 ")"
-                                Whitespace@75..76 " "
-                                FatArrow@76..78 "=>"
-                                Whitespace@78..79 " "
-                                FunctionBody@79..84
-                                  BinaryExpr@79..84
-                                    VariableRef@79..80
-                                      Identifier@79..80 "x"
-                                    Whitespace@80..81 " "
-                                    Multiply@81..82 "*"
-                                    Whitespace@82..83 " "
-                                    VariableRef@83..84
-                                      Identifier@83..84 "y"
-                              Whitespace@84..85 " "
-                              In@85..87 "in"
-                              Newline@87..88 "\n"
-                              Whitespace@88..90 "  "
-                              LetExpr@90..133
-                                Let@90..93 "let"
-                                Whitespace@93..94 " "
-                                Identifier@94..95 "x"
-                                Whitespace@95..96 " "
-                                Equal@96..97 "="
-                                Whitespace@97..98 " "
-                                CallExpr@98..116
-                                  VariableRef@98..101
-                                    Identifier@98..101 "mul"
-                                  FunctionArgList@101..116
-                                    ParenOpen@101..102 "("
-                                    FunctionArgPositional@102..112
-                                      CallExpr@102..112
-                                        VariableRef@102..105
-                                          Identifier@102..105 "add"
-                                        FunctionArgList@105..112
-                                          ParenOpen@105..106 "("
-                                          FunctionArgPositional@106..107
-                                            NumberLiteral@106..107
-                                              Number@106..107 "5"
-                                          Comma@107..108 ","
-                                          Whitespace@108..109 " "
-                                          FunctionArgPositional@109..111
-                                            NumberLiteral@109..111
-                                              Number@109..111 "42"
-                                          ParenClose@111..112 ")"
-                                    Comma@112..113 ","
-                                    Whitespace@113..114 " "
-                                    FunctionArgPositional@114..115
-                                      NumberLiteral@114..115
-                                        Number@114..115 "2"
-                                    ParenClose@115..116 ")"
-                                Whitespace@116..117 " "
-                                In@117..119 "in"
-                                Newline@119..120 "\n"
-                                Whitespace@120..122 "  "
-                                CallExpr@122..133
-                                  VariableRef@122..125
-                                    Identifier@122..125 "add"
-                                  FunctionArgList@125..133
-                                    ParenOpen@125..126 "("
-                                    FunctionArgPositional@126..127
-                                      VariableRef@126..127
-                                        Identifier@126..127 "x"
-                                    Comma@127..128 ","
-                                    Whitespace@128..129 " "
-                                    FunctionArgPositional@129..132
-                                      NumberLiteral@129..132
-                                        Number@129..132 "3.5"
-                                    ParenClose@132..133 ")"
-                          Newline@133..134 "\n"
-                          Dedent@134..134 ""
-                error at 37: missing ‘:’
-                error at 37: missing identifier, ‘Self’, ‘(’, ‘Fn’, or ‘impl’
-                error at 40: missing ‘:’
-                error at 40: missing identifier, ‘Self’, ‘(’, ‘Fn’, or ‘impl’
-                error at 71: missing ‘:’
-                error at 71: missing identifier, ‘Self’, ‘(’, ‘Fn’, or ‘impl’
-                error at 74: missing ‘:’
-                error at 74: missing identifier, ‘Self’, ‘(’, ‘Fn’, or ‘impl’"#]],
+                                  Colon@37..38 ":"
+                                  Whitespace@38..39 " "
+                                  TypeName@39..45
+                                    Identifier@39..45 "Number"
+                                Comma@45..46 ","
+                                Whitespace@46..47 " "
+                                FunctionParam@47..56
+                                  Identifier@47..48 "y"
+                                  Colon@48..49 ":"
+                                  Whitespace@49..50 " "
+                                  TypeName@50..56
+                                    Identifier@50..56 "Number"
+                                ParenClose@56..57 ")"
+                              Whitespace@57..58 " "
+                              FatArrow@58..60 "=>"
+                              Whitespace@60..61 " "
+                              FunctionBody@61..66
+                                BinaryExpr@61..66
+                                  VariableRef@61..62
+                                    Identifier@61..62 "x"
+                                  Whitespace@62..63 " "
+                                  Plus@63..64 "+"
+                                  Whitespace@64..65 " "
+                                  VariableRef@65..66
+                                    Identifier@65..66 "y"
+                            Whitespace@66..67 " "
+                            In@67..69 "in"
+                            Newline@69..70 "\n"
+                            Whitespace@70..72 "  "
+                            LetExpr@72..165
+                              Let@72..75 "let"
+                              Whitespace@75..76 " "
+                              Identifier@76..79 "mul"
+                              Whitespace@79..80 " "
+                              Equal@80..81 "="
+                              Whitespace@81..82 " "
+                              FunctionDecl@82..116
+                                Fn@82..84 "fn"
+                                Whitespace@84..85 " "
+                                FunctionParamList@85..107
+                                  ParenOpen@85..86 "("
+                                  FunctionParam@86..95
+                                    Identifier@86..87 "x"
+                                    Colon@87..88 ":"
+                                    Whitespace@88..89 " "
+                                    TypeName@89..95
+                                      Identifier@89..95 "Number"
+                                  Comma@95..96 ","
+                                  Whitespace@96..97 " "
+                                  FunctionParam@97..106
+                                    Identifier@97..98 "y"
+                                    Colon@98..99 ":"
+                                    Whitespace@99..100 " "
+                                    TypeName@100..106
+                                      Identifier@100..106 "Number"
+                                  ParenClose@106..107 ")"
+                                Whitespace@107..108 " "
+                                FatArrow@108..110 "=>"
+                                Whitespace@110..111 " "
+                                FunctionBody@111..116
+                                  BinaryExpr@111..116
+                                    VariableRef@111..112
+                                      Identifier@111..112 "x"
+                                    Whitespace@112..113 " "
+                                    Multiply@113..114 "*"
+                                    Whitespace@114..115 " "
+                                    VariableRef@115..116
+                                      Identifier@115..116 "y"
+                              Whitespace@116..117 " "
+                              In@117..119 "in"
+                              Newline@119..120 "\n"
+                              Whitespace@120..122 "  "
+                              LetExpr@122..165
+                                Let@122..125 "let"
+                                Whitespace@125..126 " "
+                                Identifier@126..127 "x"
+                                Whitespace@127..128 " "
+                                Equal@128..129 "="
+                                Whitespace@129..130 " "
+                                CallExpr@130..148
+                                  VariableRef@130..133
+                                    Identifier@130..133 "mul"
+                                  FunctionArgList@133..148
+                                    ParenOpen@133..134 "("
+                                    FunctionArgPositional@134..144
+                                      CallExpr@134..144
+                                        VariableRef@134..137
+                                          Identifier@134..137 "add"
+                                        FunctionArgList@137..144
+                                          ParenOpen@137..138 "("
+                                          FunctionArgPositional@138..139
+                                            NumberLiteral@138..139
+                                              Number@138..139 "5"
+                                          Comma@139..140 ","
+                                          Whitespace@140..141 " "
+                                          FunctionArgPositional@141..143
+                                            NumberLiteral@141..143
+                                              Number@141..143 "42"
+                                          ParenClose@143..144 ")"
+                                    Comma@144..145 ","
+                                    Whitespace@145..146 " "
+                                    FunctionArgPositional@146..147
+                                      NumberLiteral@146..147
+                                        Number@146..147 "2"
+                                    ParenClose@147..148 ")"
+                                Whitespace@148..149 " "
+                                In@149..151 "in"
+                                Newline@151..152 "\n"
+                                Whitespace@152..154 "  "
+                                CallExpr@154..165
+                                  VariableRef@154..157
+                                    Identifier@154..157 "add"
+                                  FunctionArgList@157..165
+                                    ParenOpen@157..158 "("
+                                    FunctionArgPositional@158..159
+                                      VariableRef@158..159
+                                        Identifier@158..159 "x"
+                                    Comma@159..160 ","
+                                    Whitespace@160..161 " "
+                                    FunctionArgPositional@161..164
+                                      NumberLiteral@161..164
+                                        Number@161..164 "3.5"
+                                    ParenClose@164..165 ")"
+                          Newline@165..166 "\n"
+                          Dedent@166..166 """#]],
         );
     }
 
