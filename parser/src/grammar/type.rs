@@ -3,11 +3,11 @@ use kitty_syntax::NodeKind;
 
 use crate::{marker::CompletedMarker, parser::Parser, token_set::TokenSet};
 
-const TYPE_PATH_FIRST: [TokenKind; 1] = [TokenKind::Identifier];
+const TYPE_PATH_FIRST: [TokenKind; 2] = [TokenKind::Identifier, TokenKind::SelfUpper];
 
 /// A qualified type
 pub(crate) fn type_path(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
-    let mut lhs = type_name(p, recovery);
+    let mut lhs = type_name(p, recovery)?;
 
     loop {
         if p.at(TokenKind::BracketOpen) {
@@ -25,10 +25,13 @@ pub(crate) fn type_path(p: &mut Parser, recovery: TokenSet) -> Option<CompletedM
 }
 
 /// Named type
-fn type_name(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    let m = p.start();
-    p.expect(TokenKind::Identifier, recovery);
-    m.complete(p, NodeKind::TypeName)
+fn type_name(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
+    if p.at_set([TokenKind::Identifier, TokenKind::SelfUpper]) {
+        Some(p.mark_kind(NodeKind::TypeName))
+    } else {
+        p.error(recovery);
+        None
+    }
 }
 
 /// Parametrized type with type arguments (e.g. `List[Number]`, same as `Vec<f64>` in Rust)
@@ -59,8 +62,9 @@ fn type_association(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) ->
     m.complete(p, NodeKind::TypeAssociation)
 }
 
-const TYPE_ANNOTATION_FIRST: [TokenKind; 4] = [
+const TYPE_ANNOTATION_FIRST: [TokenKind; 5] = [
     TokenKind::Identifier,
+    TokenKind::SelfUpper,
     TokenKind::ParenOpen,
     TokenKind::FnUpper,
     TokenKind::Impl,
@@ -68,7 +72,7 @@ const TYPE_ANNOTATION_FIRST: [TokenKind; 4] = [
 
 /// A type description.
 pub(crate) fn type_annotation(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
-    let cm = if p.at(TokenKind::Identifier) {
+    let cm = if p.at_set(TYPE_PATH_FIRST) {
         type_path(p, recovery)?
     } else if p.at(TokenKind::ParenOpen) {
         type_tuple(p, recovery)
@@ -279,6 +283,7 @@ mod tests {
 
     #[test]
     fn type_path_name() {
+        // Happy path
         check_type_path(
             "Number",
             expect![[r#"
@@ -289,6 +294,7 @@ mod tests {
 
     #[test]
     fn type_annotation_name() {
+        // Happy path
         check_type_annotation(
             "Number",
             expect![[r#"
@@ -553,7 +559,7 @@ mod tests {
                   Missing@18..18
                   Missing@18..18
                 error at 18: missing ‘->’
-                error at 18: missing identifier, ‘(’, ‘Fn’, or ‘impl’"#]],
+                error at 18: missing identifier, ‘Self’, ‘(’, ‘Fn’, or ‘impl’"#]],
         );
     }
 
@@ -582,9 +588,8 @@ mod tests {
             expect![[r#"
                 TypeTrait@0..4
                   Impl@0..4 "impl"
-                  TypeName@4..4
-                    Missing@4..4
-                error at 4: missing identifier"#]],
+                  Missing@4..4
+                error at 4: missing identifier or ‘Self’"#]],
         );
     }
 
@@ -623,7 +628,7 @@ mod tests {
 
     #[test]
     fn type_complex_nested_whitespace() {
-        // Happy path with extra whitespace and multiple chained operators (generic, projection, association).
+        // Happy path: type with extra whitespace and multiple chained operators (generic, projection, association).
         check_type_annotation(
             " Outer [ Inner [ Number ] ] .[ Trait ] .Member ",
             expect![[r#"
@@ -708,7 +713,7 @@ mod tests {
 
     #[test]
     fn generic_param_single_bound() {
-        // A generic parameter with a single type bound.
+        // Happy path: A generic parameter with a single type bound.
         check_generic_param_list(
             "[T: Display]",
             expect![[r#"
@@ -727,7 +732,7 @@ mod tests {
 
     #[test]
     fn generic_param_multiple() {
-        // A generic parameter list with one parameter that has a bound
+        // Happy path: A generic parameter list with one parameter that has a bound
         // and another that provides a default concrete type.
         check_generic_param_list(
             "[T: Display, U = Number]",
@@ -758,7 +763,7 @@ mod tests {
 
     #[test]
     fn generic_param_default_only() {
-        // A generic parameter that only provides a default type.
+        // Happy path: A generic parameter that only provides a default type.
         check_generic_param_list(
             "[T=Number]",
             expect![[r#"
@@ -775,7 +780,7 @@ mod tests {
 
     #[test]
     fn generic_param_missing_bound() {
-        // Error case: the parameter has a colon but no bound.
+        // Unhappy path: the parameter has a colon but no bound.
         check_generic_param_list(
             "[T:]",
             expect![[r#"
@@ -794,7 +799,7 @@ mod tests {
 
     #[test]
     fn generic_param_missing_default() {
-        // Error case: the parameter has an equal sign but no default type.
+        // Unhappy path: the parameter has an equal sign but no default type.
         check_generic_param_list(
             "[T=]",
             expect![[r#"
@@ -803,16 +808,15 @@ mod tests {
                   GenericParam@1..3
                     Identifier@1..2 "T"
                     Equal@2..3 "="
-                    TypeName@3..3
-                      Missing@3..3
+                    Missing@3..3
                   BracketClose@3..4 "]"
-                error at 3: missing identifier"#]],
+                error at 3: missing identifier or ‘Self’"#]],
         );
     }
 
     #[test]
     fn generic_arg_labelled() {
-        // A generic type with a single labelled generic argument.
+        // Happy path: A generic type with a single labelled generic argument.
         check_type_path(
             "Foo[bar: Number]",
             expect![[r#"
@@ -833,7 +837,7 @@ mod tests {
 
     #[test]
     fn generic_arg_mixed() {
-        // A generic type with a positional generic argument followed by a labelled one.
+        // Happy path: A generic type with a positional generic argument followed by a labelled one.
         check_type_path(
             "Foo[Number, bar: String]",
             expect![[r#"
@@ -859,7 +863,7 @@ mod tests {
 
     #[test]
     fn generic_arg_labelled_missing_colon() {
-        // Error case: labelled generic argument missing the colon.
+        // Unhappy path: labelled generic argument missing the colon.
         check_type_path(
             "Foo[bar Number]",
             expect![[r#"

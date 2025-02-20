@@ -240,6 +240,7 @@ mod tests {
 
     #[test]
     fn number() {
+        // Happy path
         check(
             "123",
             expect![[r#"
@@ -250,6 +251,7 @@ mod tests {
 
     #[test]
     fn number_preceded_by_whitespace() {
+        // Happy path
         check(
             "   9876",
             expect![[r#"
@@ -261,6 +263,7 @@ mod tests {
 
     #[test]
     fn number_followed_by_whitespace() {
+        // Happy path
         check(
             "999   ",
             expect![[r#"
@@ -272,6 +275,7 @@ mod tests {
 
     #[test]
     fn number_surrounded_by_whitespace() {
+        // Happy path
         check(
             " 123     ",
             expect![[r#"
@@ -284,6 +288,7 @@ mod tests {
 
     #[test]
     fn variable_ref() {
+        // Happy path
         check(
             "counter",
             expect![[r#"
@@ -294,6 +299,7 @@ mod tests {
 
     #[test]
     fn simple_infix_expression() {
+        // Happy path
         check(
             "1+2",
             expect![[r#"
@@ -308,6 +314,7 @@ mod tests {
 
     #[test]
     fn left_associative_infix_expression() {
+        // Happy path
         check(
             "1+2+3+4",
             expect![[r#"
@@ -330,6 +337,7 @@ mod tests {
 
     #[test]
     fn infix_expression_with_mixed_binding_power() {
+        // Happy path
         check(
             "1+2*3-4",
             expect![[r#"
@@ -352,6 +360,7 @@ mod tests {
 
     #[test]
     fn infix_expression_with_whitespace() {
+        // Happy path
         check(
             " 1 +   2* 3 ",
             expect![[r#"
@@ -375,6 +384,7 @@ mod tests {
 
     #[test]
     fn infix_expression_interspersed_with_newlines() {
+        // Happy path
         check(
             "
 1 +
@@ -401,6 +411,7 @@ mod tests {
 
     #[test]
     fn infix_expression_interspersed_with_blocks_and_comments() {
+        // Happy path
         check(
             "
 1 +
@@ -435,6 +446,7 @@ mod tests {
 
     #[test]
     fn do_not_operator_if_getting_rhs_failed() {
+        // Unhappy path
         check(
             "(1+",
             expect![[r#"
@@ -453,6 +465,7 @@ mod tests {
 
     #[test]
     fn negation() {
+        // Happy path
         check(
             "-10",
             expect![[r#"
@@ -465,6 +478,7 @@ mod tests {
 
     #[test]
     fn negation_has_higher_binding_power_than_binary_operators() {
+        // Happy path
         check(
             "-20+20",
             expect![[r#"
@@ -481,6 +495,7 @@ mod tests {
 
     #[test]
     fn nested_parentheses() {
+        // Happy path
         check(
             "((((((10))))))",
             expect![[r#"
@@ -509,6 +524,7 @@ mod tests {
 
     #[test]
     fn parentheses_affect_precedence() {
+        // Happy path
         check(
             "5*(2+1)",
             expect![[r#"
@@ -530,6 +546,7 @@ mod tests {
 
     #[test]
     fn paren_expr_missing_closing_paren() {
+        // Unhappy path
         check(
             "(foo",
             expect![[r#"
@@ -544,7 +561,7 @@ mod tests {
 
     #[test]
     fn call_expr_missing_closing_paren() {
-        // "foo(" is parsed as a call expression with a missing closing ')'
+        // Unhappy path: call expression with a missing closing ')'
         check(
             "foo(",
             expect![[r#"
@@ -563,7 +580,7 @@ mod tests {
 
     #[test]
     fn get_expr_missing_identifier() {
-        // "foo." is parsed as a get expression missing the identifier after the dot.
+        // Unhappy path: get expression missing the identifier after the dot.
         check(
             "foo.",
             expect![[r#"
@@ -578,7 +595,7 @@ mod tests {
 
     #[test]
     fn let_expr_missing_identifier() {
-        // "let = 1 in 2" is missing an identifier after the 'let' keyword.
+        // Unhappy path: let expression missing an identifier after the 'let' keyword.
         check(
             "let = 1 in 2",
             expect![[r#"
@@ -601,7 +618,7 @@ mod tests {
 
     #[test]
     fn let_expr_missing_equal() {
-        // "let x 1 in 2" is missing the '=' token.
+        // Unhappy path: let expression missing the '=' token.
         check(
             "let x 1 in 2",
             expect![[r#"
@@ -628,7 +645,7 @@ mod tests {
 
     #[test]
     fn let_expr_missing_expression() {
-        // "let x =  in 2" is missing an expression after the '='.
+        // Unhappy path: let expression missing an expression after the '='.
         check(
             "let x =  in 2",
             expect![[r#"
@@ -653,7 +670,7 @@ mod tests {
 
     #[test]
     fn let_expr_missing_in() {
-        // "let x = 1 2" is missing the 'in' keyword.
+        // Unhappy path: let expression missing the 'in' keyword.
         check(
             "let x = 1 2",
             expect![[r#"
@@ -677,7 +694,7 @@ mod tests {
 
     #[test]
     fn if_expr_missing_condition() {
-        // "if then 1 else 2" is missing the condition between 'if' and 'then'
+        // Unhappy path: if expression missing the condition between 'if' and 'then'
         check(
             "if then 1 else 2",
             expect![[r#"
@@ -700,7 +717,7 @@ mod tests {
 
     #[test]
     fn if_expr_missing_then_body() {
-        // "if 1 then" is missing the then–body (and there is no else branch).
+        // Unhappy path: if expression missing the then–body (and there is no else branch).
         check(
             "if 1 then",
             expect![[r#"
@@ -718,7 +735,7 @@ mod tests {
 
     #[test]
     fn call_expr_trailing_comma() {
-        // "foo(1,)" has a trailing comma with no expression following it.
+        // Unhappy path: call expression has a trailing comma with no expression following it.
         check(
             "foo(1,)",
             expect![[r#"
@@ -753,7 +770,7 @@ mod tests {
 
     #[test]
     fn if_expr_with_nested_error() {
-        // "if (1+) then 2" contains a binary expression error inside the if–condition.
+        // Unhappy path: if expression contains a binary expression error inside the if–condition.
         check(
             "if (1+) then 2",
             expect![[r#"
@@ -781,6 +798,7 @@ mod tests {
 
     #[test]
     fn let_expr_type() {
+        // Happy path
         check(
             "let x: Number = 10 in x + 20",
             expect![[r#"

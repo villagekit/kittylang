@@ -77,6 +77,11 @@ pub enum TokenKind {
     #[token("case")]
     Case,
 
+    #[token("self")]
+    SelfLower,
+    #[token("Self")]
+    SelfUpper,
+
     #[token("type")]
     Type,
     #[token("const")]
@@ -189,6 +194,8 @@ impl fmt::Display for TokenKind {
             Self::Else => "‘else’",
             Self::Match => "‘match’",
             Self::Case => "‘case’",
+            Self::SelfLower => "‘self’",
+            Self::SelfUpper => "‘Self’",
             Self::Type => "‘type’",
             Self::Const => "‘const’",
             Self::Enum => "‘enum’",

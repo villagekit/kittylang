@@ -18,31 +18,41 @@ pub(crate) fn function_param_list_optional_types(
     let m = p.start();
     p.bump(); // Consume '('
     if !p.at(TokenKind::ParenClose) {
+        let mut can_be_self = true;
         loop {
-            function_param(p, recovery_param_list, has_types);
+            function_param(p, recovery_param_list, can_be_self, has_types);
             if !p.bump_if_at(TokenKind::Comma) {
                 break;
             }
-            p.bump(); // Consume ','
+            can_be_self = false;
         }
     }
     p.expect(TokenKind::ParenClose, recovery);
     m.complete(p, NodeKind::FunctionParamList)
 }
 
-fn function_param(p: &mut Parser, recovery: TokenSet, has_types: bool) -> CompletedMarker {
+fn function_param(
+    p: &mut Parser,
+    recovery: TokenSet,
+    can_be_self: bool,
+    has_types: bool,
+) -> CompletedMarker {
     let m = p.start();
-    // Parse name
-    p.expect(TokenKind::Identifier, recovery);
-    if has_types || p.at(TokenKind::Colon) {
-        // Parse type
-        p.expect(TokenKind::Colon, recovery);
-        type_annotation(p, recovery);
-    }
-    // Parse default value
-    if p.at(TokenKind::Equal) {
-        p.bump(); // Consume '='
-        expr(p, recovery);
+    if can_be_self && p.at(TokenKind::SelfLower) {
+        p.bump(); // Consume 'self'
+    } else {
+        // Parse name
+        p.expect(TokenKind::Identifier, recovery);
+        if has_types || p.at(TokenKind::Colon) {
+            // Parse type
+            p.expect(TokenKind::Colon, recovery);
+            type_annotation(p, recovery);
+        }
+        // Parse default value
+        if p.at(TokenKind::Equal) {
+            p.bump(); // Consume '='
+            expr(p, recovery);
+        }
     }
     m.complete(p, NodeKind::FunctionParam)
 }

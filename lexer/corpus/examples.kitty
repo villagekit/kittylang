@@ -227,7 +227,7 @@ Fn@188..190
 Whitespace@190..191
 Identifier@191..197
 ParenOpen@197..198
-Identifier@198..202
+SelfLower@198..202
 ParenClose@202..203
 Colon@203..204
 Whitespace@204..205
@@ -239,7 +239,7 @@ Whitespace@210..212
 Indent@212..214
 Let@214..217
 Whitespace@217..218
-Identifier@218..222
+SelfUpper@218..222
 Whitespace@222..223
 BraceOpen@223..224
 Whitespace@224..225
@@ -255,7 +255,7 @@ BraceClose@233..234
 Whitespace@234..235
 Equal@235..236
 Whitespace@236..237
-Identifier@237..241
+SelfLower@237..241
 Newline@241..242
 Whitespace@242..246
 ParenOpen@246..247
