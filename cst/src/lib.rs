@@ -112,13 +112,18 @@ macro_rules! define_compound_token {
 	};
 }
 
-define_node!(Source);
+define_node!(Module);
+define_node!(ImportAlias);
+define_node!(ImportItem);
+define_node!(ExportItem);
+define_node!(LocalItem);
+define_compound_node!(ModuleItem, kinds: [ImportItem, ExportItem, LocalItem]);
 
 define_node!(Error);
 define_node!(Missing);
 
-impl Source {
-    pub fn items(self, tree: &SyntaxTree) -> impl Iterator<Item = TopItem> + '_ {
+impl Module {
+    pub fn items(self, tree: &SyntaxTree) -> impl Iterator<Item = ModuleItem> + '_ {
         nodes(self, tree)
     }
 }
@@ -339,7 +344,7 @@ define_compound_node!(TraitItem, kinds: [TypeDecl, ConstantDecl, PropDecl, Funct
 define_node!(ImplTraitDecl);
 define_compound_node!(ImplTraitItem, kinds: [TypeDecl, ConstantDecl, PropDecl, FunctionDecl]);
 
-define_compound_node!(TopItem, kinds: [TypeDecl, ConstantDecl, FunctionDecl, EnumDecl, StructDecl, TraitDecl, ImplTraitDecl]);
+define_compound_node!(DeclItem, kinds: [TypeDecl, ConstantDecl, FunctionDecl, EnumDecl, StructDecl, TraitDecl, ImplTraitDecl]);
 
 impl StructDecl {
     pub fn name(self, tree: &SyntaxTree) -> Option<Identifier> {

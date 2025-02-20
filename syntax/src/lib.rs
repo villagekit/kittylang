@@ -38,7 +38,11 @@ unsafe impl eventree::TreeConfig for TreeConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u8)]
 pub enum NodeKind {
-    Source,
+    Module,
+    ImportItem,
+    ImportAlias,
+    ExportItem,
+    LocalItem,
 
     // Expressions
     VariableRef,
@@ -120,17 +124,9 @@ pub enum NodeKind {
 
     // Traits
     TraitDecl,
-    TraitType,
-    TraitProp,
-    TraitFunction,
-    TraitConstant,
 
     // Impl
     ImplTraitDecl,
-    ImplTraitType,
-    ImplTraitProp,
-    ImplTraitFunction,
-    ImplTraitConstant,
 
     // Resilient syntax trees
     Error,

@@ -18,7 +18,7 @@ pub(crate) const TOP_ITEM_FIRST: [TokenKind; 7] = [
     TokenKind::Impl,
 ];
 
-pub(crate) fn top_item(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
+pub(crate) fn decl_item(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
     let cm = if p.at(TokenKind::Type) {
         type_decl(p, recovery)
     } else if p.at(TokenKind::Const) {
@@ -313,17 +313,17 @@ fn trait_impl_prop(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 
 #[cfg(test)]
 mod tests {
-    use super::{top_item, Parser, TokenSet};
+    use super::{decl_item, Parser, TokenSet};
     use crate::check_grammar;
     use expect_test::expect;
     use indoc::indoc;
-    use kitty_cst::TopItem;
+    use kitty_cst::DeclItem;
 
     fn check(input: &str, expected: expect_test::Expect) {
         let grammar = |p: &mut Parser| {
-            top_item(p, TokenSet::NONE);
+            decl_item(p, TokenSet::NONE);
         };
-        check_grammar::<TopItem>(grammar, input, expected);
+        check_grammar::<DeclItem>(grammar, input, expected);
     }
 
     #[test]

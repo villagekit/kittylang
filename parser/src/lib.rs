@@ -6,7 +6,7 @@ mod sink;
 mod source;
 mod token_set;
 
-use kitty_cst::{CstNode, Source};
+use kitty_cst::{CstNode, Module};
 use kitty_lexer::{lex, Token};
 use kitty_syntax::SyntaxTreeBuf;
 use std::fmt;
@@ -15,8 +15,13 @@ pub use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::sink::Sink;
 
-pub fn parse(input: &str) -> Parse<Source> {
-    parse_grammar(grammar::source, input)
+pub fn parse(input: &str) -> Parse<Module> {
+    parse_grammar(
+        |p: &mut Parser<'_>| {
+            grammar::module(p);
+        },
+        input,
+    )
 }
 
 pub(crate) fn parse_grammar<Node: CstNode>(
