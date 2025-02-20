@@ -159,7 +159,6 @@ pub(crate) fn generic_param_list(p: &mut Parser, recovery: TokenSet) -> Complete
             if !p.bump_if_at(TokenKind::Comma) {
                 break;
             }
-            p.bump(); // Consume ','
         }
     }
     p.expect(TokenKind::BracketClose, recovery);
@@ -240,7 +239,7 @@ pub(crate) fn type_bound_list(p: &mut Parser, recovery: TokenSet) -> CompletedMa
     let m = p.start();
     loop {
         type_bound(p, recovery);
-        if !p.at(TokenKind::Plus) {
+        if !p.bump_if_at(TokenKind::Plus) {
             break;
         }
     }
@@ -251,6 +250,27 @@ fn type_bound(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
     p.expect(TokenKind::Identifier, recovery);
     m.complete(p, NodeKind::TypeBound)
+}
+
+pub(crate) fn where_clause(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+    assert!(p.at(TokenKind::Where));
+    let recovery_where = recovery.union([TokenKind::Dedent]);
+    let m = p.start();
+    p.bump(); // Consume 'where'
+    p.expect(TokenKind::Indent, recovery);
+    while !p.at(TokenKind::Dedent) {
+        where_bound(p, recovery_where);
+    }
+    p.bump(); // Consume <dedent>
+    m.complete(p, NodeKind::WhereClause)
+}
+
+pub(crate) fn where_bound(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+    let m = p.start();
+    p.expect(TokenKind::Identifier, recovery);
+    p.expect(TokenKind::Colon, recovery);
+    type_bound_list(p, recovery);
+    m.complete(p, NodeKind::WhereBound)
 }
 
 #[cfg(test)]
@@ -737,7 +757,7 @@ mod tests {
         check_generic_param_list(
             "[T: Display, U = Number]",
             expect![[r#"
-                GenericParamList@0..23
+                GenericParamList@0..24
                   BracketOpen@0..1 "["
                   GenericParam@1..11
                     Identifier@1..2 "T"
@@ -748,16 +768,14 @@ mod tests {
                         Identifier@4..11 "Display"
                   Comma@11..12 ","
                   Whitespace@12..13 " "
-                  Identifier@13..14 "U"
-                  Whitespace@14..15 " "
-                  GenericParam@15..16
-                    Error@15..16
-                      Equal@15..16 "="
-                  Whitespace@16..17 " "
-                  Error@17..23
-                    Identifier@17..23 "Number"
-                error at 15..16: expected identifier, but found ‘=’
-                error at 17..23: expected ‘]’, but found identifier"#]],
+                  GenericParam@13..23
+                    Identifier@13..14 "U"
+                    Whitespace@14..15 " "
+                    Equal@15..16 "="
+                    Whitespace@16..17 " "
+                    TypeName@17..23
+                      Identifier@17..23 "Number"
+                  BracketClose@23..24 "]""#]],
         );
     }
 

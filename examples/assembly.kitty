@@ -1,0 +1,18 @@
+import Object3d from @std/object-3d
+import Stock from @std/stock
+
+export enum Part
+  case Stock(impl Stock)
+  case Assembly(impl Assembly)
+
+export enum PartsItem
+  case Single(Part)
+  case Nested(Self)
+  case None
+
+export struct Parts(List[PartsItem])
+
+export trait Assembly
+  fn parts: Parts
+
+impl Object3d for Assembly

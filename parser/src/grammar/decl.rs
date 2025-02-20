@@ -1,6 +1,8 @@
 use kitty_syntax::{NodeKind, TokenKind};
 
-use crate::{marker::CompletedMarker, parser::Parser, token_set::TokenSet};
+use crate::{
+    grammar::r#type::where_clause, marker::CompletedMarker, parser::Parser, token_set::TokenSet,
+};
 
 use super::{
     expr::expr,
@@ -95,6 +97,9 @@ fn struct_decl(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
         generic_param_list(p, recovery);
     }
     p.expect(TokenKind::Indent, recovery);
+    if p.at(TokenKind::Where) {
+        where_clause(p, recovery);
+    }
     while p.at_set(STRUCT_ITEM_FIRST) {
         struct_item(p, recovery_struct);
     }
@@ -153,6 +158,9 @@ fn enum_decl(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
         generic_param_list(p, recovery);
     }
     p.expect(TokenKind::Indent, recovery);
+    if p.at(TokenKind::Where) {
+        where_clause(p, recovery);
+    }
     while p.at_set(ENUM_ITEM_FIRST) {
         enum_item(p, recovery_enum);
     }
@@ -198,6 +206,9 @@ fn trait_decl(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
         generic_param_list(p, recovery);
     }
     p.expect(TokenKind::Indent, recovery);
+    if p.at(TokenKind::Where) {
+        where_clause(p, recovery);
+    }
     while p.at_set(TRAIT_ITEM_FIRST) {
         trait_item(p, recovery_trait);
     }
@@ -269,6 +280,9 @@ fn impl_trait_decl(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     p.expect(TokenKind::For, recovery);
     type_annotation(p, recovery);
     p.expect(TokenKind::Indent, recovery);
+    if p.at(TokenKind::Where) {
+        where_clause(p, recovery);
+    }
     while p.at_set(IMPL_TRAIT_ITEM_FIRST) {
         impl_trait_item(p, recovery_trait);
     }

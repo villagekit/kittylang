@@ -268,7 +268,7 @@ mod tests {
                   prop z: N = N.default()
 
                   fn length(self): N =>
-                    let Self { x, y, z } = self
+                    let Self(x, y, z) = self
                     (x * x + y * y + z * z).sqrt()
 
                 export struct Quaternion
@@ -295,10 +295,10 @@ mod tests {
                     Identifier@23..26 "ath"
                   Newline@26..27 "\n"
                   Newline@27..28 "\n"
-                  ExportItem@28..69
+                  ExportItem@28..209
                     Export@28..34 "export"
                     Whitespace@34..35 " "
-                    StructDecl@35..69
+                    StructDecl@35..209
                       Struct@35..41 "struct"
                       Whitespace@41..42 " "
                       Identifier@42..49 "Vector3"
@@ -314,142 +314,124 @@ mod tests {
                         BracketClose@60..61 "]"
                       Newline@61..62 "\n"
                       Indent@62..64 "  "
-                      Error@64..69
+                      WhereClause@64..107
                         Where@64..69 "where"
-                  Newline@69..70 "\n"
-                  Whitespace@70..72 "  "
-                  Error@72..74
-                    Indent@72..74 "  "
-                  Error@74..75
-                    Identifier@74..75 "N"
-                  Error@75..76
-                    Colon@75..76 ":"
-                  Whitespace@76..77 " "
-                  Error@77..84
-                    Identifier@77..84 "Default"
-                  Whitespace@84..85 " "
-                  Error@85..86
-                    Plus@85..86 "+"
-                  Whitespace@86..87 " "
-                  Error@87..90
-                    Identifier@87..90 "Add"
-                  Whitespace@90..91 " "
-                  Error@91..92
-                    Plus@91..92 "+"
-                  Whitespace@92..93 " "
-                  Error@93..96
-                    Identifier@93..96 "Mul"
-                  Whitespace@96..97 " "
-                  Error@97..98
-                    Plus@97..98 "+"
-                  Whitespace@98..99 " "
-                  Error@99..103
-                    Identifier@99..103 "Sqrt"
-                  Newline@103..104 "\n"
-                  Newline@104..105 "\n"
-                  Whitespace@105..107 "  "
-                  Error@107..107
-                    Dedent@107..107 ""
-                  Error@107..111
-                    Prop@107..111 "prop"
-                  Whitespace@111..112 " "
-                  Error@112..113
-                    Identifier@112..113 "x"
-                  Error@113..114
-                    Colon@113..114 ":"
-                  Whitespace@114..115 " "
-                  Error@115..116
-                    Identifier@115..116 "N"
-                  Whitespace@116..117 " "
-                  Error@117..118
-                    Equal@117..118 "="
-                  Whitespace@118..119 " "
-                  Error@119..120
-                    Identifier@119..120 "N"
-                  Error@120..121
-                    Dot@120..121 "."
-                  Error@121..128
-                    Identifier@121..128 "default"
-                  Error@128..129
-                    ParenOpen@128..129 "("
-                  Error@129..130
-                    ParenClose@129..130 ")"
-                  Newline@130..131 "\n"
-                  Newline@131..132 "\n"
-                  Whitespace@132..134 "  "
-                  Error@134..138
-                    Prop@134..138 "prop"
-                  Whitespace@138..139 " "
-                  Error@139..140
-                    Identifier@139..140 "y"
-                  Error@140..141
-                    Colon@140..141 ":"
-                  Whitespace@141..142 " "
-                  Error@142..143
-                    Identifier@142..143 "N"
-                  Whitespace@143..144 " "
-                  Error@144..145
-                    Equal@144..145 "="
-                  Whitespace@145..146 " "
-                  Error@146..147
-                    Identifier@146..147 "N"
-                  Error@147..148
-                    Dot@147..148 "."
-                  Error@148..155
-                    Identifier@148..155 "default"
-                  Error@155..156
-                    ParenOpen@155..156 "("
-                  Error@156..157
-                    ParenClose@156..157 ")"
-                  Newline@157..158 "\n"
-                  Newline@158..159 "\n"
-                  Whitespace@159..161 "  "
-                  Error@161..165
-                    Prop@161..165 "prop"
-                  Whitespace@165..166 " "
-                  Error@166..167
-                    Identifier@166..167 "z"
-                  Error@167..168
-                    Colon@167..168 ":"
-                  Whitespace@168..169 " "
-                  Error@169..170
-                    Identifier@169..170 "N"
-                  Whitespace@170..171 " "
-                  Error@171..172
-                    Equal@171..172 "="
-                  Whitespace@172..173 " "
-                  Error@173..174
-                    Identifier@173..174 "N"
-                  Error@174..175
-                    Dot@174..175 "."
-                  Error@175..182
-                    Identifier@175..182 "default"
-                  Error@182..183
-                    ParenOpen@182..183 "("
-                  Error@183..184
-                    ParenClose@183..184 ")"
-                  Newline@184..185 "\n"
-                  Newline@185..186 "\n"
-                  Whitespace@186..188 "  "
-                  LocalItem@188..206
-                    FunctionDecl@188..206
-                      Fn@188..190 "fn"
-                      Whitespace@190..191 " "
-                      Identifier@191..197 "length"
-                      FunctionParamList@197..203
-                        ParenOpen@197..198 "("
-                        FunctionParam@198..202
-                          SelfLower@198..202 "self"
-                        ParenClose@202..203 ")"
-                      Error@203..204
-                        Colon@203..204 ":"
-                      Whitespace@204..205 " "
-                      FunctionBody@205..206
-                        VariableRef@205..206
-                          Identifier@205..206 "N"
-                  Whitespace@206..207 " "
-                  Error@207..209
-                    FatArrow@207..209 "=>"
+                        Newline@69..70 "\n"
+                        Whitespace@70..72 "  "
+                        Indent@72..74 "  "
+                        WhereBound@74..103
+                          Identifier@74..75 "N"
+                          Colon@75..76 ":"
+                          Whitespace@76..77 " "
+                          TypeBoundList@77..103
+                            TypeBound@77..84
+                              Identifier@77..84 "Default"
+                            Whitespace@84..85 " "
+                            Plus@85..86 "+"
+                            Whitespace@86..87 " "
+                            TypeBound@87..90
+                              Identifier@87..90 "Add"
+                            Whitespace@90..91 " "
+                            Plus@91..92 "+"
+                            Whitespace@92..93 " "
+                            TypeBound@93..96
+                              Identifier@93..96 "Mul"
+                            Whitespace@96..97 " "
+                            Plus@97..98 "+"
+                            Whitespace@98..99 " "
+                            TypeBound@99..103
+                              Identifier@99..103 "Sqrt"
+                        Newline@103..104 "\n"
+                        Newline@104..105 "\n"
+                        Whitespace@105..107 "  "
+                        Dedent@107..107 ""
+                      PropDecl@107..130
+                        Prop@107..111 "prop"
+                        Whitespace@111..112 " "
+                        Identifier@112..113 "x"
+                        Colon@113..114 ":"
+                        Whitespace@114..115 " "
+                        TypeName@115..116
+                          Identifier@115..116 "N"
+                        Whitespace@116..117 " "
+                        Equal@117..118 "="
+                        Whitespace@118..119 " "
+                        CallExpr@119..130
+                          GetExpr@119..128
+                            VariableRef@119..120
+                              Identifier@119..120 "N"
+                            Dot@120..121 "."
+                            Identifier@121..128 "default"
+                          FunctionArgList@128..130
+                            ParenOpen@128..129 "("
+                            ParenClose@129..130 ")"
+                      Newline@130..131 "\n"
+                      Newline@131..132 "\n"
+                      Whitespace@132..134 "  "
+                      PropDecl@134..157
+                        Prop@134..138 "prop"
+                        Whitespace@138..139 " "
+                        Identifier@139..140 "y"
+                        Colon@140..141 ":"
+                        Whitespace@141..142 " "
+                        TypeName@142..143
+                          Identifier@142..143 "N"
+                        Whitespace@143..144 " "
+                        Equal@144..145 "="
+                        Whitespace@145..146 " "
+                        CallExpr@146..157
+                          GetExpr@146..155
+                            VariableRef@146..147
+                              Identifier@146..147 "N"
+                            Dot@147..148 "."
+                            Identifier@148..155 "default"
+                          FunctionArgList@155..157
+                            ParenOpen@155..156 "("
+                            ParenClose@156..157 ")"
+                      Newline@157..158 "\n"
+                      Newline@158..159 "\n"
+                      Whitespace@159..161 "  "
+                      PropDecl@161..184
+                        Prop@161..165 "prop"
+                        Whitespace@165..166 " "
+                        Identifier@166..167 "z"
+                        Colon@167..168 ":"
+                        Whitespace@168..169 " "
+                        TypeName@169..170
+                          Identifier@169..170 "N"
+                        Whitespace@170..171 " "
+                        Equal@171..172 "="
+                        Whitespace@172..173 " "
+                        CallExpr@173..184
+                          GetExpr@173..182
+                            VariableRef@173..174
+                              Identifier@173..174 "N"
+                            Dot@174..175 "."
+                            Identifier@175..182 "default"
+                          FunctionArgList@182..184
+                            ParenOpen@182..183 "("
+                            ParenClose@183..184 ")"
+                      Newline@184..185 "\n"
+                      Newline@185..186 "\n"
+                      Whitespace@186..188 "  "
+                      FunctionDecl@188..206
+                        Fn@188..190 "fn"
+                        Whitespace@190..191 " "
+                        Identifier@191..197 "length"
+                        FunctionParamList@197..203
+                          ParenOpen@197..198 "("
+                          FunctionParam@198..202
+                            SelfLower@198..202 "self"
+                          ParenClose@202..203 ")"
+                        Error@203..204
+                          Colon@203..204 ":"
+                        Whitespace@204..205 " "
+                        FunctionBody@205..206
+                          VariableRef@205..206
+                            Identifier@205..206 "N"
+                      Whitespace@206..207 " "
+                      Error@207..209
+                        FatArrow@207..209 "=>"
                   Newline@209..210 "\n"
                   Whitespace@210..212 "  "
                   Error@212..214
@@ -609,50 +591,8 @@ mod tests {
                       Newline@389..390 "\n"
                       Dedent@390..390 ""
                 error at 23..26: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found identifier
-                error at 64..69: expected dedent, but found ‘where’
-                error at 72..74: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found indent
-                error at 74..75: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found identifier
-                error at 75..76: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘:’
-                error at 77..84: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found identifier
-                error at 85..86: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘+’
-                error at 87..90: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found identifier
-                error at 91..92: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘+’
-                error at 93..96: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found identifier
-                error at 97..98: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘+’
-                error at 99..103: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found identifier
-                error at 107..107: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found dedent
-                error at 107..111: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘prop’
-                error at 112..113: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found identifier
-                error at 113..114: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘:’
-                error at 115..116: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found identifier
-                error at 117..118: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘=’
-                error at 119..120: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found identifier
-                error at 120..121: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘.’
-                error at 121..128: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found identifier
-                error at 128..129: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘(’
-                error at 129..130: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘)’
-                error at 134..138: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘prop’
-                error at 139..140: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found identifier
-                error at 140..141: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘:’
-                error at 142..143: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found identifier
-                error at 144..145: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘=’
-                error at 146..147: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found identifier
-                error at 147..148: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘.’
-                error at 148..155: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found identifier
-                error at 155..156: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘(’
-                error at 156..157: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘)’
-                error at 161..165: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘prop’
-                error at 166..167: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found identifier
-                error at 167..168: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘:’
-                error at 169..170: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found identifier
-                error at 171..172: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘=’
-                error at 173..174: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found identifier
-                error at 174..175: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘.’
-                error at 175..182: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found identifier
-                error at 182..183: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘(’
-                error at 183..184: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘)’
                 error at 203..204: expected ‘=>’, but found ‘:’
-                error at 207..209: expected ‘(’, ‘.’, ‘*’, ‘/’, ‘rem’, ‘+’, ‘-’, ‘<’, ‘<=’, ‘>’, ‘>=’, ‘==’, ‘!=’, ‘and’, ‘xor’, ‘or’, ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘=>’
+                error at 207..209: expected dedent, but found ‘=>’
                 error at 212..214: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found indent
                 error at 214..217: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘let’
                 error at 218..222: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘Self’

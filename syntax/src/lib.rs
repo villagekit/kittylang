@@ -88,6 +88,10 @@ pub enum NodeKind {
     TypeBound,
     TypeBoundList,
 
+    // Where Clauses
+    WhereClause,
+    WhereBound,
+
     // Operators.
     UnaryOperator,
     BinaryOperator,

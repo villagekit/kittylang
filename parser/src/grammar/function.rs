@@ -1,7 +1,9 @@
 use kitty_syntax::{NodeKind, TokenKind};
 
 use crate::{
-    grammar::r#type::generic_param_list, marker::CompletedMarker, parser::Parser,
+    grammar::r#type::{generic_param_list, where_clause},
+    marker::CompletedMarker,
+    parser::Parser,
     token_set::TokenSet,
 };
 
@@ -24,6 +26,9 @@ pub(crate) fn function_decl_optional_name_types_body(
         generic_param_list(p, recovery);
     }
     function_param_list_optional_types(p, recovery, required_types);
+    if p.at(TokenKind::Where) {
+        where_clause(p, recovery);
+    }
     if required_body || p.at(TokenKind::FatArrow) {
         p.expect(TokenKind::FatArrow, recovery);
         function_body(p, recovery);
