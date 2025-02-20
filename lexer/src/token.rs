@@ -2,7 +2,7 @@ use logos::{Logos, Span};
 use std::fmt;
 use text_size::TextRange;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Token {
     pub kind: TokenKind,
     pub range: TextRange,
@@ -14,6 +14,12 @@ impl Token {
             kind,
             range: TextRange::new((span.start as u32).into(), (span.end as u32).into()),
         }
+    }
+}
+
+impl fmt::Debug for Token {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}@{:?}", self.kind, self.range)
     }
 }
 

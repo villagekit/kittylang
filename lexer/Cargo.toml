@@ -14,7 +14,8 @@ categories.workspace = true
 [dependencies]
 logos = "0.15.0"
 peek-again = "0.4.0"
-text-size = "1.1.1"
+text-size = { workspace = true }
 
 [dev-dependencies]
-kitty-test-utils = { path = "../test-utils" }
+expect-test = { workspace = true }
+indoc = { workspace = true }
