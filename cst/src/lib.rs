@@ -171,7 +171,6 @@ define_node!(GetExpr);
 define_compound_node!(
     Expr,
     kinds: [
-        Missing,
         BooleanLiteral,
         NumberLiteral,
         StringLiteral,

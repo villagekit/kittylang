@@ -1,16 +1,12 @@
 use kitty_syntax::{NodeKind, TokenKind};
 
-use crate::{
-    grammar::{
-        function::{function_body, function_param_list_optional_types},
-        r#type::{generic_param_list, type_bound_list, type_path},
-    },
-    marker::CompletedMarker,
-    parser::Parser,
-    token_set::TokenSet,
-};
+use crate::{marker::CompletedMarker, parser::Parser, token_set::TokenSet};
 
-use super::{expr::expr, r#type::type_annotation};
+use super::{
+    expr::expr,
+    function::function_decl_optional_name_types_body,
+    r#type::{generic_param_list, type_annotation, type_bound_list, type_path},
+};
 
 pub(crate) const TOP_ITEM_FIRST: [TokenKind; 7] = [
     TokenKind::Type,
@@ -64,6 +60,10 @@ fn constant_decl(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     constant_decl_optional_type_value(p, recovery, false, true)
 }
 
+fn function_decl(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+    function_decl_optional_name_types_body(p, recovery, true, true, true)
+}
+
 fn constant_decl_optional_type_value(
     p: &mut Parser,
     recovery: TokenSet,
@@ -85,33 +85,6 @@ fn constant_decl_optional_type_value(
     m.complete(p, NodeKind::ConstantDecl)
 }
 
-/// Function declaration
-fn function_decl(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    function_decl_optional_types_body(p, recovery, true, true)
-}
-
-fn function_decl_optional_types_body(
-    p: &mut Parser,
-    recovery: TokenSet,
-    has_types: bool,
-    has_body: bool,
-) -> CompletedMarker {
-    assert!(p.at(TokenKind::Fn));
-    let m = p.start();
-    p.bump(); // Consume 'fn'
-    p.expect(TokenKind::Identifier, recovery);
-    if p.at(TokenKind::BracketOpen) {
-        generic_param_list(p, recovery);
-    }
-    function_param_list_optional_types(p, recovery, has_types);
-    if has_body || p.at(TokenKind::FatArrow) {
-        p.expect(TokenKind::FatArrow, recovery);
-        function_body(p, recovery);
-    }
-    m.complete(p, NodeKind::FunctionDecl)
-}
-
-/// Function declaration
 fn struct_decl(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     assert!(p.at(TokenKind::Struct));
     let recovery_struct = recovery.union(STRUCT_ITEM_FIRST).union([TokenKind::Dedent]);
@@ -279,7 +252,7 @@ fn trait_constant(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 }
 
 fn trait_function(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    function_decl_optional_types_body(p, recovery, true, false)
+    function_decl_optional_name_types_body(p, recovery, true, true, false)
 }
 
 fn impl_trait_decl(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
@@ -331,7 +304,7 @@ fn trait_impl_constant(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 }
 
 fn trait_impl_function(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    function_decl_optional_types_body(p, recovery, false, true)
+    function_decl_optional_name_types_body(p, recovery, true, false, true)
 }
 
 fn trait_impl_prop(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
@@ -887,7 +860,7 @@ mod tests {
                 error at 40: missing identifier, ‘Self’, ‘(’, ‘Fn’, or ‘impl’
                 error at 40: missing ‘)’
                 error at 40: missing ‘=>’
-                error at 40: missing ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘let’, or ‘if’"#]],
+                error at 40: missing ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’"#]],
         );
     }
 

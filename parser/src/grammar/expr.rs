@@ -2,7 +2,10 @@ use kitty_syntax::{NodeKind, TokenKind};
 
 use super::r#type::type_annotation;
 use crate::{
-    grammar::function::function_arg_list, marker::CompletedMarker, token_set::TokenSet, Parser,
+    grammar::function::{function_arg_list, function_decl_optional_name_types_body},
+    marker::CompletedMarker,
+    token_set::TokenSet,
+    Parser,
 };
 
 /// Parse an expression.
@@ -79,6 +82,8 @@ fn primary(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
         paren_expr(p, recovery)
     } else if p.at(TokenKind::Indent) {
         block_expr(p, recovery)
+    } else if p.at(TokenKind::Fn) {
+        function_expr(p, recovery)
     } else if p.at(TokenKind::Let) {
         let_expr(p, recovery)
     } else if p.at(TokenKind::If) {
@@ -109,8 +114,9 @@ fn get_expr(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> Complet
 
 /// Parse a parenthesized expression (or tuple expression).
 fn paren_expr(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+    assert!(p.at(TokenKind::ParenOpen));
     let m = p.start();
-    p.expect(TokenKind::ParenOpen, recovery);
+    p.bump(); // Consume ')'
     expr(p, recovery);
     if p.at(TokenKind::Comma) {
         // More than one expression makes it a tuple.
@@ -135,7 +141,13 @@ fn block_expr(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     m.complete(p, NodeKind::BlockExpr)
 }
 
-/// Parse a let–expression: `let <identifier> = <expr> in <body>`
+/// Parse a function expression: `fn <identifier>(<identifier>: <type annotation>) => <expr>`
+fn function_expr(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+    assert!(p.at(TokenKind::Fn));
+    function_decl_optional_name_types_body(p, recovery, false, true, true)
+}
+
+/// Parse a let expression: `let <identifier> = <expr> in <expr>`
 fn let_expr(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
     p.expect(TokenKind::Let, recovery);
@@ -229,6 +241,7 @@ mod tests {
     use super::{expr, Parser, TokenSet};
     use crate::check_grammar;
     use expect_test::expect;
+    use indoc::indoc;
     use kitty_cst::Expr;
 
     fn check(input: &str, expected: expect_test::Expect) {
@@ -458,7 +471,7 @@ mod tests {
                     Plus@2..3 "+"
                     Missing@3..3
                   Missing@3..3
-                error at 3: missing ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘let’, or ‘if’
+                error at 3: missing ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’
                 error at 3: missing ‘)’"#]],
         );
     }
@@ -573,7 +586,7 @@ mod tests {
                     FunctionArgPositional@4..4
                       Missing@4..4
                     Missing@4..4
-                error at 4: missing ‘)’, identifier, ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘let’, or ‘if’
+                error at 4: missing ‘)’, identifier, ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’
                 error at 4: missing ‘)’"#]],
         );
     }
@@ -637,9 +650,9 @@ mod tests {
                     Number@11..12 "2"
                   Missing@12..12
                 error at 6..7: expected ‘=’, but found number
-                error at 8..10: expected ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘let’, or ‘if’, but found ‘in’
+                error at 8..10: expected ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’, but found ‘in’
                 error at 11..12: expected ‘in’, but found number
-                error at 12: missing ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘let’, or ‘if’"#]],
+                error at 12: missing ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’"#]],
         );
     }
 
@@ -662,9 +675,9 @@ mod tests {
                   Error@12..13
                     Number@12..13 "2"
                   Missing@13..13
-                error at 9..11: expected ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘let’, or ‘if’, but found ‘in’
+                error at 9..11: expected ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’, but found ‘in’
                 error at 12..13: expected ‘in’, but found number
-                error at 13: missing ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘let’, or ‘if’"#]],
+                error at 13: missing ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’"#]],
         );
     }
 
@@ -688,7 +701,7 @@ mod tests {
                     Number@10..11 "2"
                   Missing@11..11
                 error at 10..11: expected ‘in’, but found number
-                error at 11: missing ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘let’, or ‘if’"#]],
+                error at 11: missing ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’"#]],
         );
     }
 
@@ -711,7 +724,7 @@ mod tests {
                   Whitespace@14..15 " "
                   NumberLiteral@15..16
                     Number@15..16 "2"
-                error at 3: missing ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘let’, or ‘if’"#]],
+                error at 3: missing ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’"#]],
         );
     }
 
@@ -729,7 +742,7 @@ mod tests {
                   Whitespace@4..5 " "
                   Then@5..9 "then"
                   Missing@9..9
-                error at 9: missing ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘let’, or ‘if’"#]],
+                error at 9: missing ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’"#]],
         );
     }
 
@@ -751,7 +764,7 @@ mod tests {
                     FunctionArgPositional@6..6
                       Missing@6..6
                     ParenClose@6..7 ")"
-                error at 6: missing identifier, ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘let’, or ‘if’"#]],
+                error at 6: missing identifier, ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’"#]],
         );
     }
 
@@ -791,7 +804,7 @@ mod tests {
                   Whitespace@12..13 " "
                   NumberLiteral@13..14
                     Number@13..14 "2"
-                error at 6..7: expected ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘let’, or ‘if’, but found ‘)’
+                error at 6..7: expected ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’, but found ‘)’
                 error at 8: missing ‘)’"#]],
         );
     }
@@ -826,6 +839,75 @@ mod tests {
                     Whitespace@25..26 " "
                     NumberLiteral@26..28
                       Number@26..28 "20""#]],
+        );
+    }
+
+    #[test]
+    fn function_expr() {
+        // Happy path
+        check(
+            indoc! {"
+                let add = fn (a: Number, b: Number) => a + b in
+                add(10, 20)
+            "},
+            expect![[r#"
+                LetExpr@0..60
+                  Let@0..3 "let"
+                  Whitespace@3..4 " "
+                  Identifier@4..7 "add"
+                  Whitespace@7..8 " "
+                  Equal@8..9 "="
+                  Whitespace@9..10 " "
+                  FunctionDecl@10..44
+                    Fn@10..12 "fn"
+                    Whitespace@12..13 " "
+                    FunctionParamList@13..35
+                      ParenOpen@13..14 "("
+                      FunctionParam@14..23
+                        Identifier@14..15 "a"
+                        Colon@15..16 ":"
+                        Whitespace@16..17 " "
+                        TypeName@17..23
+                          Identifier@17..23 "Number"
+                      Comma@23..24 ","
+                      Whitespace@24..25 " "
+                      FunctionParam@25..34
+                        Identifier@25..26 "b"
+                        Colon@26..27 ":"
+                        Whitespace@27..28 " "
+                        TypeName@28..34
+                          Identifier@28..34 "Number"
+                      ParenClose@34..35 ")"
+                    Whitespace@35..36 " "
+                    FatArrow@36..38 "=>"
+                    Whitespace@38..39 " "
+                    FunctionBody@39..44
+                      BinaryExpr@39..44
+                        VariableRef@39..40
+                          Identifier@39..40 "a"
+                        Whitespace@40..41 " "
+                        Plus@41..42 "+"
+                        Whitespace@42..43 " "
+                        VariableRef@43..44
+                          Identifier@43..44 "b"
+                  Whitespace@44..45 " "
+                  In@45..47 "in"
+                  Newline@47..48 "\n"
+                  CallExpr@48..59
+                    VariableRef@48..51
+                      Identifier@48..51 "add"
+                    FunctionArgList@51..59
+                      ParenOpen@51..52 "("
+                      FunctionArgPositional@52..54
+                        NumberLiteral@52..54
+                          Number@52..54 "10"
+                      Comma@54..55 ","
+                      Whitespace@55..56 " "
+                      FunctionArgPositional@56..58
+                        NumberLiteral@56..58
+                          Number@56..58 "20"
+                      ParenClose@58..59 ")"
+                  Newline@59..60 "\n""#]],
         );
     }
 }

@@ -125,9 +125,6 @@ impl<'t> Parser<'t> {
     pub(crate) fn lookahead_at(&mut self, nth: usize, kind: TokenKind) -> bool {
         self.source.lookahead_kind(nth) == Some(kind)
     }
-    pub(crate) fn lookahead(&mut self, nth: usize) -> Option<TokenKind> {
-        self.source.lookahead_kind(nth)
-    }
 
     fn at_set_raw(&mut self, set: &TokenSet) -> bool {
         self.peek().map_or(false, |k| set.contains(k))
@@ -139,9 +136,5 @@ impl<'t> Parser<'t> {
 
     fn peek(&mut self) -> Option<TokenKind> {
         self.source.peek_kind()
-    }
-
-    pub(crate) fn debug_source(&self) {
-        self.source.debug()
     }
 }
