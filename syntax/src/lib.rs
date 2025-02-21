@@ -98,12 +98,14 @@ pub enum NodeKind {
 
     // Patterns.
     Pattern,
-    PatternType,
+    PatternOr,
+    PatternWildcard,
     PatternLiteral,
     PatternTuple,
-    PatternConstructor,
-    PatternWildcard,
-    PatternOr,
+    PatternType,
+    PatternFieldList,
+    PatternFieldPositional,
+    PatternFieldLabelled,
 
     // Top-Level Declarations
     TypeDecl,

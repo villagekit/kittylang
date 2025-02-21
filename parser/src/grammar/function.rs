@@ -7,7 +7,7 @@ use crate::{
     token_set::TokenSet,
 };
 
-use super::{expr::expr, r#type::type_annotation};
+use super::{expr::expr, pattern, r#type::type_annotation};
 
 pub(crate) fn function_decl_optional_name_types_body(
     p: &mut Parser,
@@ -70,7 +70,7 @@ fn function_param(
         p.bump(); // Consume 'self'
     } else {
         // Parse name
-        p.expect(TokenKind::Identifier, recovery);
+        pattern(p, recovery);
         if required_types || p.at(TokenKind::Colon) {
             // Parse type
             p.expect(TokenKind::Colon, recovery);

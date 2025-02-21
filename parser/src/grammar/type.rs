@@ -1,5 +1,4 @@
-use kitty_lexer::TokenKind;
-use kitty_syntax::NodeKind;
+use kitty_syntax::{NodeKind, TokenKind};
 
 use crate::{marker::CompletedMarker, parser::Parser, token_set::TokenSet};
 

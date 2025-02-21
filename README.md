@@ -26,6 +26,8 @@
 - Used
   - https://lunacookies.github.io/lang/
   - https://matklad.github.io/2023/05/21/resilient-ll-parsing-tutorial.html
+  - https://thunderseethe.dev/series/making-a-language/
+  - https://astexplorer.net/
 
 ## TODO
 
@@ -64,3 +66,23 @@
   - but they are aliased so you can use as `True` and `False`.
 - Every value has a reference to the code span which created it.
   - This is important for code-as-CAD editors where you can interact with an object in 3d space and it performs a macro on the code.
+
+## Requirements
+
+- Compiler can be used as linter, formatter, language server, etc
+  - Even if some syntax is wrong, the compiler is able to parse the remaining correct syntax and still give useful feedback
+
+## Open questions
+
+- Should I rename the AST to:
+    - "Item X"
+      - And say within a struct, "Struct X"
+    - "Expression X"
+    - "Pattern X"
+    - "Type X"
+    - "Module X"
+- Should I change "Type Path" to be like how Rust does it?
+    - With "Type Path Segment", which has `identifier` and `arguments`
+      - TODO: how do they do the type projection `<T as Trait>::Assoc`?
+        - QSelf... hmm.. this is complicated
+    - This is actually used in "Expr Path"

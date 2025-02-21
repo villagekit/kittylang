@@ -306,13 +306,15 @@ define_compound_token!(UnaryOperator, kinds: [
 ]);
 
 // Patterns.
-define_node!(PatternType);
+define_node!(PatternOr);
+define_node!(PatternWildcard);
 define_node!(PatternLiteral);
 define_node!(PatternTuple);
-define_node!(PatternConstructor);
-define_node!(PatternWildcard);
-define_node!(PatternOr);
-define_compound_node!(Pattern, kinds: [PatternType, PatternLiteral, PatternTuple, PatternConstructor, PatternWildcard, PatternOr]);
+define_node!(PatternType);
+define_compound_node!(Pattern, kinds: [PatternType, PatternLiteral, PatternTuple, PatternWildcard, PatternOr]);
+define_node!(PatternFieldList);
+define_node!(PatternFieldPositional);
+define_node!(PatternFieldLabelled);
 
 // Top-Level Declarations.
 define_node!(TypeDecl);

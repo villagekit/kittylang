@@ -128,6 +128,8 @@ pub enum TokenKind {
     Arrow,
     #[token("=>")]
     FatArrow,
+    #[token("_", priority = 3)]
+    Underscore,
 
     #[token("+")]
     Plus,
@@ -221,6 +223,7 @@ impl fmt::Display for TokenKind {
             Self::Dot => "‘.’",
             Self::Arrow => "‘->’",
             Self::FatArrow => "‘=>’",
+            Self::Underscore => "_",
             Self::Plus => "‘+’",
             Self::Minus => "‘-’",
             Self::Multiply => "‘*’",

@@ -15,7 +15,7 @@ impl Marker {
     pub(super) fn new(pos: usize) -> Self {
         Self {
             pos,
-            bomb: DropBomb::new("markers must be completed"),
+            bomb: DropBomb::new("Marker must be either completed or abandoned"),
         }
     }
 
@@ -26,6 +26,15 @@ impl Marker {
         p.events.push(Some(Event::FinishNode));
 
         CompletedMarker { pos: self.pos }
+    }
+
+    /// Abandons the syntax tree node. All its children
+    /// are attached to its parent instead.
+    pub(crate) fn abandon(mut self, p: &mut Parser<'_>) {
+        self.bomb.defuse();
+        if self.pos == p.events.len() - 1 {
+            assert!(matches!(p.events.pop(), Some(None)));
+        }
     }
 }
 
