@@ -76,7 +76,7 @@ pub(crate) fn pattern_tuple(p: &mut Parser, recovery: TokenSet) -> CompletedMark
 pub(crate) fn pattern_type(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     assert!(p.at(TokenKind::Identifier));
     let m = p.start();
-    p.bump(); // Consume <identifier>
+    type_path(p, recovery);
     if p.at(TokenKind::ParenOpen) {
         pattern_field_list(p, recovery);
     }
