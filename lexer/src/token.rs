@@ -42,8 +42,12 @@ pub enum TokenKind {
     #[regex(r"(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?")]
     Number,
 
-    #[regex(r"[\p{XID_Start}_]\p{XID_Continue}*")]
-    Identifier,
+    #[regex(r"_*[A-Z]+(?:_[A-Z0-9]+)*")]
+    IdentifierConstant,
+    #[regex(r"_*(?:[A-Z][a-z0-9]+)(?:[A-Z]+[a-z0-9]*)*")]
+    IdentifierType,
+    #[regex(r"_*[a-z]+(?:_[a-z0-9]+)*")]
+    IdentifierValue,
 
     #[regex(r"@[a-zA-Z0-9-]+\/[a-zA-Z0-9-]")]
     Package,
@@ -66,7 +70,7 @@ pub enum TokenKind {
 
     #[token("fn")]
     Fn,
-    #[token("Fn")]
+    #[token("Fn", priority = 20)]
     FnUpper,
     #[token("let")]
     Let,
@@ -128,7 +132,7 @@ pub enum TokenKind {
     Arrow,
     #[token("=>")]
     FatArrow,
-    #[token("_", priority = 3)]
+    #[token("_", priority = 20)]
     Underscore,
 
     #[token("+")]
