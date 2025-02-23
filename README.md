@@ -86,3 +86,5 @@
       - TODO: how do they do the type projection `<T as Trait>::Assoc`?
         - QSelf... hmm.. this is complicated
     - This is actually used in "Expr Path"
+- Should values be lowercase and types be uppercase?
+  - Like we encode this in the tokens: value identifier vs type identifier

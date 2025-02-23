@@ -18,16 +18,19 @@ pub(crate) fn pattern(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMar
     Some(m.complete(p, NodeKind::PatternOr))
 }
 
+// TODO pattern_identifier
+// - how to distinguish between pattern type and pattern identifier?
+// - e.g. Thing.Cat vs thing
+
 pub(crate) fn pattern_single(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
     let cm = if p.at(TokenKind::Underscore) {
-        let type_pattern =
-        pattern_wildcard(p)?
-    } else if p.at(TokenKind::Number) {
-        type_function(p, recovery)
-    } else if p.at(TokenKind::Impl) {
-        type_impl_trait(p, recovery)
+        pattern_wildcard(p)
+    } else if p.at_set(PATTERN_LITERAL_FIRST) {
+        pattern_literal(p)
     } else if p.at(TokenKind::ParenOpen) {
         pattern_tuple(p, recovery)
+    } else if p.at(TokenKind::Identifier) {
+        pattern_type(p, recovery)
     } else {
         p.error(recovery);
         return None;
@@ -40,7 +43,8 @@ pub(crate) fn pattern_wildcard(p: &mut Parser) -> CompletedMarker {
     p.mark_kind(NodeKind::PatternWildcard)
 }
 
-const PATTERN_LITERAL_FIRST: [TokenKind; 3] = [TokenKind::Boolean, TokenKind::Number, TokenKind::String];
+const PATTERN_LITERAL_FIRST: [TokenKind; 3] =
+    [TokenKind::Boolean, TokenKind::Number, TokenKind::String];
 
 pub(crate) fn pattern_literal(p: &mut Parser) -> CompletedMarker {
     assert!(p.at_set(PATTERN_LITERAL_FIRST));
@@ -55,11 +59,77 @@ pub(crate) fn pattern_literal(p: &mut Parser) -> CompletedMarker {
     m.complete(p, NodeKind::PatternLiteral)
 }
 
-pub(crate) fn pattern_tuple(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {}
+pub(crate) fn pattern_tuple(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+    assert!(p.at(TokenKind::ParenOpen));
+    let m = p.start();
+    p.bump(); // Consume '('
+    loop {
+        pattern(p, recovery);
+        if !p.bump_if_at(TokenKind::Comma) {
+            break;
+        }
+    }
+    p.expect(TokenKind::ParenClose, recovery);
+    m.complete(p, NodeKind::PatternTuple)
+}
 
-pub(crate) fn pattern_type(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {}
+pub(crate) fn pattern_type(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+    assert!(p.at(TokenKind::Identifier));
+    let m = p.start();
+    p.bump(); // Consume <identifier>
+    if p.at(TokenKind::ParenOpen) {
+        pattern_field_list(p, recovery);
+    }
+    m.complete(p, NodeKind::PatternType)
+}
 
-pub(crate) fn pattern_type_field_list(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {}
-pub(crate) fn pattern_type_field_item(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {}
-pub(crate) fn pattern_type_field_item_positional(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {}
-pub(crate) fn pattern_type_field_item_labelled(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {}
+pub(crate) fn pattern_field_list(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+    assert!(p.at(TokenKind::ParenOpen));
+    let recovery_field_list = recovery.union([TokenKind::Comma, TokenKind::ParenClose]);
+    let m = p.start();
+    p.bump(); // Consume '('.
+    'all: {
+        if p.at(TokenKind::ParenClose) {
+            break 'all; // End all fields
+        }
+        // First process positional fields
+        'positional: loop {
+            if p.at(TokenKind::Identifier) && p.lookahead_at(1, TokenKind::Colon) {
+                break 'positional; // End positional fields
+            }
+
+            pattern_field_positional(p, recovery_field_list);
+
+            if !p.at(TokenKind::Comma) {
+                break 'all; // End all fields
+            }
+            p.bump(); // Consume ','
+        }
+        // Then process labelled fields
+        loop {
+            pattern_field_labelled(p, recovery_field_list);
+
+            if !p.at(TokenKind::Comma) {
+                break 'all;
+            }
+            p.bump(); // Consume ','
+        }
+    }
+    p.expect(TokenKind::ParenClose, recovery);
+    m.complete(p, NodeKind::PatternFieldList)
+}
+
+fn pattern_field_positional(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+    let m = p.start();
+    // expr(p, recovery);
+    m.complete(p, NodeKind::PatternFieldPositional)
+}
+
+fn pattern_field_labelled(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+    assert!(p.at(TokenKind::Identifier));
+    let m = p.start();
+    p.expect(TokenKind::Identifier, recovery);
+    p.expect(TokenKind::Colon, recovery);
+    // expr(p, recovery);
+    m.complete(p, NodeKind::PatternFieldLabelled)
+}
