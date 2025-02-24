@@ -1,16 +1,21 @@
 use kitty_syntax::{NodeKind, TokenKind};
 
 use crate::{
-    grammar::r#type::where_clause, marker::CompletedMarker, parser::Parser, token_set::TokenSet,
+    grammar::identifier::{constant_name, type_name, variable_name},
+    marker::CompletedMarker,
+    parser::Parser,
+    token_set::TokenSet,
 };
 
 use super::{
-    expr::expr,
-    function::function_decl_optional_name_types_body,
-    r#type::{generic_param_list, type_annotation, type_bound_list, type_path},
+    expression::expression,
+    function::function_declaration_optional_name_types_body,
+    r#type::{
+        generic_bound_list, generic_param_list, generic_where_clause, type_annotation, type_path,
+    },
 };
 
-pub(crate) const TOP_ITEM_FIRST: [TokenKind; 7] = [
+pub(crate) const DECLARATION_FIRST: [TokenKind; 7] = [
     TokenKind::Type,
     TokenKind::Const,
     TokenKind::Fn,
@@ -20,21 +25,21 @@ pub(crate) const TOP_ITEM_FIRST: [TokenKind; 7] = [
     TokenKind::Impl,
 ];
 
-pub(crate) fn decl_item(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
+pub(crate) fn declaration(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
     let cm = if p.at(TokenKind::Type) {
-        type_decl(p, recovery)
+        declaration_type(p, recovery)
     } else if p.at(TokenKind::Const) {
-        constant_decl(p, recovery)
+        declaration_constant(p, recovery)
     } else if p.at(TokenKind::Fn) {
-        function_decl(p, recovery)
+        declaration_function(p, recovery)
     } else if p.at(TokenKind::Enum) {
-        enum_decl(p, recovery)
+        declaration_enum(p, recovery)
     } else if p.at(TokenKind::Struct) {
-        struct_decl(p, recovery)
+        declaration_struct(p, recovery)
     } else if p.at(TokenKind::Trait) {
-        trait_decl(p, recovery)
+        declaration_trait(p, recovery)
     } else if p.at(TokenKind::Impl) {
-        impl_trait_decl(p, recovery)
+        declaration_impl_trait(p, recovery)
     } else {
         p.error(recovery);
         return None;
@@ -43,30 +48,26 @@ pub(crate) fn decl_item(p: &mut Parser, recovery: TokenSet) -> Option<CompletedM
 }
 
 /// Type alias declaration
-fn type_decl(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+fn declaration_type(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     assert!(p.at(TokenKind::Type));
     let recovery_type = recovery.union([TokenKind::Equal]);
     let m = p.start();
     p.bump(); // Consume 'type'
-    p.expect(TokenKind::Identifier, recovery_type);
+    type_name(p, recovery);
     if p.at(TokenKind::BracketOpen) {
         generic_param_list(p, recovery_type);
     }
     p.expect(TokenKind::Equal, recovery);
     type_annotation(p, recovery);
-    m.complete(p, NodeKind::TypeDecl)
+    m.complete(p, NodeKind::DeclarationType)
 }
 
 /// Constant declaration
-fn constant_decl(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    constant_decl_optional_type_value(p, recovery, false, true)
+fn declaration_constant(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+    declaration_constant_optional_type_value(p, recovery, false, true)
 }
 
-fn function_decl(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    function_decl_optional_name_types_body(p, recovery, true, true, true)
-}
-
-fn constant_decl_optional_type_value(
+fn declaration_constant_optional_type_value(
     p: &mut Parser,
     recovery: TokenSet,
     has_type: bool,
@@ -75,47 +76,51 @@ fn constant_decl_optional_type_value(
     assert!(p.at(TokenKind::Const));
     let m = p.start();
     p.bump(); // Consume 'const'
-    p.expect(TokenKind::Identifier, recovery);
+    constant_name(p, recovery);
     if has_type || p.at(TokenKind::Colon) {
         p.expect(TokenKind::Colon, recovery);
         type_annotation(p, recovery);
     }
     if has_value || p.at(TokenKind::Equal) {
         p.expect(TokenKind::Equal, recovery);
-        expr(p, recovery);
+        expression(p, recovery);
     }
-    m.complete(p, NodeKind::ConstantDecl)
+    m.complete(p, NodeKind::DeclarationConstant)
 }
 
-fn struct_decl(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+fn declaration_function(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+    function_declaration_optional_name_types_body(p, recovery, true, true, true)
+}
+
+fn declaration_struct(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     assert!(p.at(TokenKind::Struct));
     let recovery_struct = recovery.union(STRUCT_ITEM_FIRST).union([TokenKind::Dedent]);
     let m = p.start();
     p.bump(); // Consume 'struct'
-    p.expect(TokenKind::Identifier, recovery);
+    type_name(p, recovery);
     if p.at(TokenKind::BracketOpen) {
         generic_param_list(p, recovery);
     }
     p.expect(TokenKind::Indent, recovery);
     if p.at(TokenKind::Where) {
-        where_clause(p, recovery);
+        generic_where_clause(p, recovery);
     }
     while p.at_set(STRUCT_ITEM_FIRST) {
         struct_item(p, recovery_struct);
     }
     p.expect(TokenKind::Dedent, recovery);
-    m.complete(p, NodeKind::StructDecl)
+    m.complete(p, NodeKind::DeclarationStruct)
 }
 
 const STRUCT_ITEM_FIRST: [TokenKind; 3] = [TokenKind::Const, TokenKind::Fn, TokenKind::Prop];
 
 fn struct_item(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
     let cm = if p.at(TokenKind::Const) {
-        constant_decl(p, recovery)
+        declaration_constant(p, recovery)
     } else if p.at(TokenKind::Fn) {
-        function_decl(p, recovery)
+        declaration_function(p, recovery)
     } else if p.at(TokenKind::Prop) {
-        prop_decl(p, recovery)
+        declaration_prop(p, recovery)
     } else {
         p.error(recovery);
         return None;
@@ -123,11 +128,11 @@ fn struct_item(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
     Some(cm)
 }
 
-fn prop_decl(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    prop_decl_optional_type_value(p, recovery, true, false)
+fn declaration_prop(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+    declaration_prop_optional_type_value(p, recovery, true, false)
 }
 
-fn prop_decl_optional_type_value(
+fn declaration_prop_optional_type_value(
     p: &mut Parser,
     recovery: TokenSet,
     has_type: bool,
@@ -136,47 +141,47 @@ fn prop_decl_optional_type_value(
     assert!(p.at(TokenKind::Prop));
     let m = p.start();
     p.bump(); // Consume 'prop'
-    p.expect(TokenKind::Identifier, recovery);
+    variable_name(p, recovery);
     if has_type || p.at(TokenKind::Colon) {
         p.expect(TokenKind::Colon, recovery);
         type_annotation(p, recovery);
     }
     if has_value || p.at(TokenKind::Equal) {
         p.expect(TokenKind::Equal, recovery);
-        expr(p, recovery);
+        expression(p, recovery);
     }
-    m.complete(p, NodeKind::PropDecl)
+    m.complete(p, NodeKind::DeclarationProp)
 }
 
-fn enum_decl(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+fn declaration_enum(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     assert!(p.at(TokenKind::Enum));
     let recovery_enum = recovery.union(ENUM_ITEM_FIRST).union([TokenKind::Dedent]);
     let m = p.start();
-    p.bump(); // Consume 'struct'
-    p.expect(TokenKind::Identifier, recovery);
+    p.bump(); // Consume 'enum'
+    type_name(p, recovery);
     if p.at(TokenKind::BracketOpen) {
         generic_param_list(p, recovery);
     }
     p.expect(TokenKind::Indent, recovery);
     if p.at(TokenKind::Where) {
-        where_clause(p, recovery);
+        generic_where_clause(p, recovery);
     }
     while p.at_set(ENUM_ITEM_FIRST) {
         enum_item(p, recovery_enum);
     }
     p.expect(TokenKind::Dedent, recovery);
-    m.complete(p, NodeKind::EnumDecl)
+    m.complete(p, NodeKind::DeclarationEnum)
 }
 
 const ENUM_ITEM_FIRST: [TokenKind; 3] = [TokenKind::Const, TokenKind::Fn, TokenKind::Case];
 
 fn enum_item(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
     let cm = if p.at(TokenKind::Const) {
-        constant_decl(p, recovery)
+        declaration_constant(p, recovery)
     } else if p.at(TokenKind::Fn) {
-        function_decl(p, recovery)
+        declaration_function(p, recovery)
     } else if p.at(TokenKind::Case) {
-        enum_case_decl(p, recovery)
+        enum_case(p, recovery)
     } else {
         p.error(recovery);
         return None;
@@ -184,11 +189,11 @@ fn enum_item(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
     Some(cm)
 }
 
-fn enum_case_decl(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+fn enum_case(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     assert!(p.at(TokenKind::Case));
     let m = p.start();
     p.bump(); // Consume 'case'
-    p.expect(TokenKind::Identifier, recovery);
+    type_name(p, recovery);
     if p.at(TokenKind::Colon) {
         p.bump(); // Consume ':'
         type_annotation(p, recovery);
@@ -196,24 +201,24 @@ fn enum_case_decl(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     m.complete(p, NodeKind::EnumCase)
 }
 
-fn trait_decl(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+fn declaration_trait(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     assert!(p.at(TokenKind::Trait));
     let recovery_trait = recovery.union(TRAIT_ITEM_FIRST).union([TokenKind::Dedent]);
     let m = p.start();
-    p.bump(); // Consume 'struct'
-    p.expect(TokenKind::Identifier, recovery);
+    p.bump(); // Consume 'trait'
+    type_name(p, recovery);
     if p.at(TokenKind::BracketOpen) {
         generic_param_list(p, recovery);
     }
     p.expect(TokenKind::Indent, recovery);
     if p.at(TokenKind::Where) {
-        where_clause(p, recovery);
+        generic_where_clause(p, recovery);
     }
     while p.at_set(TRAIT_ITEM_FIRST) {
         trait_item(p, recovery_trait);
     }
     p.expect(TokenKind::Dedent, recovery);
-    m.complete(p, NodeKind::TraitDecl)
+    m.complete(p, NodeKind::DeclarationTrait)
 }
 
 const TRAIT_ITEM_FIRST: [TokenKind; 4] = [
@@ -231,7 +236,7 @@ fn trait_item(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
     } else if p.at(TokenKind::Fn) {
         trait_function(p, recovery)
     } else if p.at(TokenKind::Prop) {
-        prop_decl(p, recovery)
+        declaration_prop(p, recovery)
     } else {
         p.error(recovery);
         return None;
@@ -243,30 +248,30 @@ fn trait_type(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     assert!(p.at(TokenKind::Type));
     let m = p.start();
     p.bump(); // Consume 'type'
-    p.expect(TokenKind::Identifier, recovery);
+    type_name(p, recovery);
     if p.at(TokenKind::BracketOpen) {
         generic_param_list(p, recovery);
     }
     if p.at(TokenKind::Colon) {
         p.bump(); // Consume ':'
-        type_bound_list(p, recovery);
+        generic_bound_list(p, recovery);
     }
     if p.at(TokenKind::Equal) {
         p.bump(); // Consume '='
         type_annotation(p, recovery);
     }
-    m.complete(p, NodeKind::TypeDecl)
+    m.complete(p, NodeKind::DeclarationType)
 }
 
 fn trait_constant(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    constant_decl_optional_type_value(p, recovery, false, false)
+    declaration_constant_optional_type_value(p, recovery, false, false)
 }
 
 fn trait_function(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    function_decl_optional_name_types_body(p, recovery, true, true, false)
+    function_declaration_optional_name_types_body(p, recovery, true, true, false)
 }
 
-fn impl_trait_decl(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+fn declaration_impl_trait(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     assert!(p.at(TokenKind::Impl));
     let recovery_trait = recovery
         .union(IMPL_TRAIT_ITEM_FIRST)
@@ -281,13 +286,13 @@ fn impl_trait_decl(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     type_annotation(p, recovery);
     p.expect(TokenKind::Indent, recovery);
     if p.at(TokenKind::Where) {
-        where_clause(p, recovery);
+        generic_where_clause(p, recovery);
     }
     while p.at_set(IMPL_TRAIT_ITEM_FIRST) {
         impl_trait_item(p, recovery_trait);
     }
     p.expect(TokenKind::Dedent, recovery);
-    m.complete(p, NodeKind::ImplTraitDecl)
+    m.complete(p, NodeKind::DeclarationImplTrait)
 }
 
 const IMPL_TRAIT_ITEM_FIRST: [TokenKind; 4] = [
@@ -299,7 +304,7 @@ const IMPL_TRAIT_ITEM_FIRST: [TokenKind; 4] = [
 
 fn impl_trait_item(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
     let cm = if p.at(TokenKind::Type) {
-        type_decl(p, recovery)
+        declaration_type(p, recovery)
     } else if p.at(TokenKind::Const) {
         trait_impl_constant(p, recovery)
     } else if p.at(TokenKind::Fn) {
@@ -314,30 +319,30 @@ fn impl_trait_item(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker
 }
 
 fn trait_impl_constant(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    constant_decl_optional_type_value(p, recovery, false, true)
+    declaration_constant_optional_type_value(p, recovery, false, true)
 }
 
 fn trait_impl_function(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    function_decl_optional_name_types_body(p, recovery, true, false, true)
+    function_declaration_optional_name_types_body(p, recovery, true, false, true)
 }
 
 fn trait_impl_prop(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    prop_decl_optional_type_value(p, recovery, false, true)
+    declaration_prop_optional_type_value(p, recovery, false, true)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{decl_item, Parser, TokenSet};
+    use super::{declaration, Parser, TokenSet};
     use crate::check_grammar;
     use expect_test::expect;
     use indoc::indoc;
-    use kitty_cst::DeclItem;
+    use kitty_cst::Declaration;
 
     fn check(input: &str, expected: expect_test::Expect) {
         let grammar = |p: &mut Parser| {
-            decl_item(p, TokenSet::NONE);
+            declaration(p, TokenSet::NONE);
         };
-        check_grammar::<DeclItem>(grammar, input, expected);
+        check_grammar::<Declaration>(grammar, input, expected);
     }
 
     #[test]

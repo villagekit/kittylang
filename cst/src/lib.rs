@@ -129,7 +129,10 @@ define_node!(TraitReference);
 // Module
 define_node!(Module);
 define_node!(ModuleImport);
-define_node!(ImportAlias);
+define_node!(ImportAliasConstant);
+define_node!(ImportAliasType);
+define_node!(ImportAliasVariable);
+define_compound_node!(ImportAlias, kinds: [ImportAliasConstant, ImportAliasVariable, ImportAliasType]);
 define_node!(ModuleExport);
 define_node!(ModuleLocal);
 define_compound_node!(ModuleItem, kinds: [ModuleImport, ModuleExport, ModuleLocal]);

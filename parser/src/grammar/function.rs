@@ -3,11 +3,15 @@ use kitty_syntax::{NodeKind, TokenKind};
 use super::{
     expression::expression,
     identifier::variable_name,
+    pattern::pattern,
     r#type::{generic_param_list, generic_where_clause, type_annotation},
 };
-use crate::{marker::CompletedMarker, parser::Parser, token_set::TokenSet};
+use crate::{
+    grammar::identifier::VARIABLE_NAME_FIRST, marker::CompletedMarker, parser::Parser,
+    token_set::TokenSet,
+};
 
-pub(crate) fn function_decl_optional_name_types_body(
+pub(crate) fn function_declaration_optional_name_types_body(
     p: &mut Parser,
     recovery: TokenSet,
     required_name: bool,
@@ -44,41 +48,30 @@ fn function_param_list_optional_types(
     let m = p.start();
     p.bump(); // Consume '('
     if !p.at(TokenKind::ParenClose) {
-        let mut can_be_self = true;
         loop {
-            function_param(p, recovery_param_list, can_be_self, required_types);
+            function_param(p, recovery_param_list, required_types);
             if !p.bump_if_at(TokenKind::Comma) {
                 break;
             }
-            can_be_self = false;
         }
     }
     p.expect(TokenKind::ParenClose, recovery);
     m.complete(p, NodeKind::FunctionParamList)
 }
 
-fn function_param(
-    p: &mut Parser,
-    recovery: TokenSet,
-    can_be_self: bool,
-    required_types: bool,
-) -> CompletedMarker {
+fn function_param(p: &mut Parser, recovery: TokenSet, required_types: bool) -> CompletedMarker {
     let m = p.start();
-    if can_be_self && p.at(TokenKind::SelfLower) {
-        p.bump(); // Consume 'self'
-    } else {
-        // Parse name
-        pattern(p, recovery);
-        if required_types || p.at(TokenKind::Colon) {
-            // Parse type
-            p.expect(TokenKind::Colon, recovery);
-            type_annotation(p, recovery);
-        }
-        // Parse default value
-        if p.at(TokenKind::Equal) {
-            p.bump(); // Consume '='
-            expr(p, recovery);
-        }
+    // Parse name
+    pattern(p, recovery);
+    if required_types || p.at(TokenKind::Colon) {
+        // Parse type
+        p.expect(TokenKind::Colon, recovery);
+        type_annotation(p, recovery);
+    }
+    // Parse default value
+    if p.at(TokenKind::Equal) {
+        p.bump(); // Consume '='
+        expression(p, recovery);
     }
     m.complete(p, NodeKind::FunctionParam)
 }
@@ -94,7 +87,7 @@ pub(crate) fn function_arg_list(p: &mut Parser, recovery: TokenSet) -> Completed
         }
         // First process positional args
         'positional: loop {
-            if p.at(TokenKind::Identifier) && p.lookahead_at(1, TokenKind::Colon) {
+            if p.at_set(VARIABLE_NAME_FIRST) && p.lookahead_at(1, TokenKind::Colon) {
                 break 'positional; // End positional args
             }
 
@@ -121,21 +114,21 @@ pub(crate) fn function_arg_list(p: &mut Parser, recovery: TokenSet) -> Completed
 
 fn function_positional_arg(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
-    expr(p, recovery);
+    expression(p, recovery);
     m.complete(p, NodeKind::FunctionArgPositional)
 }
 
 fn function_labelled_arg(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at(TokenKind::Identifier));
+    assert!(p.at_set(VARIABLE_NAME_FIRST));
     let m = p.start();
-    p.expect(TokenKind::Identifier, recovery);
+    variable_name(p, recovery);
     p.expect(TokenKind::Colon, recovery);
-    expr(p, recovery);
+    expression(p, recovery);
     m.complete(p, NodeKind::FunctionArgLabelled)
 }
 
 fn function_body(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
-    expr(p, recovery);
+    expression(p, recovery);
     m.complete(p, NodeKind::FunctionBody)
 }

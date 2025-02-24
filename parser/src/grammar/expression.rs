@@ -1,12 +1,12 @@
 use kitty_syntax::{NodeKind, TokenKind};
 
 use super::{
-    identifier::{constant_reference, variable_reference},
+    identifier::{constant_name, variable_name, CONSTANT_NAME_FIRST, VARIABLE_NAME_FIRST},
     pattern::pattern,
     r#type::type_annotation,
 };
 use crate::{
-    grammar::function::{function_arg_list, function_decl_optional_name_types_body},
+    grammar::function::{function_arg_list, function_declaration_optional_name_types_body},
     marker::CompletedMarker,
     token_set::TokenSet,
     Parser,
@@ -60,10 +60,6 @@ fn expression_pratt(p: &mut Parser, recovery: TokenSet, min_bp: u8) -> Option<Co
     Some(lhs)
 }
 
-pub(crate) fn expression(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
-    expression_pratt(p, recovery, 0)
-}
-
 /// Parse a left-hand side expression, which may be a unary operator or a primary.
 fn expression_lhs(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
     if let Some(bp) = unary_binding_power(p) {
@@ -78,10 +74,10 @@ fn expression_lhs(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker>
 
 /// Parse a primary expression.
 fn expression_primary(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
-    let cm = if p.at(TokenKind::IdentifierVariable) {
-        variable_reference(p, recovery);
-    } else if p.at(TokenKind::IdentifierConstant) {
-        constant_reference(p, recovery);
+    let cm = if p.at_set(VARIABLE_NAME_FIRST) {
+        variable_name(p, recovery)?
+    } else if p.at_set(CONSTANT_NAME_FIRST) {
+        constant_name(p, recovery)?
     } else if p.at_set(LITERAL_FIRST) {
         expression_literal(p, recovery)?
     } else if p.at(TokenKind::ParenOpen) {
@@ -125,7 +121,7 @@ fn expression_get(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> C
     assert!(p.at(TokenKind::Dot));
     let m = lhs.precede(p);
     p.bump(); // Consume '.'.
-    variable_reference(p, recovery);
+    variable_name(p, recovery);
     m.complete(p, NodeKind::ExpressionGet)
 }
 
@@ -157,7 +153,7 @@ fn expression_block(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 /// Parse a function expression: `fn <identifier>(<identifier>: <type annotation>) => <expr>`
 fn expression_function(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     assert!(p.at(TokenKind::Fn));
-    function_decl_optional_name_types_body(p, recovery, false, true, true)
+    function_declaration_optional_name_types_body(p, recovery, false, true, true)
 }
 
 /// Parse a let expression: `let <identifier> = <expr> in <expr>`
@@ -179,7 +175,7 @@ fn expression_let(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 }
 
 /// Parse an if–expression: `if <cond> { ... } [else { ... }]`
-fn if_expr(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+fn expression_if(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
     p.expect(TokenKind::If, recovery);
     expression(p, recovery.union([TokenKind::Then])); // condition
@@ -256,7 +252,7 @@ mod tests {
 
     fn check(input: &str, expected: expect_test::Expect) {
         let grammar = |p: &mut Parser| {
-            expr(p, TokenSet::NONE);
+            expression(p, TokenSet::NONE);
         };
         check_grammar::<Expression>(grammar, input, expected);
     }

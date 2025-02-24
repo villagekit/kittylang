@@ -62,5 +62,5 @@ fn it_works() {
     assert!(set.contains(TokenKind::Let));
     assert!(set.contains(TokenKind::Number));
     assert!(set.contains(TokenKind::String));
-    assert!(!set.contains(TokenKind::Identifier));
+    assert!(!set.contains(TokenKind::IdentifierVariable));
 }

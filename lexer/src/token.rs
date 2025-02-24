@@ -305,7 +305,7 @@ mod tests {
 
     #[test]
     fn lex_identifier() {
-        check_token("abcd", TokenKind::IdentifierValue);
+        check_token("abcd", TokenKind::IdentifierVariable);
     }
 
     #[test]

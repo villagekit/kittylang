@@ -55,7 +55,9 @@ pub enum NodeKind {
     // Module
     Module,
     ModuleImport,
-    ImportAlias,
+    ImportAliasConstant,
+    ImportAliasVariable,
+    ImportAliasType,
     ModuleExport,
     ModuleLocal,
 

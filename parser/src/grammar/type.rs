@@ -2,13 +2,13 @@ use kitty_syntax::{NodeKind, TokenKind};
 
 use crate::{marker::CompletedMarker, parser::Parser, token_set::TokenSet};
 
-use super::identifier::{trait_reference, type_name, type_reference};
+use super::identifier::{trait_name, type_name};
 
 const TYPE_PATH_FIRST: [TokenKind; 2] = [TokenKind::IdentifierType, TokenKind::SelfUpper];
 
 /// A qualified type
 pub(crate) fn type_path(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
-    let mut lhs = type_reference(p, recovery)?;
+    let mut lhs = type_name(p, recovery)?;
 
     loop {
         if p.at(TokenKind::BracketOpen) {
@@ -133,7 +133,7 @@ fn type_impl_trait(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let recovery_trait = recovery.union(TYPE_PATH_FIRST);
     let m = p.start();
     p.bump(); // Consume 'impl'
-    trait_reference(p, recovery_trait);
+    trait_name(p, recovery_trait);
     m.complete(p, NodeKind::TypeTrait)
 }
 
@@ -239,7 +239,7 @@ pub(crate) fn generic_bound_list(p: &mut Parser, recovery: TokenSet) -> Complete
 
 fn generic_bound(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
-    trait_reference(p, recovery);
+    trait_name(p, recovery);
     m.complete(p, NodeKind::GenericBound)
 }
 

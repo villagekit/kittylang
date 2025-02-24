@@ -94,7 +94,7 @@ mod tests {
     fn one_expected_did_find() {
         check(
             vec![TokenKind::Equal],
-            Some(TokenKind::Identifier),
+            Some(TokenKind::IdentifierVariable),
             10..20,
             "error at 10..20: expected ‘=’, but found identifier",
         );
@@ -125,7 +125,7 @@ mod tests {
         check(
             vec![
                 TokenKind::Number,
-                TokenKind::Identifier,
+                TokenKind::IdentifierVariable,
                 TokenKind::Minus,
                 TokenKind::ParenOpen,
             ],
