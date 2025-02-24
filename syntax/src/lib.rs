@@ -44,13 +44,9 @@ pub enum NodeKind {
 
     // Identifier
     ConstantName,
-    ConstantReference,
     VariableName,
-    VariableReference,
     TypeName,
-    TypeReference,
     TraitName,
-    TraitReference,
 
     // Module
     Module,

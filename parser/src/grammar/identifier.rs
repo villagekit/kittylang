@@ -2,11 +2,11 @@ use kitty_syntax::{NodeKind, TokenKind};
 
 use crate::{marker::CompletedMarker, parser::Parser, token_set::TokenSet};
 
-pub(crate) const CONSTANT_NAME_FIRST: [TokenKind; 1] = [TokenKind::IdentifierType];
+pub(crate) const CONSTANT_NAME_FIRST: [TokenKind; 1] = [TokenKind::IdentifierConstant];
 
 /// Constant name
 pub(crate) fn constant_name(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
-    if p.at(TokenKind::IdentifierConstant) {
+    if p.at_set(CONSTANT_NAME_FIRST) {
         Some(p.mark_kind(NodeKind::ConstantName))
     } else {
         p.error(recovery);
@@ -15,7 +15,7 @@ pub(crate) fn constant_name(p: &mut Parser, recovery: TokenSet) -> Option<Comple
 }
 
 pub(crate) const VARIABLE_NAME_FIRST: [TokenKind; 2] =
-    [TokenKind::IdentifierType, TokenKind::SelfLower];
+    [TokenKind::IdentifierVariable, TokenKind::SelfLower];
 
 /// Variable name
 pub(crate) fn variable_name(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
@@ -44,7 +44,7 @@ pub(crate) const TRAIT_NAME_FIRST: [TokenKind; 1] = [TokenKind::IdentifierType];
 
 /// Trait name
 pub(crate) fn trait_name(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
-    if p.at(TokenKind::IdentifierType) {
+    if p.at_set(TRAIT_NAME_FIRST) {
         Some(p.mark_kind(NodeKind::TraitName))
     } else {
         p.error(recovery);

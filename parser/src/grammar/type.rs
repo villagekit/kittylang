@@ -4,7 +4,8 @@ use crate::{marker::CompletedMarker, parser::Parser, token_set::TokenSet};
 
 use super::identifier::{trait_name, type_name};
 
-const TYPE_PATH_FIRST: [TokenKind; 2] = [TokenKind::IdentifierType, TokenKind::SelfUpper];
+pub(crate) const TYPE_PATH_FIRST: [TokenKind; 2] =
+    [TokenKind::IdentifierType, TokenKind::SelfUpper];
 
 /// A qualified type
 pub(crate) fn type_path(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {

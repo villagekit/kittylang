@@ -1,9 +1,11 @@
 use kitty_syntax::{NodeKind, TokenKind};
 
 use super::{
-    identifier::{constant_name, variable_name, CONSTANT_NAME_FIRST, VARIABLE_NAME_FIRST},
+    identifier::{
+        constant_name, variable_name, CONSTANT_NAME_FIRST, TYPE_NAME_FIRST, VARIABLE_NAME_FIRST,
+    },
     pattern::pattern,
-    r#type::type_annotation,
+    r#type::{type_annotation, type_path, TYPE_PATH_FIRST},
 };
 use crate::{
     grammar::function::{function_arg_list, function_declaration_optional_name_types_body},
@@ -78,6 +80,8 @@ fn expression_primary(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMar
         variable_name(p, recovery)?
     } else if p.at_set(CONSTANT_NAME_FIRST) {
         constant_name(p, recovery)?
+    } else if p.at_set(TYPE_PATH_FIRST) {
+        type_path(p, recovery)?
     } else if p.at_set(LITERAL_FIRST) {
         expression_literal(p, recovery)?
     } else if p.at(TokenKind::ParenOpen) {
@@ -160,7 +164,11 @@ fn expression_function(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 fn expression_let(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
     p.expect(TokenKind::Let, recovery);
-    pattern(p, recovery.union([TokenKind::Equal, TokenKind::In]));
+    p.expect(
+        TokenKind::IdentifierVariable,
+        recovery.union([TokenKind::Equal, TokenKind::In]),
+    );
+    // pattern(p, recovery.union([TokenKind::Equal, TokenKind::In]));
     if p.at(TokenKind::Colon) {
         p.bump(); // Consume ':'.
         type_annotation(p, recovery);

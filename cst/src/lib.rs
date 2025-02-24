@@ -118,13 +118,9 @@ define_node!(Missing);
 
 // Identifier
 define_node!(ConstantName);
-define_node!(ConstantReference);
 define_node!(VariableName);
-define_node!(VariableReference);
 define_node!(TypeName);
-define_node!(TypeReference);
 define_node!(TraitName);
-define_node!(TraitReference);
 
 // Module
 define_node!(Module);
@@ -192,8 +188,8 @@ define_node!(ExpressionGet);
 define_compound_node!(
     Expression,
     kinds: [
-        ConstantReference,
-        VariableReference,
+        ConstantName,
+        VariableName,
         ExpressionLiteral,
         ExpressionBlock,
         ExpressionLet,

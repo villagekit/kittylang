@@ -46,7 +46,7 @@ pub enum TokenKind {
     IdentifierConstant,
     #[regex(r"_*[a-z]+(?:_[a-z0-9]+)*")]
     IdentifierVariable,
-    #[regex(r"_*(?:[A-Z][a-z0-9]+)(?:[A-Z]+[a-z0-9]*)*")]
+    #[regex(r"_*([A-Z]|(?:[A-Z][a-z0-9]+)(?:[A-Z]+[a-z0-9]*)*)", priority = 3)]
     IdentifierType,
 
     #[regex(r"@[a-zA-Z0-9-]+\/[a-zA-Z0-9-]")]
@@ -188,9 +188,9 @@ impl fmt::Display for TokenKind {
             Self::Boolean => "boolean",
             Self::String => "string",
             Self::Number => "number",
-            Self::IdentifierConstant => "constant-identifier",
-            Self::IdentifierVariable => "variable-identifier",
-            Self::IdentifierType => "type-identifier",
+            Self::IdentifierConstant => "constant-id",
+            Self::IdentifierVariable => "variable-id",
+            Self::IdentifierType => "type-id",
             Self::Package => "package",
             Self::ParenOpen => "‘(’",
             Self::ParenClose => "‘)’",
@@ -304,8 +304,18 @@ mod tests {
     }
 
     #[test]
-    fn lex_identifier() {
-        check_token("abcd", TokenKind::IdentifierVariable);
+    fn lex_identifier_constant() {
+        check_token("THING", TokenKind::IdentifierConstant);
+    }
+
+    #[test]
+    fn lex_identifier_variable() {
+        check_token("thing", TokenKind::IdentifierVariable);
+    }
+
+    #[test]
+    fn lex_identifier_type() {
+        check_token("Thing", TokenKind::IdentifierType);
     }
 
     #[test]
