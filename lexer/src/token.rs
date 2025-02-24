@@ -44,10 +44,10 @@ pub enum TokenKind {
 
     #[regex(r"_*[A-Z]+(?:_[A-Z0-9]+)*")]
     IdentifierConstant,
+    #[regex(r"_*[a-z]+(?:_[a-z0-9]+)*")]
+    IdentifierVariable,
     #[regex(r"_*(?:[A-Z][a-z0-9]+)(?:[A-Z]+[a-z0-9]*)*")]
     IdentifierType,
-    #[regex(r"_*[a-z]+(?:_[a-z0-9]+)*")]
-    IdentifierValue,
 
     #[regex(r"@[a-zA-Z0-9-]+\/[a-zA-Z0-9-]")]
     Package,
@@ -188,7 +188,9 @@ impl fmt::Display for TokenKind {
             Self::Boolean => "boolean",
             Self::String => "string",
             Self::Number => "number",
-            Self::Identifier => "identifier",
+            Self::IdentifierConstant => "constant-identifier",
+            Self::IdentifierVariable => "variable-identifier",
+            Self::IdentifierType => "type-identifier",
             Self::Package => "package",
             Self::ParenOpen => "‘(’",
             Self::ParenClose => "‘)’",
@@ -303,7 +305,7 @@ mod tests {
 
     #[test]
     fn lex_identifier() {
-        check_token("abcd", TokenKind::Identifier);
+        check_token("abcd", TokenKind::IdentifierValue);
     }
 
     #[test]

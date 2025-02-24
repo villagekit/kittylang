@@ -2,11 +2,13 @@ use kitty_syntax::{NodeKind, TokenKind};
 
 use crate::{marker::CompletedMarker, parser::Parser, token_set::TokenSet};
 
-const TYPE_PATH_FIRST: [TokenKind; 2] = [TokenKind::Identifier, TokenKind::SelfUpper];
+use super::identifier::{trait_reference, type_name, type_reference};
+
+const TYPE_PATH_FIRST: [TokenKind; 2] = [TokenKind::IdentifierType, TokenKind::SelfUpper];
 
 /// A qualified type
 pub(crate) fn type_path(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
-    let mut lhs = type_name(p, recovery)?;
+    let mut lhs = type_reference(p, recovery)?;
 
     loop {
         if p.at(TokenKind::BracketOpen) {
@@ -23,16 +25,6 @@ pub(crate) fn type_path(p: &mut Parser, recovery: TokenSet) -> Option<CompletedM
     Some(lhs)
 }
 
-/// Named type
-fn type_name(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
-    if p.at_set([TokenKind::Identifier, TokenKind::SelfUpper]) {
-        Some(p.mark_kind(NodeKind::TypeName))
-    } else {
-        p.error(recovery);
-        None
-    }
-}
-
 /// Parametrized type with type arguments (e.g. `List[Number]`, same as `Vec<f64>` in Rust)
 fn type_generic(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> CompletedMarker {
     assert!(p.at(TokenKind::BracketOpen));
@@ -47,7 +39,7 @@ fn type_projection(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> 
     let recovery_projection = recovery.union([TokenKind::BracketClose]);
     let m = lhs.precede(p);
     p.bump(); // Consume '.['.
-    p.expect(TokenKind::Identifier, recovery_projection);
+    type_name(p, recovery_projection);
     p.expect(TokenKind::BracketClose, recovery);
     m.complete(p, NodeKind::TypeProjection)
 }
@@ -57,12 +49,12 @@ fn type_association(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) ->
     assert!(p.at(TokenKind::Dot));
     let m = lhs.precede(p);
     p.bump(); // Consume '.'.
-    p.expect(TokenKind::Identifier, recovery);
+    type_name(p, recovery);
     m.complete(p, NodeKind::TypeAssociation)
 }
 
 const TYPE_ANNOTATION_FIRST: [TokenKind; 5] = [
-    TokenKind::Identifier,
+    TokenKind::IdentifierType,
     TokenKind::SelfUpper,
     TokenKind::ParenOpen,
     TokenKind::FnUpper,
@@ -141,7 +133,7 @@ fn type_impl_trait(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let recovery_trait = recovery.union(TYPE_PATH_FIRST);
     let m = p.start();
     p.bump(); // Consume 'impl'
-    type_path(p, recovery_trait);
+    trait_reference(p, recovery_trait);
     m.complete(p, NodeKind::TypeTrait)
 }
 
@@ -167,16 +159,16 @@ pub(crate) fn generic_param_list(p: &mut Parser, recovery: TokenSet) -> Complete
 fn generic_param(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
     // Parse generic type name
-    p.expect(TokenKind::Identifier, recovery);
+    type_name(p, recovery);
     // Parse generic type bounds
     if p.at(TokenKind::Colon) {
         p.bump(); // Consume ':'
-        type_bound_list(p, recovery);
+        generic_bound_list(p, recovery);
     }
     // Parse default concrete type
     if p.at(TokenKind::Equal) {
         p.bump(); // Consume '='
-        type_path(p, recovery);
+        type_annotation(p, recovery);
     }
     m.complete(p, NodeKind::GenericParam)
 }
@@ -194,7 +186,7 @@ pub(crate) fn generic_arg_list(p: &mut Parser, recovery: TokenSet) -> CompletedM
         }
         // First process positional args
         'positional: loop {
-            if p.at(TokenKind::Identifier) && p.lookahead_at(1, TokenKind::Colon) {
+            if p.at(TokenKind::IdentifierType) && p.lookahead_at(1, TokenKind::Colon) {
                 break 'positional; // End positional args
             }
 
@@ -226,50 +218,50 @@ fn generic_positional_arg(p: &mut Parser, recovery: TokenSet) -> CompletedMarker
 }
 
 fn generic_labelled_arg(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at(TokenKind::Identifier));
+    assert!(p.at(TokenKind::IdentifierType));
     let m = p.start();
-    p.expect(TokenKind::Identifier, recovery);
+    type_name(p, recovery);
     p.expect(TokenKind::Colon, recovery);
     type_annotation(p, recovery);
     m.complete(p, NodeKind::GenericArgLabelled)
 }
 
-pub(crate) fn type_bound_list(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+pub(crate) fn generic_bound_list(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
     loop {
-        type_bound(p, recovery);
+        generic_bound(p, recovery);
         if !p.bump_if_at(TokenKind::Plus) {
             break;
         }
     }
-    m.complete(p, NodeKind::TypeBoundList)
+    m.complete(p, NodeKind::GenericBoundList)
 }
 
-fn type_bound(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+fn generic_bound(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
-    p.expect(TokenKind::Identifier, recovery);
-    m.complete(p, NodeKind::TypeBound)
+    trait_reference(p, recovery);
+    m.complete(p, NodeKind::GenericBound)
 }
 
-pub(crate) fn where_clause(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+pub(crate) fn generic_where_clause(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     assert!(p.at(TokenKind::Where));
     let recovery_where = recovery.union([TokenKind::Dedent]);
     let m = p.start();
     p.bump(); // Consume 'where'
     p.expect(TokenKind::Indent, recovery);
     while !p.at(TokenKind::Dedent) {
-        where_bound(p, recovery_where);
+        generic_bound(p, recovery_where);
     }
     p.bump(); // Consume <dedent>
-    m.complete(p, NodeKind::WhereClause)
+    m.complete(p, NodeKind::GenericWhereClause)
 }
 
-pub(crate) fn where_bound(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+pub(crate) fn generic_where_bound(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
-    p.expect(TokenKind::Identifier, recovery);
+    type_name(p, recovery);
     p.expect(TokenKind::Colon, recovery);
-    type_bound_list(p, recovery);
-    m.complete(p, NodeKind::WhereBound)
+    generic_bound_list(p, recovery);
+    m.complete(p, NodeKind::GenericWhereBound)
 }
 
 #[cfg(test)]

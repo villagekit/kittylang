@@ -22,6 +22,7 @@
   - https://github.com/gingerbread-lang/gingerbread
   - https://github.com/capy-language/capy
 - https://github.com/naalit/pika/
+- https://steveklabnik.com/writing/the-language-strangeness-budget
 
 - Used
   - https://lunacookies.github.io/lang/
@@ -88,3 +89,8 @@
     - This is actually used in "Expr Path"
 - Should values be lowercase and types be uppercase?
   - Like we encode this in the tokens: value identifier vs type identifier
+- Use `choice` instead of `enum`?
+- Use `{}` instead of `[]` for type arguments?
+    - This is what Julia does.
+    - Because we don't need `{}` for blocks or objects.
+    - But we could use `[]` for field get.

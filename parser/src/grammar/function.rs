@@ -1,13 +1,11 @@
 use kitty_syntax::{NodeKind, TokenKind};
 
-use crate::{
-    grammar::r#type::{generic_param_list, where_clause},
-    marker::CompletedMarker,
-    parser::Parser,
-    token_set::TokenSet,
+use super::{
+    expression::expression,
+    identifier::variable_name,
+    r#type::{generic_param_list, generic_where_clause, type_annotation},
 };
-
-use super::{expr::expr, pattern, r#type::type_annotation};
+use crate::{marker::CompletedMarker, parser::Parser, token_set::TokenSet};
 
 pub(crate) fn function_decl_optional_name_types_body(
     p: &mut Parser,
@@ -19,21 +17,21 @@ pub(crate) fn function_decl_optional_name_types_body(
     assert!(p.at(TokenKind::Fn));
     let m = p.start();
     p.bump(); // Consume 'fn'
-    if required_name || p.at(TokenKind::Identifier) {
-        p.expect(TokenKind::Identifier, recovery);
+    if required_name || p.at(TokenKind::IdentifierVariable) {
+        variable_name(p, recovery);
     }
     if p.at(TokenKind::BracketOpen) {
         generic_param_list(p, recovery);
     }
     function_param_list_optional_types(p, recovery, required_types);
     if p.at(TokenKind::Where) {
-        where_clause(p, recovery);
+        generic_where_clause(p, recovery);
     }
     if required_body || p.at(TokenKind::FatArrow) {
         p.expect(TokenKind::FatArrow, recovery);
         function_body(p, recovery);
     }
-    m.complete(p, NodeKind::FunctionDecl)
+    m.complete(p, NodeKind::DeclarationFunction)
 }
 
 fn function_param_list_optional_types(

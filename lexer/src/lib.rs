@@ -88,20 +88,20 @@ fn foo()
             (Newline, 0..1),
             (Fn, 1..3),
             (Whitespace, 3..4),
-            (Identifier, 4..7),
+            (IdentifierValue, 4..7),
             (ParenOpen, 7..8),
             (ParenClose, 8..9),
             (Newline, 9..10),
             (Indent, 10..12),
             (Fn, 12..14),
             (Whitespace, 14..15),
-            (Identifier, 15..18),
+            (IdentifierValue, 15..18),
             (ParenOpen, 18..19),
             (ParenClose, 19..20),
             (Newline, 20..21),
             (Whitespace, 21..23),
             (Indent, 23..25),
-            (Identifier, 25..28),
+            (IdentifierValue, 25..28),
             (Newline, 28..29),
             (Dedent, 29..29),
             (Dedent, 29..29),
@@ -122,13 +122,13 @@ fn foo()
             (Newline, 0..1),
             (Fn, 1..3),
             (Whitespace, 3..4),
-            (Identifier, 4..7),
+            (IdentifierValue, 4..7),
             (ParenOpen, 7..8),
             (ParenClose, 8..9),
             (Newline, 9..10),
             (Newline, 10..11),
             (Indent, 11..13),
-            (Identifier, 13..16),
+            (IdentifierValue, 13..16),
             (Newline, 16..17),
             (Newline, 17..18),
             (Dedent, 18..18),
@@ -148,15 +148,15 @@ foo()
             (Newline, 0..1),
             (Fn, 1..3),
             (Whitespace, 3..4),
-            (Identifier, 4..7),
+            (IdentifierValue, 4..7),
             (ParenOpen, 7..8),
             (ParenClose, 8..9),
             (Newline, 9..10),
             (Indent, 10..12),
-            (Identifier, 12..15),
+            (IdentifierValue, 12..15),
             (Newline, 15..16),
             (Dedent, 16..16),
-            (Identifier, 16..19),
+            (IdentifierValue, 16..19),
             (ParenOpen, 19..20),
             (ParenClose, 20..21),
             (Newline, 21..22),
@@ -179,7 +179,7 @@ foo()
                 Whitespace@6..7
                 Fn@7..9
                 Whitespace@9..10
-                Identifier@10..14
+                IdentifierValue@10..14
                 ParenOpen@14..15
                 ParenClose@15..16
                 Whitespace@16..17
@@ -188,61 +188,61 @@ foo()
                 Indent@20..22
                 Let@22..25
                 Whitespace@25..26
-                Identifier@26..29
+                IdentifierValue@26..29
                 Whitespace@29..30
                 Equal@30..31
                 Whitespace@31..32
                 Fn@32..34
                 Whitespace@34..35
                 ParenOpen@35..36
-                Identifier@36..37
+                IdentifierValue@36..37
                 Comma@37..38
                 Whitespace@38..39
-                Identifier@39..40
+                IdentifierValue@39..40
                 ParenClose@40..41
                 Whitespace@41..42
                 FatArrow@42..44
                 Whitespace@44..45
-                Identifier@45..46
+                IdentifierValue@45..46
                 Whitespace@46..47
                 Plus@47..48
                 Whitespace@48..49
-                Identifier@49..50
+                IdentifierValue@49..50
                 Newline@50..51
                 Whitespace@51..53
                 Let@53..56
                 Whitespace@56..57
-                Identifier@57..60
+                IdentifierValue@57..60
                 Whitespace@60..61
                 Equal@61..62
                 Whitespace@62..63
                 Fn@63..65
                 Whitespace@65..66
                 ParenOpen@66..67
-                Identifier@67..68
+                IdentifierValue@67..68
                 Comma@68..69
                 Whitespace@69..70
-                Identifier@70..71
+                IdentifierValue@70..71
                 ParenClose@71..72
                 Whitespace@72..73
                 FatArrow@73..75
                 Whitespace@75..76
-                Identifier@76..77
+                IdentifierValue@76..77
                 Whitespace@77..78
                 Multiply@78..79
                 Whitespace@79..80
-                Identifier@80..81
+                IdentifierValue@80..81
                 Newline@81..82
                 Whitespace@82..84
                 Let@84..87
                 Whitespace@87..88
-                Identifier@88..89
+                IdentifierValue@88..89
                 Whitespace@89..90
                 Equal@90..91
                 Whitespace@91..92
-                Identifier@92..95
+                IdentifierValue@92..95
                 ParenOpen@95..96
-                Identifier@96..99
+                IdentifierValue@96..99
                 ParenOpen@99..100
                 Number@100..101
                 Comma@101..102
@@ -255,9 +255,9 @@ foo()
                 ParenClose@109..110
                 Newline@110..111
                 Whitespace@111..113
-                Identifier@113..116
+                IdentifierValue@113..116
                 ParenOpen@116..117
-                Identifier@117..118
+                IdentifierValue@117..118
                 Comma@118..119
                 Whitespace@119..120
                 Number@120..123

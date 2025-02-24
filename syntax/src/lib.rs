@@ -38,34 +38,45 @@ unsafe impl eventree::TreeConfig for TreeConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u8)]
 pub enum NodeKind {
+    // Resilient syntax trees
+    Error,
+    Missing,
+
+    // Identifier
+    ConstantName,
+    ConstantReference,
+    VariableName,
+    VariableReference,
+    TypeName,
+    TypeReference,
+    TraitName,
+    TraitReference,
+
+    // Module
     Module,
-    ImportItem,
+    ModuleImport,
     ImportAlias,
-    ExportItem,
-    LocalItem,
+    ModuleExport,
+    ModuleLocal,
 
-    // Expressions
-    VariableRef,
-    BooleanLiteral,
-    NumberLiteral,
-    StringLiteral,
-    ParenExpr,
-    BlockExpr,
-    FunctionExpr,
-    LetExpr,
-    IfExpr,
-    CallExpr,
-    TupleExpr,
-    UnaryExpr,
-    BinaryExpr,
-    GetExpr,
-
-    // Match
-    MatchExpr,
+    // Expression
+    ExpressionLiteral,
+    LiteralBoolean,
+    LiteralNumber,
+    LiteralString,
+    ExpressionBlock,
+    ExpressionFunction,
+    ExpressionLet,
+    ExpressionIf,
+    ExpressionMatch,
     MatchArm,
+    ExpressionApply,
+    ExpressionTuple,
+    ExpressionUnary,
+    ExpressionBinary,
+    ExpressionGet,
 
     // Type Path
-    TypeName,
     TypeGeneric,
     TypeProjection,
     TypeAssociation,
@@ -85,12 +96,12 @@ pub enum NodeKind {
     GenericArgList,
 
     // Type Bounds
-    TypeBound,
-    TypeBoundList,
+    GenericBound,
+    GenericBoundList,
 
     // Where Clauses
-    WhereClause,
-    WhereBound,
+    GenericWhereClause,
+    GenericWhereBound,
 
     // Operators.
     UnaryOperator,
@@ -106,13 +117,14 @@ pub enum NodeKind {
     PatternFieldList,
     PatternFieldPositional,
     PatternFieldLabelled,
+    PatternVariable,
 
     // Top-Level Declarations
-    TypeDecl,
-    ConstantDecl,
+    DeclarationType,
+    DeclarationConstant,
 
     // Function Declarations
-    FunctionDecl,
+    DeclarationFunction,
     FunctionParam,
     FunctionParamList,
     FunctionArgPositional,
@@ -121,20 +133,16 @@ pub enum NodeKind {
     FunctionBody,
 
     // Enum Declarations
-    EnumDecl,
+    DeclarationEnum,
     EnumCase,
 
     // Struct Declarations
-    StructDecl,
-    PropDecl,
+    DeclarationStruct,
+    DeclarationProp,
 
     // Traits
-    TraitDecl,
+    DeclarationTrait,
 
     // Impl
-    ImplTraitDecl,
-
-    // Resilient syntax trees
-    Error,
-    Missing,
+    DeclarationImplTrait,
 }

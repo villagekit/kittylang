@@ -1,6 +1,10 @@
 use kitty_syntax::{NodeKind, TokenKind};
 
-use super::r#type::type_annotation;
+use super::{
+    identifier::{constant_reference, variable_reference},
+    pattern::pattern,
+    r#type::type_annotation,
+};
 use crate::{
     grammar::function::{function_arg_list, function_decl_optional_name_types_body},
     marker::CompletedMarker,
@@ -10,24 +14,24 @@ use crate::{
 
 /// Parse an expression.
 #[allow(dead_code)]
-pub(crate) fn expr(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
-    expr_pratt(p, recovery, 0)
+pub(crate) fn expression(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
+    expression_pratt(p, recovery, 0)
 }
 
 /// Parse an expression with a given minimum binding power.
 /// (Also known as a Pratt parser.)
-fn expr_pratt(p: &mut Parser, recovery: TokenSet, min_bp: u8) -> Option<CompletedMarker> {
+fn expression_pratt(p: &mut Parser, recovery: TokenSet, min_bp: u8) -> Option<CompletedMarker> {
     // First, parse a left-hand side (unary operator or primary) expression.
-    let mut lhs = lhs(p, recovery)?;
+    let mut lhs = expression_lhs(p, recovery)?;
 
     loop {
         // Check for postfix operators inline.
         if p.at(TokenKind::ParenOpen) {
-            lhs = call_expr(p, lhs, recovery);
+            lhs = expression_apply(p, lhs, recovery);
             continue;
         }
         if p.at(TokenKind::Dot) {
-            lhs = get_expr(p, lhs, recovery);
+            lhs = expression_get(p, lhs, recovery);
             continue;
         }
 
@@ -45,8 +49,8 @@ fn expr_pratt(p: &mut Parser, recovery: TokenSet, min_bp: u8) -> Option<Complete
         p.bump(); // Consume the operator.
 
         let m = lhs.precede(p);
-        let rhs = expr_pratt(p, recovery, right_bp);
-        lhs = m.complete(p, NodeKind::BinaryExpr);
+        let rhs = expression_pratt(p, recovery, right_bp);
+        lhs = m.complete(p, NodeKind::ExpressionBinary);
 
         if rhs.is_none() {
             break;
@@ -56,38 +60,40 @@ fn expr_pratt(p: &mut Parser, recovery: TokenSet, min_bp: u8) -> Option<Complete
     Some(lhs)
 }
 
+pub(crate) fn expression(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
+    expression_pratt(p, recovery, 0)
+}
+
 /// Parse a left-hand side expression, which may be a unary operator or a primary.
-fn lhs(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
+fn expression_lhs(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
     if let Some(bp) = unary_binding_power(p) {
         // A unary operator is present.
         let m = p.start();
         p.bump(); // Consume the unary operator token.
-        expr_pratt(p, recovery, bp)?;
-        return Some(m.complete(p, NodeKind::UnaryExpr));
+        expression_pratt(p, recovery, bp)?;
+        return Some(m.complete(p, NodeKind::ExpressionUnary));
     }
-    primary(p, recovery)
+    expression_primary(p, recovery)
 }
 
 /// Parse a primary expression.
-fn primary(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
-    let cm = if p.at(TokenKind::Identifier) {
-        p.mark_kind(NodeKind::VariableRef)
-    } else if p.at(TokenKind::Boolean) {
-        p.mark_kind(NodeKind::BooleanLiteral)
-    } else if p.at(TokenKind::Number) {
-        p.mark_kind(NodeKind::NumberLiteral)
-    } else if p.at(TokenKind::String) {
-        p.mark_kind(NodeKind::StringLiteral)
+fn expression_primary(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
+    let cm = if p.at(TokenKind::IdentifierVariable) {
+        variable_reference(p, recovery);
+    } else if p.at(TokenKind::IdentifierConstant) {
+        constant_reference(p, recovery);
+    } else if p.at_set(LITERAL_FIRST) {
+        expression_literal(p, recovery)?
     } else if p.at(TokenKind::ParenOpen) {
-        paren_expr(p, recovery)
+        expression_tuple(p, recovery)
     } else if p.at(TokenKind::Indent) {
-        block_expr(p, recovery)
+        expression_block(p, recovery)
     } else if p.at(TokenKind::Fn) {
-        function_expr(p, recovery)
+        expression_function(p, recovery)
     } else if p.at(TokenKind::Let) {
-        let_expr(p, recovery)
+        expression_let(p, recovery)
     } else if p.at(TokenKind::If) {
-        if_expr(p, recovery)
+        expression_if(p, recovery)
     } else {
         p.error(recovery);
         return None;
@@ -95,91 +101,95 @@ fn primary(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
     Some(cm)
 }
 
-/// Parse a call expression given an existing `lhs`.
-fn call_expr(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> CompletedMarker {
+const LITERAL_FIRST: [TokenKind; 3] = [TokenKind::Boolean, TokenKind::Number, TokenKind::String];
+
+fn expression_literal(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
+    if p.at_set(LITERAL_FIRST) {
+        Some(p.mark_kind(NodeKind::ExpressionLiteral))
+    } else {
+        p.error(recovery);
+        None
+    }
+}
+
+/// Parse an apply expression given an existing `lhs`.
+fn expression_apply(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> CompletedMarker {
     assert!(p.at(TokenKind::ParenOpen));
     let m = lhs.precede(p);
     function_arg_list(p, recovery);
-    m.complete(p, NodeKind::CallExpr)
+    m.complete(p, NodeKind::ExpressionApply)
 }
 
 /// Parse a field access (get expression) given an existing `lhs`.
-fn get_expr(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> CompletedMarker {
+fn expression_get(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> CompletedMarker {
     assert!(p.at(TokenKind::Dot));
     let m = lhs.precede(p);
     p.bump(); // Consume '.'.
-    p.expect(TokenKind::Identifier, recovery);
-    m.complete(p, NodeKind::GetExpr)
+    variable_reference(p, recovery);
+    m.complete(p, NodeKind::ExpressionGet)
 }
 
-/// Parse a parenthesized expression (or tuple expression).
-fn paren_expr(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+/// Parse a tuple expression.
+fn expression_tuple(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     assert!(p.at(TokenKind::ParenOpen));
     let m = p.start();
     p.bump(); // Consume ')'
-    expr(p, recovery);
-    if p.at(TokenKind::Comma) {
-        // More than one expression makes it a tuple.
-        while p.at(TokenKind::Comma) {
-            p.bump();
-            expr(p, recovery);
+    loop {
+        expression(p, recovery);
+        if !p.bump_if_at(TokenKind::Comma) {
+            break;
         }
-        p.expect(TokenKind::ParenClose, recovery);
-        return m.complete(p, NodeKind::TupleExpr);
     }
     p.expect(TokenKind::ParenClose, recovery);
-    m.complete(p, NodeKind::ParenExpr)
+    m.complete(p, NodeKind::ExpressionTuple)
 }
 
 /// Parse a block expression: `{ ... }` but with indents
-fn block_expr(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+fn expression_block(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let recovery_block = recovery.union([TokenKind::Indent, TokenKind::Dedent]);
     let m = p.start();
     p.expect(TokenKind::Indent, recovery_block);
-    expr(p, recovery_block);
+    expression(p, recovery_block);
     p.expect(TokenKind::Dedent, recovery_block);
-    m.complete(p, NodeKind::BlockExpr)
+    m.complete(p, NodeKind::ExpressionBlock)
 }
 
 /// Parse a function expression: `fn <identifier>(<identifier>: <type annotation>) => <expr>`
-fn function_expr(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+fn expression_function(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     assert!(p.at(TokenKind::Fn));
     function_decl_optional_name_types_body(p, recovery, false, true, true)
 }
 
 /// Parse a let expression: `let <identifier> = <expr> in <expr>`
-fn let_expr(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+fn expression_let(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
     p.expect(TokenKind::Let, recovery);
-    p.expect(
-        TokenKind::Identifier,
-        recovery.union([TokenKind::Equal, TokenKind::In]),
-    );
+    pattern(p, recovery.union([TokenKind::Equal, TokenKind::In]));
     if p.at(TokenKind::Colon) {
         p.bump(); // Consume ':'.
         type_annotation(p, recovery);
     }
     p.expect(TokenKind::Equal, recovery.union([TokenKind::In]));
     // The value of the variable
-    expr(p, recovery);
+    expression(p, recovery);
     p.expect(TokenKind::In, recovery);
     // The body of the let scope
-    expr(p, recovery);
-    m.complete(p, NodeKind::LetExpr)
+    expression(p, recovery);
+    m.complete(p, NodeKind::ExpressionLet)
 }
 
 /// Parse an if–expression: `if <cond> { ... } [else { ... }]`
 fn if_expr(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
     p.expect(TokenKind::If, recovery);
-    expr(p, recovery.union([TokenKind::Then])); // condition
+    expression(p, recovery.union([TokenKind::Then])); // condition
     p.expect(TokenKind::Then, recovery);
-    expr(p, recovery.union([TokenKind::Else])); // then body
+    expression(p, recovery.union([TokenKind::Else])); // then body
     if p.at(TokenKind::Else) {
         p.bump(); // Consume 'else'.
-        expr(p, recovery); // else body
+        expression(p, recovery); // else body
     }
-    m.complete(p, NodeKind::IfExpr)
+    m.complete(p, NodeKind::ExpressionIf)
 }
 
 /// Return the binding power for a unary operator at the current token, if any.
@@ -238,17 +248,17 @@ fn binary_binding_power(p: &mut Parser) -> Option<(u8, u8)> {
 
 #[cfg(test)]
 mod tests {
-    use super::{expr, Parser, TokenSet};
+    use super::{expression, Parser, TokenSet};
     use crate::check_grammar;
     use expect_test::expect;
     use indoc::indoc;
-    use kitty_cst::Expr;
+    use kitty_cst::Expression;
 
     fn check(input: &str, expected: expect_test::Expect) {
         let grammar = |p: &mut Parser| {
             expr(p, TokenSet::NONE);
         };
-        check_grammar::<Expr>(grammar, input, expected);
+        check_grammar::<Expression>(grammar, input, expected);
     }
 
     #[test]
@@ -316,7 +326,7 @@ mod tests {
         check(
             "1+2",
             expect![[r#"
-                BinaryExpr@0..3
+                BinaryExpression@0..3
                   NumberLiteral@0..1
                     Number@0..1 "1"
                   Plus@1..2 "+"
@@ -331,9 +341,9 @@ mod tests {
         check(
             "1+2+3+4",
             expect![[r#"
-                BinaryExpr@0..7
-                  BinaryExpr@0..5
-                    BinaryExpr@0..3
+                BinaryExpression@0..7
+                  BinaryExpression@0..5
+                    BinaryExpression@0..3
                       NumberLiteral@0..1
                         Number@0..1 "1"
                       Plus@1..2 "+"
@@ -354,12 +364,12 @@ mod tests {
         check(
             "1+2*3-4",
             expect![[r#"
-                BinaryExpr@0..7
-                  BinaryExpr@0..5
+                BinaryExpression@0..7
+                  BinaryExpression@0..5
                     NumberLiteral@0..1
                       Number@0..1 "1"
                     Plus@1..2 "+"
-                    BinaryExpr@2..5
+                    BinaryExpression@2..5
                       NumberLiteral@2..3
                         Number@2..3 "2"
                       Multiply@3..4 "*"
@@ -377,14 +387,14 @@ mod tests {
         check(
             " 1 +   2* 3 ",
             expect![[r#"
-                BinaryExpr@0..12
+                BinaryExpression@0..12
                   Whitespace@0..1 " "
                   NumberLiteral@1..2
                     Number@1..2 "1"
                   Whitespace@2..3 " "
                   Plus@3..4 "+"
                   Whitespace@4..7 "   "
-                  BinaryExpr@7..11
+                  BinaryExpression@7..11
                     NumberLiteral@7..8
                       Number@7..8 "2"
                     Multiply@8..9 "*"
@@ -404,9 +414,9 @@ mod tests {
 1
 + 1",
             expect![[r#"
-                BinaryExpr@0..10
+                BinaryExpression@0..10
                   Newline@0..1 "\n"
-                  BinaryExpr@1..6
+                  BinaryExpression@1..6
                     NumberLiteral@1..2
                       Number@1..2 "1"
                     Whitespace@2..3 " "
@@ -431,16 +441,16 @@ mod tests {
   1 # Add one
   + 10 # Add ten",
             expect![[r##"
-                BinaryExpr@0..35
+                BinaryExpression@0..35
                   Newline@0..1 "\n"
                   NumberLiteral@1..2
                     Number@1..2 "1"
                   Whitespace@2..3 " "
                   Plus@3..4 "+"
                   Newline@4..5 "\n"
-                  BlockExpr@5..35
+                  BlockExpression@5..35
                     Indent@5..7 "  "
-                    BinaryExpr@7..25
+                    BinaryExpression@7..25
                       NumberLiteral@7..8
                         Number@7..8 "1"
                       Whitespace@8..9 " "
@@ -463,9 +473,9 @@ mod tests {
         check(
             "(1+",
             expect![[r#"
-                ParenExpr@0..3
+                ParenExpression@0..3
                   ParenOpen@0..1 "("
-                  BinaryExpr@1..3
+                  BinaryExpression@1..3
                     NumberLiteral@1..2
                       Number@1..2 "1"
                     Plus@2..3 "+"
@@ -482,7 +492,7 @@ mod tests {
         check(
             "-10",
             expect![[r#"
-                UnaryExpr@0..3
+                UnaryExpression@0..3
                   Minus@0..1 "-"
                   NumberLiteral@1..3
                     Number@1..3 "10""#]],
@@ -495,8 +505,8 @@ mod tests {
         check(
             "-20+20",
             expect![[r#"
-                BinaryExpr@0..6
-                  UnaryExpr@0..3
+                BinaryExpression@0..6
+                  UnaryExpression@0..3
                     Minus@0..1 "-"
                     NumberLiteral@1..3
                       Number@1..3 "20"
@@ -512,17 +522,17 @@ mod tests {
         check(
             "((((((10))))))",
             expect![[r#"
-                ParenExpr@0..14
+                ParenExpression@0..14
                   ParenOpen@0..1 "("
-                  ParenExpr@1..13
+                  ParenExpression@1..13
                     ParenOpen@1..2 "("
-                    ParenExpr@2..12
+                    ParenExpression@2..12
                       ParenOpen@2..3 "("
-                      ParenExpr@3..11
+                      ParenExpression@3..11
                         ParenOpen@3..4 "("
-                        ParenExpr@4..10
+                        ParenExpression@4..10
                           ParenOpen@4..5 "("
-                          ParenExpr@5..9
+                          ParenExpression@5..9
                             ParenOpen@5..6 "("
                             NumberLiteral@6..8
                               Number@6..8 "10"
@@ -541,13 +551,13 @@ mod tests {
         check(
             "5*(2+1)",
             expect![[r#"
-                BinaryExpr@0..7
+                BinaryExpression@0..7
                   NumberLiteral@0..1
                     Number@0..1 "5"
                   Multiply@1..2 "*"
-                  ParenExpr@2..7
+                  ParenExpression@2..7
                     ParenOpen@2..3 "("
-                    BinaryExpr@3..6
+                    BinaryExpression@3..6
                       NumberLiteral@3..4
                         Number@3..4 "2"
                       Plus@4..5 "+"
@@ -558,12 +568,12 @@ mod tests {
     }
 
     #[test]
-    fn paren_expr_missing_closing_paren() {
+    fn paren_expression_missing_closing_paren() {
         // Unhappy path
         check(
             "(foo",
             expect![[r#"
-                ParenExpr@0..4
+                ParenExpression@0..4
                   ParenOpen@0..1 "("
                   VariableRef@1..4
                     Identifier@1..4 "foo"
@@ -573,12 +583,12 @@ mod tests {
     }
 
     #[test]
-    fn call_expr_missing_closing_paren() {
+    fn call_expression_missing_closing_paren() {
         // Unhappy path: call expression with a missing closing ')'
         check(
             "foo(",
             expect![[r#"
-                CallExpr@0..4
+                CallExpression@0..4
                   VariableRef@0..3
                     Identifier@0..3 "foo"
                   FunctionArgList@3..4
@@ -592,12 +602,12 @@ mod tests {
     }
 
     #[test]
-    fn get_expr_missing_identifier() {
+    fn get_expression_missing_identifier() {
         // Unhappy path: get expression missing the identifier after the dot.
         check(
             "foo.",
             expect![[r#"
-                GetExpr@0..4
+                GetExpression@0..4
                   VariableRef@0..3
                     Identifier@0..3 "foo"
                   Dot@3..4 "."
@@ -607,12 +617,12 @@ mod tests {
     }
 
     #[test]
-    fn let_expr_missing_identifier() {
+    fn let_expression_missing_identifier() {
         // Unhappy path: let expression missing an identifier after the 'let' keyword.
         check(
             "let = 1 in 2",
             expect![[r#"
-                LetExpr@0..12
+                LetExpression@0..12
                   Let@0..3 "let"
                   Whitespace@3..4 " "
                   Missing@4..4
@@ -630,12 +640,12 @@ mod tests {
     }
 
     #[test]
-    fn let_expr_missing_equal() {
+    fn let_expression_missing_equal() {
         // Unhappy path: let expression missing the '=' token.
         check(
             "let x 1 in 2",
             expect![[r#"
-                LetExpr@0..12
+                LetExpression@0..12
                   Let@0..3 "let"
                   Whitespace@3..4 " "
                   Identifier@4..5 "x"
@@ -657,12 +667,12 @@ mod tests {
     }
 
     #[test]
-    fn let_expr_missing_expression() {
+    fn let_expression_missing_expression() {
         // Unhappy path: let expression missing an expression after the '='.
         check(
             "let x =  in 2",
             expect![[r#"
-                LetExpr@0..13
+                LetExpression@0..13
                   Let@0..3 "let"
                   Whitespace@3..4 " "
                   Identifier@4..5 "x"
@@ -682,12 +692,12 @@ mod tests {
     }
 
     #[test]
-    fn let_expr_missing_in() {
+    fn let_expression_missing_in() {
         // Unhappy path: let expression missing the 'in' keyword.
         check(
             "let x = 1 2",
             expect![[r#"
-                LetExpr@0..11
+                LetExpression@0..11
                   Let@0..3 "let"
                   Whitespace@3..4 " "
                   Identifier@4..5 "x"
@@ -706,12 +716,12 @@ mod tests {
     }
 
     #[test]
-    fn if_expr_missing_condition() {
+    fn if_expression_missing_condition() {
         // Unhappy path: if expression missing the condition between 'if' and 'then'
         check(
             "if then 1 else 2",
             expect![[r#"
-                IfExpr@0..16
+                IfExpression@0..16
                   If@0..2 "if"
                   Whitespace@2..3 " "
                   Missing@3..3
@@ -729,12 +739,12 @@ mod tests {
     }
 
     #[test]
-    fn if_expr_missing_then_body() {
+    fn if_expression_missing_then_body() {
         // Unhappy path: if expression missing the then–body (and there is no else branch).
         check(
             "if 1 then",
             expect![[r#"
-                IfExpr@0..9
+                IfExpression@0..9
                   If@0..2 "if"
                   Whitespace@2..3 " "
                   NumberLiteral@3..4
@@ -747,12 +757,12 @@ mod tests {
     }
 
     #[test]
-    fn call_expr_trailing_comma() {
+    fn call_expression_trailing_comma() {
         // Unhappy path: call expression has a trailing comma with no expression following it.
         check(
             "foo(1,)",
             expect![[r#"
-                CallExpr@0..7
+                CallExpression@0..7
                   VariableRef@0..3
                     Identifier@0..3 "foo"
                   FunctionArgList@3..7
@@ -782,17 +792,17 @@ mod tests {
     */
 
     #[test]
-    fn if_expr_with_nested_error() {
+    fn if_expression_with_nested_error() {
         // Unhappy path: if expression contains a binary expression error inside the if–condition.
         check(
             "if (1+) then 2",
             expect![[r#"
-                IfExpr@0..14
+                IfExpression@0..14
                   If@0..2 "if"
                   Whitespace@2..3 " "
-                  ParenExpr@3..8
+                  ParenExpression@3..8
                     ParenOpen@3..4 "("
-                    BinaryExpr@4..7
+                    BinaryExpression@4..7
                       NumberLiteral@4..5
                         Number@4..5 "1"
                       Plus@5..6 "+"
@@ -810,12 +820,12 @@ mod tests {
     }
 
     #[test]
-    fn let_expr_type() {
+    fn let_expression_type() {
         // Happy path
         check(
             "let x: Number = 10 in x + 20",
             expect![[r#"
-                LetExpr@0..28
+                LetExpression@0..28
                   Let@0..3 "let"
                   Whitespace@3..4 " "
                   Identifier@4..5 "x"
@@ -831,7 +841,7 @@ mod tests {
                   Whitespace@18..19 " "
                   In@19..21 "in"
                   Whitespace@21..22 " "
-                  BinaryExpr@22..28
+                  BinaryExpression@22..28
                     VariableRef@22..23
                       Identifier@22..23 "x"
                     Whitespace@23..24 " "
@@ -851,7 +861,7 @@ mod tests {
                 add(10, 20)
             "},
             expect![[r#"
-                LetExpr@0..60
+                LetExpression@0..60
                   Let@0..3 "let"
                   Whitespace@3..4 " "
                   Identifier@4..7 "add"
@@ -882,7 +892,7 @@ mod tests {
                     FatArrow@36..38 "=>"
                     Whitespace@38..39 " "
                     FunctionBody@39..44
-                      BinaryExpr@39..44
+                      BinaryExpression@39..44
                         VariableRef@39..40
                           Identifier@39..40 "a"
                         Whitespace@40..41 " "
@@ -893,7 +903,7 @@ mod tests {
                   Whitespace@44..45 " "
                   In@45..47 "in"
                   Newline@47..48 "\n"
-                  CallExpr@48..59
+                  CallExpression@48..59
                     VariableRef@48..51
                       Identifier@48..51 "add"
                     FunctionArgList@51..59

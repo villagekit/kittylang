@@ -112,15 +112,27 @@ macro_rules! define_compound_token {
 	};
 }
 
-define_node!(Module);
-define_node!(ImportAlias);
-define_node!(ImportItem);
-define_node!(ExportItem);
-define_node!(LocalItem);
-define_compound_node!(ModuleItem, kinds: [ImportItem, ExportItem, LocalItem]);
-
+// Resilient syntax trees
 define_node!(Error);
 define_node!(Missing);
+
+// Identifier
+define_node!(ConstantName);
+define_node!(ConstantReference);
+define_node!(VariableName);
+define_node!(VariableReference);
+define_node!(TypeName);
+define_node!(TypeReference);
+define_node!(TraitName);
+define_node!(TraitReference);
+
+// Module
+define_node!(Module);
+define_node!(ModuleImport);
+define_node!(ImportAlias);
+define_node!(ModuleExport);
+define_node!(ModuleLocal);
+define_compound_node!(ModuleItem, kinds: [ModuleImport, ModuleExport, ModuleLocal]);
 
 impl Module {
     pub fn items(self, tree: &SyntaxTree) -> impl Iterator<Item = ModuleItem> + '_ {
@@ -128,29 +140,30 @@ impl Module {
     }
 }
 
-// Expressions
-define_node!(VariableRef);
-define_node!(BooleanLiteral);
-define_node!(NumberLiteral);
-define_node!(StringLiteral);
-define_node!(ParenExpr);
-define_node!(BlockExpr);
-define_node!(LetExpr);
-impl LetExpr {
-    pub fn name(self, tree: &SyntaxTree) -> Option<Identifier> {
-        token(self, tree)
+// Expression
+define_node!(ExpressionLiteral);
+define_node!(LiteralBoolean);
+define_node!(LiteralNumber);
+define_node!(LiteralString);
+define_node!(ExpressionBlock);
+define_node!(ExpressionLet);
+impl ExpressionLet {
+    pub fn name(self, tree: &SyntaxTree) -> Option<VariableName> {
+        node(self, tree)
     }
 
-    pub fn value(self, tree: &SyntaxTree) -> Option<Expr> {
+    pub fn value(self, tree: &SyntaxTree) -> Option<Expression> {
         node(self, tree)
     }
 }
-define_node!(IfExpr);
-define_node!(CallExpr);
-define_node!(TupleExpr);
-define_node!(UnaryExpr);
-impl UnaryExpr {
-    pub fn right(self, tree: &SyntaxTree) -> Option<Expr> {
+define_node!(ExpressionIf);
+define_node!(ExpressionMatch);
+define_node!(MatchArm);
+define_node!(ExpressionApply);
+define_node!(ExpressionTuple);
+define_node!(ExpressionUnary);
+impl ExpressionUnary {
+    pub fn right(self, tree: &SyntaxTree) -> Option<Expression> {
         nodes(self, tree).nth(1)
     }
 
@@ -158,13 +171,13 @@ impl UnaryExpr {
         token(self, tree)
     }
 }
-define_node!(BinaryExpr);
-impl BinaryExpr {
-    pub fn lhs(self, tree: &SyntaxTree) -> Option<Expr> {
+define_node!(ExpressionBinary);
+impl ExpressionBinary {
+    pub fn lhs(self, tree: &SyntaxTree) -> Option<Expression> {
         node(self, tree)
     }
 
-    pub fn rhs(self, tree: &SyntaxTree) -> Option<Expr> {
+    pub fn rhs(self, tree: &SyntaxTree) -> Option<Expression> {
         nodes(self, tree).nth(1)
     }
 
@@ -172,33 +185,26 @@ impl BinaryExpr {
         token(self, tree)
     }
 }
-define_node!(GetExpr);
+define_node!(ExpressionGet);
 define_compound_node!(
-    Expr,
+    Expression,
     kinds: [
-        BooleanLiteral,
-        NumberLiteral,
-        StringLiteral,
-        VariableRef,
-        ParenExpr,
-        BlockExpr,
-        LetExpr,
-        IfExpr,
-        MatchExpr,
-        CallExpr,
-        TupleExpr,
-        UnaryExpr,
-        BinaryExpr,
-        GetExpr
+        ConstantReference,
+        VariableReference,
+        ExpressionLiteral,
+        ExpressionBlock,
+        ExpressionLet,
+        ExpressionIf,
+        ExpressionMatch,
+        ExpressionApply,
+        ExpressionTuple,
+        ExpressionUnary,
+        ExpressionBinary,
+        ExpressionGet
     ]
 );
 
-// Match
-define_node!(MatchExpr);
-define_node!(MatchArm);
-
 // Type Path
-define_node!(TypeName);
 define_node!(TypeGeneric);
 define_node!(TypeProjection);
 define_node!(TypeAssociation);
@@ -251,18 +257,16 @@ define_node!(GenericArgLabelled);
 define_node!(GenericArgList);
 
 // Type Bounds
-define_node!(TypeBound);
-define_node!(TypeBoundList);
+define_node!(GenericBound);
+define_node!(GenericBoundList);
 
-// Literals
+// Literal
 define_token!(Boolean);
 define_token!(Number);
 define_token!(String);
+define_compound_token!(Literal, kinds: [Boolean, Number, String]);
 
-// Identifier
-define_token!(Identifier);
-
-// Operators
+// Operator
 define_token!(Plus);
 define_token!(Minus);
 define_token!(Multiply);
@@ -305,62 +309,51 @@ define_compound_token!(UnaryOperator, kinds: [
     Not
 ]);
 
-// Patterns.
+// Pattern
 define_node!(PatternOr);
 define_node!(PatternWildcard);
 define_node!(PatternLiteral);
 define_node!(PatternTuple);
 define_node!(PatternType);
-define_compound_node!(Pattern, kinds: [PatternType, PatternLiteral, PatternTuple, PatternWildcard, PatternOr]);
+define_compound_node!(Pattern, kinds: [
+    PatternType,
+    PatternLiteral,
+    PatternTuple,
+    PatternWildcard,
+    PatternOr
+]);
 define_node!(PatternFieldList);
 define_node!(PatternFieldPositional);
 define_node!(PatternFieldLabelled);
 
-// Top-Level Declarations.
-define_node!(TypeDecl);
-define_node!(ConstantDecl);
+// Declaration
+define_node!(DeclarationType);
+define_node!(DeclarationConstant);
 
-// Function Declarations.
-define_node!(FunctionDecl);
+define_node!(DeclarationFunction);
+impl DeclarationFunction {
+    pub fn name(self, tree: &SyntaxTree) -> Option<VariableName> {
+        node(self, tree)
+    }
+
+    pub fn body(self, tree: &SyntaxTree) -> Option<Expression> {
+        node(self, tree)
+    }
+}
+
 define_node!(FunctionParam);
 define_node!(FunctionParamList);
 define_node!(FunctionArgPositional);
 define_node!(FunctionArgLabelled);
 define_node!(FunctionArgList);
 
-// Enum Declarations.
-define_node!(EnumDecl);
+define_node!(DeclarationEnum);
 define_node!(EnumCase);
 
-define_node!(PropDecl);
-
-// Struct Declarations.
-define_node!(StructDecl);
-define_compound_node!(StructItem, kinds: [ConstantDecl, PropDecl, FunctionDecl]);
-
-// Traits
-define_node!(TraitDecl);
-define_compound_node!(TraitItem, kinds: [TypeDecl, ConstantDecl, PropDecl, FunctionDecl]);
-
-// Impl
-define_node!(ImplTraitDecl);
-define_compound_node!(ImplTraitItem, kinds: [TypeDecl, ConstantDecl, PropDecl, FunctionDecl]);
-
-define_compound_node!(DeclItem, kinds: [TypeDecl, ConstantDecl, FunctionDecl, EnumDecl, StructDecl, TraitDecl, ImplTraitDecl]);
-
-impl StructDecl {
-    pub fn name(self, tree: &SyntaxTree) -> Option<Identifier> {
-        token(self, tree)
-    }
-
-    pub fn properties(self, tree: &SyntaxTree) -> impl Iterator<Item = PropDecl> + '_ {
-        nodes(self, tree)
-    }
-}
-
-impl PropDecl {
-    pub fn name(self, tree: &SyntaxTree) -> Option<Identifier> {
-        token(self, tree)
+define_node!(DeclarationProp);
+impl DeclarationProp {
+    pub fn name(self, tree: &SyntaxTree) -> Option<VariableName> {
+        node(self, tree)
     }
 
     // e.g. the type annotation or some other child node
@@ -369,15 +362,52 @@ impl PropDecl {
     // }
 }
 
-impl FunctionDecl {
-    pub fn name(self, tree: &SyntaxTree) -> Option<Identifier> {
-        token(self, tree)
-    }
-
-    pub fn body(self, tree: &SyntaxTree) -> Option<BlockExpr> {
+// Struct
+define_node!(DeclarationStruct);
+impl DeclarationStruct {
+    pub fn name(self, tree: &SyntaxTree) -> Option<TypeName> {
         node(self, tree)
     }
+
+    pub fn properties(self, tree: &SyntaxTree) -> impl Iterator<Item = DeclarationProp> + '_ {
+        nodes(self, tree)
+    }
 }
+define_compound_node!(StructItem, kinds: [
+    DeclarationConstant,
+    DeclarationProp,
+    DeclarationFunction
+]);
+
+// Trait
+define_node!(DeclarationTrait);
+define_compound_node!(TraitItem, kinds: [
+    DeclarationType,
+    DeclarationConstant,
+    DeclarationProp,
+    DeclarationFunction
+]);
+
+// Impl
+define_node!(DeclarationImplTrait);
+define_compound_node!(ImplTraitItem, kinds: [
+    DeclarationType,
+    DeclarationConstant,
+    DeclarationProp,
+    DeclarationFunction
+]);
+
+define_compound_node!(Declaration, kinds: [
+    DeclarationType,
+    DeclarationConstant,
+    DeclarationFunction,
+    DeclarationEnum,
+    DeclarationStruct,
+    DeclarationTrait,
+    DeclarationImplTrait
+]);
+
+/* helpers */
 
 fn node<Parent: CstNode, Child: CstNode>(node: Parent, tree: &SyntaxTree) -> Option<Child> {
     node.syntax()
