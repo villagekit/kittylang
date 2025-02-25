@@ -2,14 +2,11 @@ use kitty_syntax::{NodeKind, TokenKind};
 
 use super::{
     expression::expression,
-    identifier::variable_name,
+    identifier::{value_name, VALUE_NAME_FIRST},
     pattern::pattern,
     r#type::{generic_param_list, generic_where_clause, type_annotation},
 };
-use crate::{
-    grammar::identifier::VARIABLE_NAME_FIRST, marker::CompletedMarker, parser::Parser,
-    token_set::TokenSet,
-};
+use crate::{marker::CompletedMarker, parser::Parser, token_set::TokenSet};
 
 pub(crate) fn function_declaration_optional_name_types_body(
     p: &mut Parser,
@@ -21,8 +18,8 @@ pub(crate) fn function_declaration_optional_name_types_body(
     assert!(p.at(TokenKind::Fn));
     let m = p.start();
     p.bump(); // Consume 'fn'
-    if required_name || p.at(TokenKind::IdentifierVariable) {
-        variable_name(p, recovery);
+    if required_name || p.at_set(VALUE_NAME_FIRST) {
+        value_name(p, recovery);
     }
     if p.at(TokenKind::BracketOpen) {
         generic_param_list(p, recovery);
@@ -87,7 +84,7 @@ pub(crate) fn function_arg_list(p: &mut Parser, recovery: TokenSet) -> Completed
         }
         // First process positional args
         'positional: loop {
-            if p.at_set(VARIABLE_NAME_FIRST) && p.lookahead_at(1, TokenKind::Colon) {
+            if p.at_set(VALUE_NAME_FIRST) && p.lookahead_at(1, TokenKind::Colon) {
                 break 'positional; // End positional args
             }
 
@@ -119,9 +116,9 @@ fn function_positional_arg(p: &mut Parser, recovery: TokenSet) -> CompletedMarke
 }
 
 fn function_labelled_arg(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at_set(VARIABLE_NAME_FIRST));
+    assert!(p.at_set(VALUE_NAME_FIRST));
     let m = p.start();
-    variable_name(p, recovery);
+    value_name(p, recovery);
     p.expect(TokenKind::Colon, recovery);
     expression(p, recovery);
     m.complete(p, NodeKind::FunctionArgLabelled)

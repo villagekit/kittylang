@@ -88,20 +88,20 @@ fn foo()
             (Newline, 0..1),
             (Fn, 1..3),
             (Whitespace, 3..4),
-            (IdentifierVariable, 4..7),
+            (IdentifierValue, 4..7),
             (ParenOpen, 7..8),
             (ParenClose, 8..9),
             (Newline, 9..10),
             (Indent, 10..12),
             (Fn, 12..14),
             (Whitespace, 14..15),
-            (IdentifierVariable, 15..18),
+            (IdentifierValue, 15..18),
             (ParenOpen, 18..19),
             (ParenClose, 19..20),
             (Newline, 20..21),
             (Whitespace, 21..23),
             (Indent, 23..25),
-            (IdentifierVariable, 25..28),
+            (IdentifierValue, 25..28),
             (Newline, 28..29),
             (Dedent, 29..29),
             (Dedent, 29..29),
@@ -122,13 +122,13 @@ fn foo()
             (Newline, 0..1),
             (Fn, 1..3),
             (Whitespace, 3..4),
-            (IdentifierVariable, 4..7),
+            (IdentifierValue, 4..7),
             (ParenOpen, 7..8),
             (ParenClose, 8..9),
             (Newline, 9..10),
             (Newline, 10..11),
             (Indent, 11..13),
-            (IdentifierVariable, 13..16),
+            (IdentifierValue, 13..16),
             (Newline, 16..17),
             (Newline, 17..18),
             (Dedent, 18..18),
@@ -148,15 +148,15 @@ foo()
             (Newline, 0..1),
             (Fn, 1..3),
             (Whitespace, 3..4),
-            (IdentifierVariable, 4..7),
+            (IdentifierValue, 4..7),
             (ParenOpen, 7..8),
             (ParenClose, 8..9),
             (Newline, 9..10),
             (Indent, 10..12),
-            (IdentifierVariable, 12..15),
+            (IdentifierValue, 12..15),
             (Newline, 15..16),
             (Dedent, 16..16),
-            (IdentifierVariable, 16..19),
+            (IdentifierValue, 16..19),
             (ParenOpen, 19..20),
             (ParenClose, 20..21),
             (Newline, 21..22),
@@ -300,25 +300,25 @@ foo()
             expect![[r#"
                 Import@0..6
                 Whitespace@6..7
-                Identifier@7..11
+                IdentifierValue@7..11
                 Whitespace@11..12
                 From@12..16
                 Whitespace@16..17
                 Package@17..23
-                Identifier@23..26
+                IdentifierValue@23..26
                 Newline@26..27
                 Newline@27..28
                 Export@28..34
                 Whitespace@34..35
                 Struct@35..41
                 Whitespace@41..42
-                Identifier@42..49
+                IdentifierType@42..49
                 BracketOpen@49..50
-                Identifier@50..51
+                IdentifierType@50..51
                 Whitespace@51..52
                 Equal@52..53
                 Whitespace@53..54
-                Identifier@54..60
+                IdentifierType@54..60
                 BracketClose@60..61
                 Newline@61..62
                 Indent@62..64
@@ -326,38 +326,38 @@ foo()
                 Newline@69..70
                 Whitespace@70..72
                 Indent@72..74
-                Identifier@74..75
+                IdentifierType@74..75
                 Colon@75..76
                 Whitespace@76..77
-                Identifier@77..84
+                IdentifierType@77..84
                 Whitespace@84..85
                 Plus@85..86
                 Whitespace@86..87
-                Identifier@87..90
+                IdentifierType@87..90
                 Whitespace@90..91
                 Plus@91..92
                 Whitespace@92..93
-                Identifier@93..96
+                IdentifierType@93..96
                 Whitespace@96..97
                 Plus@97..98
                 Whitespace@98..99
-                Identifier@99..103
+                IdentifierType@99..103
                 Newline@103..104
                 Newline@104..105
                 Whitespace@105..107
                 Dedent@107..107
                 Prop@107..111
                 Whitespace@111..112
-                Identifier@112..113
+                IdentifierValue@112..113
                 Colon@113..114
                 Whitespace@114..115
-                Identifier@115..116
+                IdentifierType@115..116
                 Whitespace@116..117
                 Equal@117..118
                 Whitespace@118..119
-                Identifier@119..120
+                IdentifierType@119..120
                 Dot@120..121
-                Identifier@121..128
+                IdentifierValue@121..128
                 ParenOpen@128..129
                 ParenClose@129..130
                 Newline@130..131
@@ -365,16 +365,16 @@ foo()
                 Whitespace@132..134
                 Prop@134..138
                 Whitespace@138..139
-                Identifier@139..140
+                IdentifierValue@139..140
                 Colon@140..141
                 Whitespace@141..142
-                Identifier@142..143
+                IdentifierType@142..143
                 Whitespace@143..144
                 Equal@144..145
                 Whitespace@145..146
-                Identifier@146..147
+                IdentifierType@146..147
                 Dot@147..148
-                Identifier@148..155
+                IdentifierValue@148..155
                 ParenOpen@155..156
                 ParenClose@156..157
                 Newline@157..158
@@ -382,16 +382,16 @@ foo()
                 Whitespace@159..161
                 Prop@161..165
                 Whitespace@165..166
-                Identifier@166..167
+                IdentifierValue@166..167
                 Colon@167..168
                 Whitespace@168..169
-                Identifier@169..170
+                IdentifierType@169..170
                 Whitespace@170..171
                 Equal@171..172
                 Whitespace@172..173
-                Identifier@173..174
+                IdentifierType@173..174
                 Dot@174..175
-                Identifier@175..182
+                IdentifierValue@175..182
                 ParenOpen@182..183
                 ParenClose@183..184
                 Newline@184..185
@@ -399,13 +399,13 @@ foo()
                 Whitespace@186..188
                 Fn@188..190
                 Whitespace@190..191
-                Identifier@191..197
+                IdentifierValue@191..197
                 ParenOpen@197..198
                 SelfLower@198..202
                 ParenClose@202..203
                 Colon@203..204
                 Whitespace@204..205
-                Identifier@205..206
+                IdentifierType@205..206
                 Whitespace@206..207
                 FatArrow@207..209
                 Newline@209..210
@@ -417,13 +417,13 @@ foo()
                 Whitespace@222..223
                 BraceOpen@223..224
                 Whitespace@224..225
-                Identifier@225..226
+                IdentifierValue@225..226
                 Comma@226..227
                 Whitespace@227..228
-                Identifier@228..229
+                IdentifierValue@228..229
                 Comma@229..230
                 Whitespace@230..231
-                Identifier@231..232
+                IdentifierValue@231..232
                 Whitespace@232..233
                 BraceClose@233..234
                 Whitespace@234..235
@@ -433,30 +433,30 @@ foo()
                 Newline@241..242
                 Whitespace@242..246
                 ParenOpen@246..247
-                Identifier@247..248
+                IdentifierValue@247..248
                 Whitespace@248..249
                 Multiply@249..250
                 Whitespace@250..251
-                Identifier@251..252
+                IdentifierValue@251..252
                 Whitespace@252..253
                 Plus@253..254
                 Whitespace@254..255
-                Identifier@255..256
+                IdentifierValue@255..256
                 Whitespace@256..257
                 Multiply@257..258
                 Whitespace@258..259
-                Identifier@259..260
+                IdentifierValue@259..260
                 Whitespace@260..261
                 Plus@261..262
                 Whitespace@262..263
-                Identifier@263..264
+                IdentifierValue@263..264
                 Whitespace@264..265
                 Multiply@265..266
                 Whitespace@266..267
-                Identifier@267..268
+                IdentifierValue@267..268
                 ParenClose@268..269
                 Dot@269..270
-                Identifier@270..274
+                IdentifierValue@270..274
                 ParenOpen@274..275
                 ParenClose@275..276
                 Newline@276..277
@@ -467,15 +467,15 @@ foo()
                 Whitespace@284..285
                 Struct@285..291
                 Whitespace@291..292
-                Identifier@292..302
+                IdentifierType@292..302
                 Newline@302..303
                 Indent@303..305
                 Prop@305..309
                 Whitespace@309..310
-                Identifier@310..311
+                IdentifierValue@310..311
                 Colon@311..312
                 Whitespace@312..313
-                Identifier@313..319
+                IdentifierType@313..319
                 Whitespace@319..320
                 Equal@320..321
                 Whitespace@321..322
@@ -485,10 +485,10 @@ foo()
                 Whitespace@325..327
                 Prop@327..331
                 Whitespace@331..332
-                Identifier@332..333
+                IdentifierValue@332..333
                 Colon@333..334
                 Whitespace@334..335
-                Identifier@335..341
+                IdentifierType@335..341
                 Whitespace@341..342
                 Equal@342..343
                 Whitespace@343..344
@@ -498,10 +498,10 @@ foo()
                 Whitespace@347..349
                 Prop@349..353
                 Whitespace@353..354
-                Identifier@354..355
+                IdentifierValue@354..355
                 Colon@355..356
                 Whitespace@356..357
-                Identifier@357..363
+                IdentifierType@357..363
                 Whitespace@363..364
                 Equal@364..365
                 Whitespace@365..366
@@ -511,10 +511,10 @@ foo()
                 Whitespace@369..371
                 Prop@371..375
                 Whitespace@375..376
-                Identifier@376..377
+                IdentifierValue@376..377
                 Colon@377..378
                 Whitespace@378..379
-                Identifier@379..385
+                IdentifierType@379..385
                 Whitespace@385..386
                 Equal@386..387
                 Whitespace@387..388

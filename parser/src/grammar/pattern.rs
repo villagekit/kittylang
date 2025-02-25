@@ -1,12 +1,15 @@
 use kitty_syntax::{NodeKind, TokenKind};
 
-use super::{identifier::variable_name, r#type::type_path};
+use super::{
+    identifier::value_name,
+    r#type::{type_path, TYPE_PATH_FIRST},
+};
 use crate::{marker::CompletedMarker, parser::Parser, token_set::TokenSet};
 
 const PATTERN_FIRST: [TokenKind; 3] = [
     TokenKind::IdentifierType,
     TokenKind::SelfUpper,
-    TokenKind::IdentifierVariable,
+    TokenKind::IdentifierValue,
 ];
 
 pub(crate) fn pattern(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
@@ -34,9 +37,9 @@ pub(crate) fn pattern_single(p: &mut Parser, recovery: TokenSet) -> Option<Compl
         pattern_literal(p)
     } else if p.at(TokenKind::ParenOpen) {
         pattern_tuple(p, recovery)
-    } else if p.at(TokenKind::IdentifierType) {
+    } else if p.at_set(TYPE_PATH_FIRST) {
         pattern_type(p, recovery)
-    } else if p.at(TokenKind::IdentifierVariable) {
+    } else if p.at(TokenKind::IdentifierValue) {
         pattern_variable(p, recovery)
     } else {
         p.error(recovery);
@@ -95,7 +98,7 @@ pub(crate) fn pattern_field_list(p: &mut Parser, recovery: TokenSet) -> Complete
         }
         // First process positional fields
         'positional: loop {
-            if p.at(TokenKind::IdentifierVariable) && p.lookahead_at(1, TokenKind::Colon) {
+            if p.at(TokenKind::IdentifierValue) && p.lookahead_at(1, TokenKind::Colon) {
                 break 'positional; // End positional fields
             }
 
@@ -121,7 +124,7 @@ pub(crate) fn pattern_field_list(p: &mut Parser, recovery: TokenSet) -> Complete
 }
 
 // TODO handle this with ':' to rename
-fn pattern_field_positional(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+fn pattern_field_positional(p: &mut Parser, _recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
     // expr(p, recovery);
     m.complete(p, NodeKind::PatternFieldPositional)
@@ -129,9 +132,9 @@ fn pattern_field_positional(p: &mut Parser, recovery: TokenSet) -> CompletedMark
 
 // TODO handle this like Julia does (?)
 fn pattern_field_labelled(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at(TokenKind::IdentifierVariable));
+    assert!(p.at(TokenKind::IdentifierValue));
     let m = p.start();
-    p.expect(TokenKind::IdentifierVariable, recovery);
+    p.expect(TokenKind::IdentifierValue, recovery);
     p.expect(TokenKind::Colon, recovery);
     // expr(p, recovery);
     m.complete(p, NodeKind::PatternFieldLabelled)
@@ -139,6 +142,6 @@ fn pattern_field_labelled(p: &mut Parser, recovery: TokenSet) -> CompletedMarker
 
 fn pattern_variable(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
-    variable_name(p, recovery);
+    value_name(p, recovery);
     m.complete(p, NodeKind::PatternVariable)
 }

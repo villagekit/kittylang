@@ -2,10 +2,9 @@ use kitty_syntax::{NodeKind, TokenKind};
 
 use crate::{marker::CompletedMarker, parser::Parser, token_set::TokenSet};
 
-use super::identifier::{trait_name, type_name};
+use super::identifier::{trait_name, type_name, TYPE_NAME_FIRST};
 
-pub(crate) const TYPE_PATH_FIRST: [TokenKind; 2] =
-    [TokenKind::IdentifierType, TokenKind::SelfUpper];
+pub(crate) const TYPE_PATH_FIRST: [TokenKind; 2] = TYPE_NAME_FIRST;
 
 /// A qualified type
 pub(crate) fn type_path(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {

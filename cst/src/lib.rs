@@ -117,18 +117,16 @@ define_node!(Error);
 define_node!(Missing);
 
 // Identifier
-define_node!(ConstantName);
-define_node!(VariableName);
+define_node!(ValueName);
 define_node!(TypeName);
 define_node!(TraitName);
 
 // Module
 define_node!(Module);
 define_node!(ModuleImport);
-define_node!(ImportAliasConstant);
+define_node!(ImportAliasValue);
 define_node!(ImportAliasType);
-define_node!(ImportAliasVariable);
-define_compound_node!(ImportAlias, kinds: [ImportAliasConstant, ImportAliasVariable, ImportAliasType]);
+define_compound_node!(ImportAlias, kinds: [ImportAliasValue, ImportAliasType]);
 define_node!(ModuleExport);
 define_node!(ModuleLocal);
 define_compound_node!(ModuleItem, kinds: [ModuleImport, ModuleExport, ModuleLocal]);
@@ -147,7 +145,7 @@ define_node!(LiteralString);
 define_node!(ExpressionBlock);
 define_node!(ExpressionLet);
 impl ExpressionLet {
-    pub fn name(self, tree: &SyntaxTree) -> Option<VariableName> {
+    pub fn name(self, tree: &SyntaxTree) -> Option<ValueName> {
         node(self, tree)
     }
 
@@ -188,8 +186,7 @@ define_node!(ExpressionGet);
 define_compound_node!(
     Expression,
     kinds: [
-        ConstantName,
-        VariableName,
+        ValueName,
         ExpressionLiteral,
         ExpressionBlock,
         ExpressionLet,
@@ -331,7 +328,7 @@ define_node!(DeclarationConstant);
 
 define_node!(DeclarationFunction);
 impl DeclarationFunction {
-    pub fn name(self, tree: &SyntaxTree) -> Option<VariableName> {
+    pub fn name(self, tree: &SyntaxTree) -> Option<ValueName> {
         node(self, tree)
     }
 
@@ -351,7 +348,7 @@ define_node!(EnumCase);
 
 define_node!(DeclarationProp);
 impl DeclarationProp {
-    pub fn name(self, tree: &SyntaxTree) -> Option<VariableName> {
+    pub fn name(self, tree: &SyntaxTree) -> Option<ValueName> {
         node(self, tree)
     }
 

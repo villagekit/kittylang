@@ -94,9 +94,9 @@ mod tests {
     fn one_expected_did_find() {
         check(
             vec![TokenKind::Equal],
-            Some(TokenKind::IdentifierVariable),
+            Some(TokenKind::IdentifierValue),
             10..20,
-            "error at 10..20: expected ‘=’, but found identifier",
+            "error at 10..20: expected ‘=’, but found value-id",
         );
     }
 
@@ -125,13 +125,13 @@ mod tests {
         check(
             vec![
                 TokenKind::Number,
-                TokenKind::IdentifierVariable,
+                TokenKind::IdentifierValue,
                 TokenKind::Minus,
                 TokenKind::ParenOpen,
             ],
             Some(TokenKind::Let),
             100..105,
-            "error at 100..105: expected number, identifier, ‘-’, or ‘(’, but found ‘let’",
+            "error at 100..105: expected number, value-id, ‘-’, or ‘(’, but found ‘let’",
         );
     }
 }

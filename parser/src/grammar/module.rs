@@ -69,26 +69,15 @@ fn module_import(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     m.complete(p, NodeKind::ModuleImport)
 }
 
-const IMPORT_ALIAS_FIRST: [TokenKind; 3] = [
-    TokenKind::IdentifierConstant,
-    TokenKind::IdentifierVariable,
-    TokenKind::IdentifierType,
-];
+const IMPORT_ALIAS_FIRST: [TokenKind; 2] = [TokenKind::IdentifierValue, TokenKind::IdentifierType];
 
 fn import_alias(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
-    let cm = if p.at(TokenKind::IdentifierConstant) {
+    let cm = if p.at(TokenKind::IdentifierValue) {
         import_alias_kind(
             p,
             recovery,
-            TokenKind::IdentifierConstant,
-            NodeKind::ImportAliasConstant,
-        )
-    } else if p.at(TokenKind::IdentifierVariable) {
-        import_alias_kind(
-            p,
-            recovery,
-            TokenKind::IdentifierVariable,
-            NodeKind::ImportAliasVariable,
+            TokenKind::IdentifierValue,
+            NodeKind::ImportAliasValue,
         )
     } else if p.at(TokenKind::IdentifierType) {
         import_alias_kind(

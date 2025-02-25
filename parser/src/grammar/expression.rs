@@ -1,18 +1,12 @@
 use kitty_syntax::{NodeKind, TokenKind};
 
 use super::{
-    identifier::{
-        constant_name, variable_name, CONSTANT_NAME_FIRST, TYPE_NAME_FIRST, VARIABLE_NAME_FIRST,
-    },
+    function::{function_arg_list, function_declaration_optional_name_types_body},
+    identifier::{value_name, VALUE_NAME_FIRST},
     pattern::pattern,
     r#type::{type_annotation, type_path, TYPE_PATH_FIRST},
 };
-use crate::{
-    grammar::function::{function_arg_list, function_declaration_optional_name_types_body},
-    marker::CompletedMarker,
-    token_set::TokenSet,
-    Parser,
-};
+use crate::{marker::CompletedMarker, token_set::TokenSet, Parser};
 
 /// Parse an expression.
 #[allow(dead_code)]
@@ -76,10 +70,8 @@ fn expression_lhs(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker>
 
 /// Parse a primary expression.
 fn expression_primary(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
-    let cm = if p.at_set(VARIABLE_NAME_FIRST) {
-        variable_name(p, recovery)?
-    } else if p.at_set(CONSTANT_NAME_FIRST) {
-        constant_name(p, recovery)?
+    let cm = if p.at_set(VALUE_NAME_FIRST) {
+        value_name(p, recovery)?
     } else if p.at_set(TYPE_PATH_FIRST) {
         type_path(p, recovery)?
     } else if p.at_set(LITERAL_FIRST) {
@@ -125,7 +117,7 @@ fn expression_get(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> C
     assert!(p.at(TokenKind::Dot));
     let m = lhs.precede(p);
     p.bump(); // Consume '.'.
-    variable_name(p, recovery);
+    value_name(p, recovery);
     m.complete(p, NodeKind::ExpressionGet)
 }
 
@@ -164,11 +156,7 @@ fn expression_function(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 fn expression_let(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
     p.expect(TokenKind::Let, recovery);
-    p.expect(
-        TokenKind::IdentifierVariable,
-        recovery.union([TokenKind::Equal, TokenKind::In]),
-    );
-    // pattern(p, recovery.union([TokenKind::Equal, TokenKind::In]));
+    pattern(p, recovery.union([TokenKind::Equal, TokenKind::In]));
     if p.at(TokenKind::Colon) {
         p.bump(); // Consume ':'.
         type_annotation(p, recovery);

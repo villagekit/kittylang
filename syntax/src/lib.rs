@@ -43,16 +43,14 @@ pub enum NodeKind {
     Missing,
 
     // Identifier
-    ConstantName,
-    VariableName,
+    ValueName,
     TypeName,
     TraitName,
 
     // Module
     Module,
     ModuleImport,
-    ImportAliasConstant,
-    ImportAliasVariable,
+    ImportAliasValue,
     ImportAliasType,
     ModuleExport,
     ModuleLocal,

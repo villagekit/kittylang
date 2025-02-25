@@ -1,7 +1,7 @@
 use kitty_syntax::{NodeKind, TokenKind};
 
 use crate::{
-    grammar::identifier::{constant_name, type_name, variable_name},
+    grammar::identifier::{type_name, value_name},
     marker::CompletedMarker,
     parser::Parser,
     token_set::TokenSet,
@@ -76,7 +76,7 @@ fn declaration_constant_optional_type_value(
     assert!(p.at(TokenKind::Const));
     let m = p.start();
     p.bump(); // Consume 'const'
-    constant_name(p, recovery);
+    value_name(p, recovery);
     if has_type || p.at(TokenKind::Colon) {
         p.expect(TokenKind::Colon, recovery);
         type_annotation(p, recovery);
@@ -141,7 +141,7 @@ fn declaration_prop_optional_type_value(
     assert!(p.at(TokenKind::Prop));
     let m = p.start();
     p.bump(); // Consume 'prop'
-    variable_name(p, recovery);
+    value_name(p, recovery);
     if has_type || p.at(TokenKind::Colon) {
         p.expect(TokenKind::Colon, recovery);
         type_annotation(p, recovery);
