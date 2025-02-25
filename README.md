@@ -23,6 +23,8 @@
   - https://github.com/capy-language/capy
 - https://github.com/naalit/pika/
 - https://steveklabnik.com/writing/the-language-strangeness-budget
+- [rhombus](https://docs.racket-lang.org/rhombus)
+  - [shrubbery](https://docs.racket-lang.org/shrubbery/)
 
 - Used
   - https://lunacookies.github.io/lang/
@@ -36,6 +38,9 @@
   - https://maoridictionary.co.nz/word/158
 
 - write ItemTree like https://github.com/rust-lang/rust-analyzer/blob/master/crates/hir-def/src/item_tree.rs
+- Add `++` operator for append / concatenate
+- Add `value.[Trait]` to cast value as trait object, to call trait method (with no ambiguity).
+
 
 ## Language
 
@@ -53,13 +58,13 @@
 - Match like Gleam: https://tour.gleam.run/everything/#data-types-record-pattern-matching
 - `True` and `False` are part of a `Boolean` enum
   - but they are aliased so you can use as `True` and `False`.
-- Every value has a reference to the code span which created it.
-  - This is important for code-as-CAD editors where you can interact with an object in 3d space and it performs a macro on the code.
 
 ## Requirements
 
 - Compiler can be used as linter, formatter, language server, etc
   - Even if some syntax is wrong, the compiler is able to parse the remaining correct syntax and still give useful feedback
+- Every value has a reference to the code span which created it.
+  - This is important for code-as-CAD editors where you can interact with an object in 3d space and it performs a macro on the code.
 
 ## Open questions
 
@@ -73,6 +78,7 @@
 
 - Separated value and type identifiers, to be able to distinguish them in a pattern:
   - Otherwise no way to know if `None` is an existing type or a new variable name
+  - Also helps for unifying `.` across both values and types.
 
 ```
 match maybe_thing
