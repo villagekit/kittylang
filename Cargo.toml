@@ -1,8 +1,13 @@
 [workspace]
 resolver = "2"
 members = [
+  "cst",
+  "hir",
   "lexer",
-  "test-utils"
+  "meta",
+  "number",
+  "parser",
+  "syntax"
 ]
 
 [workspace.package]
@@ -19,3 +24,7 @@ keywords = []
 categories = []
 
 [workspace.dependencies]
+expect-test = "1.5.1"
+indoc = "2.0.3"
+internment = "0.8.6"
+text-size = "1.1.1"

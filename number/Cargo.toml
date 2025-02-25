@@ -1,8 +1,8 @@
 [package]
-name = "kitty-lexer"
+name = "kitty-number"
 version.workspace = true
-rust-version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 description.workspace = true
 readme.workspace = true
 homepage.workspace = true
@@ -12,10 +12,4 @@ keywords.workspace = true
 categories.workspace = true
 
 [dependencies]
-logos = "0.15.0"
-peek-again = "0.4.0"
-text-size = { workspace = true }
-
-[dev-dependencies]
-expect-test = { workspace = true }
-indoc = { workspace = true }
+fastnum = "0.1.13"
