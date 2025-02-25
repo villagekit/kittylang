@@ -93,13 +93,13 @@ mod tests {
             "},
             expect![[r#"
                 Module@0..166
-                  ExportItem@0..166
+                  ModuleExport@0..166
                     Export@0..6 "export"
                     Whitespace@6..7 " "
-                    FunctionDecl@7..166
+                    DeclarationFunction@7..166
                       Fn@7..9 "fn"
                       Whitespace@9..10 " "
-                      Identifier@10..14 "main"
+                      IdentifierValue@10..14 "main"
                       FunctionParamList@14..16
                         ParenOpen@14..15 "("
                         ParenClose@15..16 ")"
@@ -107,143 +107,150 @@ mod tests {
                       FatArrow@17..19 "=>"
                       Newline@19..20 "\n"
                       FunctionBody@20..166
-                        BlockExpr@20..166
+                        ExpressionBlock@20..166
                           Indent@20..22 "  "
-                          LetExpr@22..165
+                          ExpressionLet@22..165
                             Let@22..25 "let"
                             Whitespace@25..26 " "
-                            Identifier@26..29 "add"
+                            PatternName@26..29
+                              IdentifierValue@26..29 "add"
                             Whitespace@29..30 " "
                             Equal@30..31 "="
                             Whitespace@31..32 " "
-                            FunctionDecl@32..66
+                            DeclarationFunction@32..66
                               Fn@32..34 "fn"
                               Whitespace@34..35 " "
                               FunctionParamList@35..57
                                 ParenOpen@35..36 "("
                                 FunctionParam@36..45
-                                  Identifier@36..37 "x"
+                                  FunctionParamLabel@36..37
+                                    IdentifierValue@36..37 "x"
                                   Colon@37..38 ":"
                                   Whitespace@38..39 " "
-                                  TypeName@39..45
-                                    Identifier@39..45 "Number"
+                                  TypeReference@39..45
+                                    IdentifierType@39..45 "Number"
                                 Comma@45..46 ","
                                 Whitespace@46..47 " "
                                 FunctionParam@47..56
-                                  Identifier@47..48 "y"
+                                  FunctionParamLabel@47..48
+                                    IdentifierValue@47..48 "y"
                                   Colon@48..49 ":"
                                   Whitespace@49..50 " "
-                                  TypeName@50..56
-                                    Identifier@50..56 "Number"
+                                  TypeReference@50..56
+                                    IdentifierType@50..56 "Number"
                                 ParenClose@56..57 ")"
                               Whitespace@57..58 " "
                               FatArrow@58..60 "=>"
                               Whitespace@60..61 " "
                               FunctionBody@61..66
-                                BinaryExpr@61..66
-                                  VariableRef@61..62
-                                    Identifier@61..62 "x"
+                                ExpressionBinary@61..66
+                                  ExpressionReference@61..62
+                                    IdentifierValue@61..62 "x"
                                   Whitespace@62..63 " "
                                   Plus@63..64 "+"
                                   Whitespace@64..65 " "
-                                  VariableRef@65..66
-                                    Identifier@65..66 "y"
+                                  ExpressionReference@65..66
+                                    IdentifierValue@65..66 "y"
                             Whitespace@66..67 " "
                             In@67..69 "in"
                             Newline@69..70 "\n"
                             Whitespace@70..72 "  "
-                            LetExpr@72..165
+                            ExpressionLet@72..165
                               Let@72..75 "let"
                               Whitespace@75..76 " "
-                              Identifier@76..79 "mul"
+                              PatternName@76..79
+                                IdentifierValue@76..79 "mul"
                               Whitespace@79..80 " "
                               Equal@80..81 "="
                               Whitespace@81..82 " "
-                              FunctionDecl@82..116
+                              DeclarationFunction@82..116
                                 Fn@82..84 "fn"
                                 Whitespace@84..85 " "
                                 FunctionParamList@85..107
                                   ParenOpen@85..86 "("
                                   FunctionParam@86..95
-                                    Identifier@86..87 "x"
+                                    FunctionParamLabel@86..87
+                                      IdentifierValue@86..87 "x"
                                     Colon@87..88 ":"
                                     Whitespace@88..89 " "
-                                    TypeName@89..95
-                                      Identifier@89..95 "Number"
+                                    TypeReference@89..95
+                                      IdentifierType@89..95 "Number"
                                   Comma@95..96 ","
                                   Whitespace@96..97 " "
                                   FunctionParam@97..106
-                                    Identifier@97..98 "y"
+                                    FunctionParamLabel@97..98
+                                      IdentifierValue@97..98 "y"
                                     Colon@98..99 ":"
                                     Whitespace@99..100 " "
-                                    TypeName@100..106
-                                      Identifier@100..106 "Number"
+                                    TypeReference@100..106
+                                      IdentifierType@100..106 "Number"
                                   ParenClose@106..107 ")"
                                 Whitespace@107..108 " "
                                 FatArrow@108..110 "=>"
                                 Whitespace@110..111 " "
                                 FunctionBody@111..116
-                                  BinaryExpr@111..116
-                                    VariableRef@111..112
-                                      Identifier@111..112 "x"
+                                  ExpressionBinary@111..116
+                                    ExpressionReference@111..112
+                                      IdentifierValue@111..112 "x"
                                     Whitespace@112..113 " "
                                     Multiply@113..114 "*"
                                     Whitespace@114..115 " "
-                                    VariableRef@115..116
-                                      Identifier@115..116 "y"
+                                    ExpressionReference@115..116
+                                      IdentifierValue@115..116 "y"
                               Whitespace@116..117 " "
                               In@117..119 "in"
                               Newline@119..120 "\n"
                               Whitespace@120..122 "  "
-                              LetExpr@122..165
+                              ExpressionLet@122..165
                                 Let@122..125 "let"
                                 Whitespace@125..126 " "
-                                Identifier@126..127 "x"
+                                PatternName@126..127
+                                  IdentifierValue@126..127 "x"
                                 Whitespace@127..128 " "
                                 Equal@128..129 "="
                                 Whitespace@129..130 " "
-                                CallExpr@130..148
-                                  VariableRef@130..133
-                                    Identifier@130..133 "mul"
+                                ExpressionApply@130..148
+                                  ExpressionReference@130..133
+                                    IdentifierValue@130..133 "mul"
                                   FunctionArgList@133..148
                                     ParenOpen@133..134 "("
                                     FunctionArgPositional@134..144
-                                      CallExpr@134..144
-                                        VariableRef@134..137
-                                          Identifier@134..137 "add"
+                                      ExpressionApply@134..144
+                                        ExpressionReference@134..137
+                                          IdentifierValue@134..137 "add"
                                         FunctionArgList@137..144
                                           ParenOpen@137..138 "("
                                           FunctionArgPositional@138..139
-                                            NumberLiteral@138..139
+                                            ExpressionLiteral@138..139
                                               Number@138..139 "5"
                                           Comma@139..140 ","
                                           Whitespace@140..141 " "
                                           FunctionArgPositional@141..143
-                                            NumberLiteral@141..143
+                                            ExpressionLiteral@141..143
                                               Number@141..143 "42"
                                           ParenClose@143..144 ")"
                                     Comma@144..145 ","
                                     Whitespace@145..146 " "
                                     FunctionArgPositional@146..147
-                                      NumberLiteral@146..147
+                                      ExpressionLiteral@146..147
                                         Number@146..147 "2"
                                     ParenClose@147..148 ")"
                                 Whitespace@148..149 " "
                                 In@149..151 "in"
                                 Newline@151..152 "\n"
                                 Whitespace@152..154 "  "
-                                CallExpr@154..165
-                                  VariableRef@154..157
-                                    Identifier@154..157 "add"
+                                ExpressionApply@154..165
+                                  ExpressionReference@154..157
+                                    IdentifierValue@154..157 "add"
                                   FunctionArgList@157..165
                                     ParenOpen@157..158 "("
                                     FunctionArgPositional@158..159
-                                      VariableRef@158..159
-                                        Identifier@158..159 "x"
+                                      ExpressionReference@158..159
+                                        IdentifierValue@158..159 "x"
                                     Comma@159..160 ","
                                     Whitespace@160..161 " "
                                     FunctionArgPositional@161..164
-                                      NumberLiteral@161..164
+                                      ExpressionLiteral@161..164
                                         Number@161..164 "3.5"
                                     ParenClose@164..165 ")"
                           Newline@165..166 "\n"
@@ -281,154 +288,165 @@ mod tests {
                   prop w: Number = 0
             "},
             expect![[r#"
-                Module@0..390
-                  ImportItem@0..23
+                Module@0..387
+                  ModuleImport@0..23
                     Import@0..6 "import"
                     Whitespace@6..7 " "
-                    ImportAlias@7..11
-                      Identifier@7..11 "sqrt"
+                    ImportAliasValue@7..11
+                      IdentifierValue@7..11 "sqrt"
                     Whitespace@11..12 " "
                     From@12..16 "from"
                     Whitespace@16..17 " "
                     Package@17..23 "@std/m"
                   Error@23..26
-                    Identifier@23..26 "ath"
+                    IdentifierValue@23..26 "ath"
                   Newline@26..27 "\n"
                   Newline@27..28 "\n"
-                  ExportItem@28..209
+                  ModuleExport@28..209
                     Export@28..34 "export"
                     Whitespace@34..35 " "
-                    StructDecl@35..209
+                    DeclarationStruct@35..209
                       Struct@35..41 "struct"
                       Whitespace@41..42 " "
-                      Identifier@42..49 "Vector3"
+                      IdentifierType@42..49 "Vector3"
                       GenericParamList@49..61
                         BracketOpen@49..50 "["
                         GenericParam@50..60
-                          Identifier@50..51 "N"
+                          IdentifierType@50..51 "N"
                           Whitespace@51..52 " "
                           Equal@52..53 "="
                           Whitespace@53..54 " "
-                          TypeName@54..60
-                            Identifier@54..60 "Number"
+                          TypeReference@54..60
+                            IdentifierType@54..60 "Number"
                         BracketClose@60..61 "]"
                       Newline@61..62 "\n"
                       Indent@62..64 "  "
-                      WhereClause@64..107
+                      GenericWhereClause@64..107
                         Where@64..69 "where"
                         Newline@69..70 "\n"
                         Whitespace@70..72 "  "
                         Indent@72..74 "  "
-                        WhereBound@74..103
-                          Identifier@74..75 "N"
-                          Colon@75..76 ":"
-                          Whitespace@76..77 " "
-                          TypeBoundList@77..103
-                            TypeBound@77..84
-                              Identifier@77..84 "Default"
-                            Whitespace@84..85 " "
+                        GenericBound@74..75
+                          IdentifierType@74..75 "N"
+                        GenericBound@75..76
+                          Error@75..76
+                            Colon@75..76 ":"
+                        Whitespace@76..77 " "
+                        GenericBound@77..84
+                          IdentifierType@77..84 "Default"
+                        Whitespace@84..85 " "
+                        GenericBound@85..86
+                          Error@85..86
                             Plus@85..86 "+"
-                            Whitespace@86..87 " "
-                            TypeBound@87..90
-                              Identifier@87..90 "Add"
-                            Whitespace@90..91 " "
+                        Whitespace@86..87 " "
+                        GenericBound@87..90
+                          IdentifierType@87..90 "Add"
+                        Whitespace@90..91 " "
+                        GenericBound@91..92
+                          Error@91..92
                             Plus@91..92 "+"
-                            Whitespace@92..93 " "
-                            TypeBound@93..96
-                              Identifier@93..96 "Mul"
-                            Whitespace@96..97 " "
+                        Whitespace@92..93 " "
+                        GenericBound@93..96
+                          IdentifierType@93..96 "Mul"
+                        Whitespace@96..97 " "
+                        GenericBound@97..98
+                          Error@97..98
                             Plus@97..98 "+"
-                            Whitespace@98..99 " "
-                            TypeBound@99..103
-                              Identifier@99..103 "Sqrt"
+                        Whitespace@98..99 " "
+                        GenericBound@99..103
+                          IdentifierType@99..103 "Sqrt"
                         Newline@103..104 "\n"
                         Newline@104..105 "\n"
                         Whitespace@105..107 "  "
                         Dedent@107..107 ""
-                      PropDecl@107..130
+                      DeclarationProp@107..130
                         Prop@107..111 "prop"
                         Whitespace@111..112 " "
-                        Identifier@112..113 "x"
+                        IdentifierValue@112..113 "x"
                         Colon@113..114 ":"
                         Whitespace@114..115 " "
-                        TypeName@115..116
-                          Identifier@115..116 "N"
+                        TypeReference@115..116
+                          IdentifierType@115..116 "N"
                         Whitespace@116..117 " "
                         Equal@117..118 "="
                         Whitespace@118..119 " "
-                        CallExpr@119..130
-                          GetExpr@119..128
-                            VariableRef@119..120
-                              Identifier@119..120 "N"
+                        ExpressionApply@119..130
+                          TypeAssociation@119..128
+                            TypeReference@119..120
+                              IdentifierType@119..120 "N"
                             Dot@120..121 "."
-                            Identifier@121..128 "default"
+                            Error@121..128
+                              IdentifierValue@121..128 "default"
                           FunctionArgList@128..130
                             ParenOpen@128..129 "("
                             ParenClose@129..130 ")"
                       Newline@130..131 "\n"
                       Newline@131..132 "\n"
                       Whitespace@132..134 "  "
-                      PropDecl@134..157
+                      DeclarationProp@134..157
                         Prop@134..138 "prop"
                         Whitespace@138..139 " "
-                        Identifier@139..140 "y"
+                        IdentifierValue@139..140 "y"
                         Colon@140..141 ":"
                         Whitespace@141..142 " "
-                        TypeName@142..143
-                          Identifier@142..143 "N"
+                        TypeReference@142..143
+                          IdentifierType@142..143 "N"
                         Whitespace@143..144 " "
                         Equal@144..145 "="
                         Whitespace@145..146 " "
-                        CallExpr@146..157
-                          GetExpr@146..155
-                            VariableRef@146..147
-                              Identifier@146..147 "N"
+                        ExpressionApply@146..157
+                          TypeAssociation@146..155
+                            TypeReference@146..147
+                              IdentifierType@146..147 "N"
                             Dot@147..148 "."
-                            Identifier@148..155 "default"
+                            Error@148..155
+                              IdentifierValue@148..155 "default"
                           FunctionArgList@155..157
                             ParenOpen@155..156 "("
                             ParenClose@156..157 ")"
                       Newline@157..158 "\n"
                       Newline@158..159 "\n"
                       Whitespace@159..161 "  "
-                      PropDecl@161..184
+                      DeclarationProp@161..184
                         Prop@161..165 "prop"
                         Whitespace@165..166 " "
-                        Identifier@166..167 "z"
+                        IdentifierValue@166..167 "z"
                         Colon@167..168 ":"
                         Whitespace@168..169 " "
-                        TypeName@169..170
-                          Identifier@169..170 "N"
+                        TypeReference@169..170
+                          IdentifierType@169..170 "N"
                         Whitespace@170..171 " "
                         Equal@171..172 "="
                         Whitespace@172..173 " "
-                        CallExpr@173..184
-                          GetExpr@173..182
-                            VariableRef@173..174
-                              Identifier@173..174 "N"
+                        ExpressionApply@173..184
+                          TypeAssociation@173..182
+                            TypeReference@173..174
+                              IdentifierType@173..174 "N"
                             Dot@174..175 "."
-                            Identifier@175..182 "default"
+                            Error@175..182
+                              IdentifierValue@175..182 "default"
                           FunctionArgList@182..184
                             ParenOpen@182..183 "("
                             ParenClose@183..184 ")"
                       Newline@184..185 "\n"
                       Newline@185..186 "\n"
                       Whitespace@186..188 "  "
-                      FunctionDecl@188..206
+                      DeclarationFunction@188..206
                         Fn@188..190 "fn"
                         Whitespace@190..191 " "
-                        Identifier@191..197 "length"
+                        IdentifierValue@191..197 "length"
                         FunctionParamList@197..203
                           ParenOpen@197..198 "("
                           FunctionParam@198..202
-                            SelfLower@198..202 "self"
+                            FunctionParamLabel@198..202
+                              SelfLower@198..202 "self"
                           ParenClose@202..203 ")"
                         Error@203..204
                           Colon@203..204 ":"
                         Whitespace@204..205 " "
                         FunctionBody@205..206
-                          VariableRef@205..206
-                            Identifier@205..206 "N"
+                          TypeReference@205..206
+                            IdentifierType@205..206 "N"
                       Whitespace@206..207 " "
                       Error@207..209
                         FatArrow@207..209 "=>"
@@ -441,189 +459,193 @@ mod tests {
                   Whitespace@217..218 " "
                   Error@218..222
                     SelfUpper@218..222 "Self"
-                  Whitespace@222..223 " "
+                  Error@222..223
+                    ParenOpen@222..223 "("
                   Error@223..224
-                    BraceOpen@223..224 "{"
-                  Whitespace@224..225 " "
-                  Error@225..226
-                    Identifier@225..226 "x"
+                    IdentifierValue@223..224 "x"
+                  Error@224..225
+                    Comma@224..225 ","
+                  Whitespace@225..226 " "
                   Error@226..227
-                    Comma@226..227 ","
-                  Whitespace@227..228 " "
-                  Error@228..229
-                    Identifier@228..229 "y"
+                    IdentifierValue@226..227 "y"
+                  Error@227..228
+                    Comma@227..228 ","
+                  Whitespace@228..229 " "
                   Error@229..230
-                    Comma@229..230 ","
-                  Whitespace@230..231 " "
-                  Error@231..232
-                    Identifier@231..232 "z"
-                  Whitespace@232..233 " "
-                  Error@233..234
-                    BraceClose@233..234 "}"
-                  Whitespace@234..235 " "
-                  Error@235..236
-                    Equal@235..236 "="
-                  Whitespace@236..237 " "
-                  Error@237..241
-                    SelfLower@237..241 "self"
-                  Newline@241..242 "\n"
-                  Whitespace@242..246 "    "
+                    IdentifierValue@229..230 "z"
+                  Error@230..231
+                    ParenClose@230..231 ")"
+                  Whitespace@231..232 " "
+                  Error@232..233
+                    Equal@232..233 "="
+                  Whitespace@233..234 " "
+                  Error@234..238
+                    SelfLower@234..238 "self"
+                  Newline@238..239 "\n"
+                  Whitespace@239..243 "    "
+                  Error@243..244
+                    ParenOpen@243..244 "("
+                  Error@244..245
+                    IdentifierValue@244..245 "x"
+                  Whitespace@245..246 " "
                   Error@246..247
-                    ParenOpen@246..247 "("
-                  Error@247..248
-                    Identifier@247..248 "x"
-                  Whitespace@248..249 " "
-                  Error@249..250
-                    Multiply@249..250 "*"
-                  Whitespace@250..251 " "
-                  Error@251..252
-                    Identifier@251..252 "x"
-                  Whitespace@252..253 " "
-                  Error@253..254
-                    Plus@253..254 "+"
-                  Whitespace@254..255 " "
-                  Error@255..256
-                    Identifier@255..256 "y"
-                  Whitespace@256..257 " "
-                  Error@257..258
-                    Multiply@257..258 "*"
-                  Whitespace@258..259 " "
-                  Error@259..260
-                    Identifier@259..260 "y"
-                  Whitespace@260..261 " "
-                  Error@261..262
-                    Plus@261..262 "+"
-                  Whitespace@262..263 " "
-                  Error@263..264
-                    Identifier@263..264 "z"
-                  Whitespace@264..265 " "
+                    Multiply@246..247 "*"
+                  Whitespace@247..248 " "
+                  Error@248..249
+                    IdentifierValue@248..249 "x"
+                  Whitespace@249..250 " "
+                  Error@250..251
+                    Plus@250..251 "+"
+                  Whitespace@251..252 " "
+                  Error@252..253
+                    IdentifierValue@252..253 "y"
+                  Whitespace@253..254 " "
+                  Error@254..255
+                    Multiply@254..255 "*"
+                  Whitespace@255..256 " "
+                  Error@256..257
+                    IdentifierValue@256..257 "y"
+                  Whitespace@257..258 " "
+                  Error@258..259
+                    Plus@258..259 "+"
+                  Whitespace@259..260 " "
+                  Error@260..261
+                    IdentifierValue@260..261 "z"
+                  Whitespace@261..262 " "
+                  Error@262..263
+                    Multiply@262..263 "*"
+                  Whitespace@263..264 " "
+                  Error@264..265
+                    IdentifierValue@264..265 "z"
                   Error@265..266
-                    Multiply@265..266 "*"
-                  Whitespace@266..267 " "
-                  Error@267..268
-                    Identifier@267..268 "z"
-                  Error@268..269
-                    ParenClose@268..269 ")"
-                  Error@269..270
-                    Dot@269..270 "."
-                  Error@270..274
-                    Identifier@270..274 "sqrt"
-                  Error@274..275
-                    ParenOpen@274..275 "("
-                  Error@275..276
-                    ParenClose@275..276 ")"
-                  Newline@276..277 "\n"
-                  Newline@277..278 "\n"
-                  Error@278..278
-                    Dedent@278..278 ""
-                  Error@278..278
-                    Dedent@278..278 ""
-                  ExportItem@278..390
-                    Export@278..284 "export"
-                    Whitespace@284..285 " "
-                    StructDecl@285..390
-                      Struct@285..291 "struct"
-                      Whitespace@291..292 " "
-                      Identifier@292..302 "Quaternion"
-                      Newline@302..303 "\n"
-                      Indent@303..305 "  "
-                      PropDecl@305..323
-                        Prop@305..309 "prop"
+                    ParenClose@265..266 ")"
+                  Error@266..267
+                    Dot@266..267 "."
+                  Error@267..271
+                    IdentifierValue@267..271 "sqrt"
+                  Error@271..272
+                    ParenOpen@271..272 "("
+                  Error@272..273
+                    ParenClose@272..273 ")"
+                  Newline@273..274 "\n"
+                  Newline@274..275 "\n"
+                  Error@275..275
+                    Dedent@275..275 ""
+                  Error@275..275
+                    Dedent@275..275 ""
+                  ModuleExport@275..387
+                    Export@275..281 "export"
+                    Whitespace@281..282 " "
+                    DeclarationStruct@282..387
+                      Struct@282..288 "struct"
+                      Whitespace@288..289 " "
+                      IdentifierType@289..299 "Quaternion"
+                      Newline@299..300 "\n"
+                      Indent@300..302 "  "
+                      DeclarationProp@302..320
+                        Prop@302..306 "prop"
+                        Whitespace@306..307 " "
+                        IdentifierValue@307..308 "x"
+                        Colon@308..309 ":"
                         Whitespace@309..310 " "
-                        Identifier@310..311 "x"
-                        Colon@311..312 ":"
-                        Whitespace@312..313 " "
-                        TypeName@313..319
-                          Identifier@313..319 "Number"
-                        Whitespace@319..320 " "
-                        Equal@320..321 "="
-                        Whitespace@321..322 " "
-                        NumberLiteral@322..323
-                          Number@322..323 "0"
-                      Newline@323..324 "\n"
-                      Newline@324..325 "\n"
-                      Whitespace@325..327 "  "
-                      PropDecl@327..345
-                        Prop@327..331 "prop"
+                        TypeReference@310..316
+                          IdentifierType@310..316 "Number"
+                        Whitespace@316..317 " "
+                        Equal@317..318 "="
+                        Whitespace@318..319 " "
+                        ExpressionLiteral@319..320
+                          Number@319..320 "0"
+                      Newline@320..321 "\n"
+                      Newline@321..322 "\n"
+                      Whitespace@322..324 "  "
+                      DeclarationProp@324..342
+                        Prop@324..328 "prop"
+                        Whitespace@328..329 " "
+                        IdentifierValue@329..330 "y"
+                        Colon@330..331 ":"
                         Whitespace@331..332 " "
-                        Identifier@332..333 "y"
-                        Colon@333..334 ":"
-                        Whitespace@334..335 " "
-                        TypeName@335..341
-                          Identifier@335..341 "Number"
-                        Whitespace@341..342 " "
-                        Equal@342..343 "="
-                        Whitespace@343..344 " "
-                        NumberLiteral@344..345
-                          Number@344..345 "0"
-                      Newline@345..346 "\n"
-                      Newline@346..347 "\n"
-                      Whitespace@347..349 "  "
-                      PropDecl@349..367
-                        Prop@349..353 "prop"
+                        TypeReference@332..338
+                          IdentifierType@332..338 "Number"
+                        Whitespace@338..339 " "
+                        Equal@339..340 "="
+                        Whitespace@340..341 " "
+                        ExpressionLiteral@341..342
+                          Number@341..342 "0"
+                      Newline@342..343 "\n"
+                      Newline@343..344 "\n"
+                      Whitespace@344..346 "  "
+                      DeclarationProp@346..364
+                        Prop@346..350 "prop"
+                        Whitespace@350..351 " "
+                        IdentifierValue@351..352 "z"
+                        Colon@352..353 ":"
                         Whitespace@353..354 " "
-                        Identifier@354..355 "z"
-                        Colon@355..356 ":"
-                        Whitespace@356..357 " "
-                        TypeName@357..363
-                          Identifier@357..363 "Number"
-                        Whitespace@363..364 " "
-                        Equal@364..365 "="
-                        Whitespace@365..366 " "
-                        NumberLiteral@366..367
-                          Number@366..367 "0"
-                      Newline@367..368 "\n"
-                      Newline@368..369 "\n"
-                      Whitespace@369..371 "  "
-                      PropDecl@371..389
-                        Prop@371..375 "prop"
+                        TypeReference@354..360
+                          IdentifierType@354..360 "Number"
+                        Whitespace@360..361 " "
+                        Equal@361..362 "="
+                        Whitespace@362..363 " "
+                        ExpressionLiteral@363..364
+                          Number@363..364 "0"
+                      Newline@364..365 "\n"
+                      Newline@365..366 "\n"
+                      Whitespace@366..368 "  "
+                      DeclarationProp@368..386
+                        Prop@368..372 "prop"
+                        Whitespace@372..373 " "
+                        IdentifierValue@373..374 "w"
+                        Colon@374..375 ":"
                         Whitespace@375..376 " "
-                        Identifier@376..377 "w"
-                        Colon@377..378 ":"
-                        Whitespace@378..379 " "
-                        TypeName@379..385
-                          Identifier@379..385 "Number"
-                        Whitespace@385..386 " "
-                        Equal@386..387 "="
-                        Whitespace@387..388 " "
-                        NumberLiteral@388..389
-                          Number@388..389 "0"
-                      Newline@389..390 "\n"
-                      Dedent@390..390 ""
-                error at 23..26: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found identifier
+                        TypeReference@376..382
+                          IdentifierType@376..382 "Number"
+                        Whitespace@382..383 " "
+                        Equal@383..384 "="
+                        Whitespace@384..385 " "
+                        ExpressionLiteral@385..386
+                          Number@385..386 "0"
+                      Newline@386..387 "\n"
+                      Dedent@387..387 ""
+                error at 23..26: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found value-id
+                error at 75..76: expected type-id, but found ‘:’
+                error at 85..86: expected type-id, but found ‘+’
+                error at 91..92: expected type-id, but found ‘+’
+                error at 97..98: expected type-id, but found ‘+’
+                error at 121..128: expected type-id, but found value-id
+                error at 148..155: expected type-id, but found value-id
+                error at 175..182: expected type-id, but found value-id
                 error at 203..204: expected ‘=>’, but found ‘:’
                 error at 207..209: expected dedent, but found ‘=>’
                 error at 212..214: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found indent
                 error at 214..217: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘let’
                 error at 218..222: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘Self’
-                error at 223..224: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘{’
-                error at 225..226: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found identifier
-                error at 226..227: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘,’
-                error at 228..229: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found identifier
-                error at 229..230: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘,’
-                error at 231..232: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found identifier
-                error at 233..234: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘}’
-                error at 235..236: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘=’
-                error at 237..241: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘self’
-                error at 246..247: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘(’
-                error at 247..248: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found identifier
-                error at 249..250: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘*’
-                error at 251..252: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found identifier
-                error at 253..254: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘+’
-                error at 255..256: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found identifier
-                error at 257..258: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘*’
-                error at 259..260: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found identifier
-                error at 261..262: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘+’
-                error at 263..264: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found identifier
-                error at 265..266: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘*’
-                error at 267..268: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found identifier
-                error at 268..269: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘)’
-                error at 269..270: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘.’
-                error at 270..274: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found identifier
-                error at 274..275: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘(’
-                error at 275..276: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘)’
-                error at 278..278: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found dedent
-                error at 278..278: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found dedent"#]],
+                error at 222..223: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘(’
+                error at 223..224: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found value-id
+                error at 224..225: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘,’
+                error at 226..227: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found value-id
+                error at 227..228: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘,’
+                error at 229..230: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found value-id
+                error at 230..231: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘)’
+                error at 232..233: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘=’
+                error at 234..238: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘self’
+                error at 243..244: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘(’
+                error at 244..245: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found value-id
+                error at 246..247: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘*’
+                error at 248..249: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found value-id
+                error at 250..251: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘+’
+                error at 252..253: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found value-id
+                error at 254..255: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘*’
+                error at 256..257: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found value-id
+                error at 258..259: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘+’
+                error at 260..261: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found value-id
+                error at 262..263: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘*’
+                error at 264..265: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found value-id
+                error at 265..266: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘)’
+                error at 266..267: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘.’
+                error at 267..271: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found value-id
+                error at 271..272: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘(’
+                error at 272..273: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘)’
+                error at 275..275: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found dedent
+                error at 275..275: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found dedent"#]],
         );
     }
 }

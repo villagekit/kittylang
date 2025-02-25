@@ -42,11 +42,6 @@ pub enum NodeKind {
     Error,
     Missing,
 
-    // Identifier
-    ValueName,
-    TypeName,
-    TraitName,
-
     // Module
     Module,
     ModuleImport,
@@ -56,6 +51,7 @@ pub enum NodeKind {
     ModuleLocal,
 
     // Expression
+    ExpressionReference,
     ExpressionLiteral,
     LiteralBoolean,
     LiteralNumber,
@@ -73,6 +69,7 @@ pub enum NodeKind {
     ExpressionGet,
 
     // Type Path
+    TypeReference,
     TypeGeneric,
     TypeProjection,
     TypeAssociation,
@@ -97,6 +94,7 @@ pub enum NodeKind {
 
     // Where Clauses
     GenericWhereClause,
+    GenericWhereTypeLabel,
     GenericWhereBound,
 
     // Operators.
@@ -110,10 +108,10 @@ pub enum NodeKind {
     PatternLiteral,
     PatternTuple,
     PatternType,
-    PatternFieldList,
-    PatternFieldPositional,
-    PatternFieldLabelled,
-    PatternVariable,
+    PatternTypeArgPositional,
+    PatternTypeArgLabelled,
+    PatternTypeArgList,
+    PatternName,
 
     // Top-Level Declarations
     DeclarationType,
@@ -122,6 +120,7 @@ pub enum NodeKind {
     // Function Declarations
     DeclarationFunction,
     FunctionParam,
+    FunctionParamLabel,
     FunctionParamList,
     FunctionArgPositional,
     FunctionArgLabelled,

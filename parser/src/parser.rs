@@ -134,7 +134,7 @@ impl<'t> Parser<'t> {
         self.peek().is_none()
     }
 
-    fn peek(&mut self) -> Option<TokenKind> {
+    pub(crate) fn peek(&mut self) -> Option<TokenKind> {
         self.source.peek_kind()
     }
 }

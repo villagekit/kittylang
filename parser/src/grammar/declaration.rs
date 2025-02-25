@@ -1,15 +1,10 @@
 use kitty_syntax::{NodeKind, TokenKind};
 
-use crate::{
-    grammar::identifier::{type_name, value_name},
-    marker::CompletedMarker,
-    parser::Parser,
-    token_set::TokenSet,
-};
+use crate::{marker::CompletedMarker, parser::Parser, token_set::TokenSet};
 
 use super::{
     expression::expression,
-    function::function_declaration_optional_name_types_body,
+    function::function_declaration_option_name_body,
     r#type::{
         generic_bound_list, generic_param_list, generic_where_clause, type_annotation, type_path,
     },
@@ -50,10 +45,10 @@ pub(crate) fn declaration(p: &mut Parser, recovery: TokenSet) -> Option<Complete
 /// Type alias declaration
 fn declaration_type(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     assert!(p.at(TokenKind::Type));
-    let recovery_type = recovery.union([TokenKind::Equal]);
+    let recovery_type = recovery.union([TokenKind::Equal, TokenKind::Colon]);
     let m = p.start();
     p.bump(); // Consume 'type'
-    type_name(p, recovery);
+    p.expect(TokenKind::IdentifierType, recovery_type);
     if p.at(TokenKind::BracketOpen) {
         generic_param_list(p, recovery_type);
     }
@@ -76,7 +71,7 @@ fn declaration_constant_optional_type_value(
     assert!(p.at(TokenKind::Const));
     let m = p.start();
     p.bump(); // Consume 'const'
-    value_name(p, recovery);
+    p.expect(TokenKind::IdentifierValue, recovery);
     if has_type || p.at(TokenKind::Colon) {
         p.expect(TokenKind::Colon, recovery);
         type_annotation(p, recovery);
@@ -89,7 +84,7 @@ fn declaration_constant_optional_type_value(
 }
 
 fn declaration_function(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    function_declaration_optional_name_types_body(p, recovery, true, true, true)
+    function_declaration_option_name_body(p, recovery, true, true)
 }
 
 fn declaration_struct(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
@@ -97,7 +92,7 @@ fn declaration_struct(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let recovery_struct = recovery.union(STRUCT_ITEM_FIRST).union([TokenKind::Dedent]);
     let m = p.start();
     p.bump(); // Consume 'struct'
-    type_name(p, recovery);
+    p.expect(TokenKind::IdentifierType, recovery);
     if p.at(TokenKind::BracketOpen) {
         generic_param_list(p, recovery);
     }
@@ -141,7 +136,7 @@ fn declaration_prop_optional_type_value(
     assert!(p.at(TokenKind::Prop));
     let m = p.start();
     p.bump(); // Consume 'prop'
-    value_name(p, recovery);
+    p.expect(TokenKind::IdentifierValue, recovery);
     if has_type || p.at(TokenKind::Colon) {
         p.expect(TokenKind::Colon, recovery);
         type_annotation(p, recovery);
@@ -158,7 +153,7 @@ fn declaration_enum(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let recovery_enum = recovery.union(ENUM_ITEM_FIRST).union([TokenKind::Dedent]);
     let m = p.start();
     p.bump(); // Consume 'enum'
-    type_name(p, recovery);
+    p.expect(TokenKind::IdentifierType, recovery);
     if p.at(TokenKind::BracketOpen) {
         generic_param_list(p, recovery);
     }
@@ -193,7 +188,7 @@ fn enum_case(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     assert!(p.at(TokenKind::Case));
     let m = p.start();
     p.bump(); // Consume 'case'
-    type_name(p, recovery);
+    p.expect(TokenKind::IdentifierType, recovery);
     if p.at(TokenKind::Colon) {
         p.bump(); // Consume ':'
         type_annotation(p, recovery);
@@ -206,7 +201,7 @@ fn declaration_trait(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let recovery_trait = recovery.union(TRAIT_ITEM_FIRST).union([TokenKind::Dedent]);
     let m = p.start();
     p.bump(); // Consume 'trait'
-    type_name(p, recovery);
+    p.expect(TokenKind::IdentifierType, recovery);
     if p.at(TokenKind::BracketOpen) {
         generic_param_list(p, recovery);
     }
@@ -248,7 +243,7 @@ fn trait_type(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     assert!(p.at(TokenKind::Type));
     let m = p.start();
     p.bump(); // Consume 'type'
-    type_name(p, recovery);
+    p.expect(TokenKind::IdentifierType, recovery);
     if p.at(TokenKind::BracketOpen) {
         generic_param_list(p, recovery);
     }
@@ -268,7 +263,7 @@ fn trait_constant(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 }
 
 fn trait_function(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    function_declaration_optional_name_types_body(p, recovery, true, true, false)
+    function_declaration_option_name_body(p, recovery, true, false)
 }
 
 fn declaration_impl_trait(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
@@ -323,7 +318,7 @@ fn trait_impl_constant(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 }
 
 fn trait_impl_function(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    function_declaration_optional_name_types_body(p, recovery, true, false, true)
+    function_declaration_option_name_body(p, recovery, true, true)
 }
 
 fn trait_impl_prop(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
@@ -351,21 +346,21 @@ mod tests {
         check(
             "type ThingList = List[Thing]",
             expect![[r#"
-                TypeDecl@0..28
+                DeclarationType@0..28
                   Type@0..4 "type"
                   Whitespace@4..5 " "
-                  Identifier@5..14 "ThingList"
+                  IdentifierType@5..14 "ThingList"
                   Whitespace@14..15 " "
                   Equal@15..16 "="
                   Whitespace@16..17 " "
                   TypeGeneric@17..28
-                    TypeName@17..21
-                      Identifier@17..21 "List"
+                    TypeReference@17..21
+                      IdentifierType@17..21 "List"
                     GenericArgList@21..28
                       BracketOpen@21..22 "["
                       GenericArgPositional@22..27
-                        TypeName@22..27
-                          Identifier@22..27 "Thing"
+                        TypeReference@22..27
+                          IdentifierType@22..27 "Thing"
                       BracketClose@27..28 "]""#]],
         );
     }
@@ -376,18 +371,18 @@ mod tests {
         check(
             "const x: Number = 42",
             expect![[r#"
-                ConstantDecl@0..20
+                DeclarationConstant@0..20
                   Const@0..5 "const"
                   Whitespace@5..6 " "
-                  Identifier@6..7 "x"
+                  IdentifierValue@6..7 "x"
                   Colon@7..8 ":"
                   Whitespace@8..9 " "
-                  TypeName@9..15
-                    Identifier@9..15 "Number"
+                  TypeReference@9..15
+                    IdentifierType@9..15 "Number"
                   Whitespace@15..16 " "
                   Equal@16..17 "="
                   Whitespace@17..18 " "
-                  NumberLiteral@18..20
+                  ExpressionLiteral@18..20
                     Number@18..20 "42""#]],
         );
     }
@@ -398,14 +393,14 @@ mod tests {
         check(
             "const y = 100",
             expect![[r#"
-                ConstantDecl@0..13
+                DeclarationConstant@0..13
                   Const@0..5 "const"
                   Whitespace@5..6 " "
-                  Identifier@6..7 "y"
+                  IdentifierValue@6..7 "y"
                   Whitespace@7..8 " "
                   Equal@8..9 "="
                   Whitespace@9..10 " "
-                  NumberLiteral@10..13
+                  ExpressionLiteral@10..13
                     Number@10..13 "100""#]],
         );
     }
@@ -420,31 +415,31 @@ mod tests {
                     case None
             "},
             expect![[r#"
-                EnumDecl@0..46
+                DeclarationEnum@0..46
                   Enum@0..4 "enum"
                   Whitespace@4..5 " "
-                  Identifier@5..11 "Option"
+                  IdentifierType@5..11 "Option"
                   GenericParamList@11..14
                     BracketOpen@11..12 "["
                     GenericParam@12..13
-                      Identifier@12..13 "T"
+                      IdentifierType@12..13 "T"
                     BracketClose@13..14 "]"
                   Newline@14..15 "\n"
                   Indent@15..19 "    "
                   EnumCase@19..31
                     Case@19..23 "case"
                     Whitespace@23..24 " "
-                    Identifier@24..28 "Some"
+                    IdentifierType@24..28 "Some"
                     Colon@28..29 ":"
                     Whitespace@29..30 " "
-                    TypeName@30..31
-                      Identifier@30..31 "T"
+                    TypeReference@30..31
+                      IdentifierType@30..31 "T"
                   Newline@31..32 "\n"
                   Whitespace@32..36 "    "
                   EnumCase@36..45
                     Case@36..40 "case"
                     Whitespace@40..41 " "
-                    Identifier@41..45 "None"
+                    IdentifierType@41..45 "None"
                   Newline@45..46 "\n"
                   Dedent@46..46 """#]],
         );
@@ -456,25 +451,26 @@ mod tests {
         check(
             "fn foo(x: Number) => x",
             expect![[r#"
-                FunctionDecl@0..22
+                DeclarationFunction@0..22
                   Fn@0..2 "fn"
                   Whitespace@2..3 " "
-                  Identifier@3..6 "foo"
+                  IdentifierValue@3..6 "foo"
                   FunctionParamList@6..17
                     ParenOpen@6..7 "("
                     FunctionParam@7..16
-                      Identifier@7..8 "x"
+                      FunctionParamLabel@7..8
+                        IdentifierValue@7..8 "x"
                       Colon@8..9 ":"
                       Whitespace@9..10 " "
-                      TypeName@10..16
-                        Identifier@10..16 "Number"
+                      TypeReference@10..16
+                        IdentifierType@10..16 "Number"
                     ParenClose@16..17 ")"
                   Whitespace@17..18 " "
                   FatArrow@18..20 "=>"
                   Whitespace@20..21 " "
                   FunctionBody@21..22
-                    VariableRef@21..22
-                      Identifier@21..22 "x""#]],
+                    ExpressionReference@21..22
+                      IdentifierValue@21..22 "x""#]],
         );
     }
 
@@ -487,27 +483,28 @@ mod tests {
                     x
             "},
             expect![[r#"
-                FunctionDecl@0..27
+                DeclarationFunction@0..27
                   Fn@0..2 "fn"
                   Whitespace@2..3 " "
-                  Identifier@3..6 "foo"
+                  IdentifierValue@3..6 "foo"
                   FunctionParamList@6..17
                     ParenOpen@6..7 "("
                     FunctionParam@7..16
-                      Identifier@7..8 "x"
+                      FunctionParamLabel@7..8
+                        IdentifierValue@7..8 "x"
                       Colon@8..9 ":"
                       Whitespace@9..10 " "
-                      TypeName@10..16
-                        Identifier@10..16 "Number"
+                      TypeReference@10..16
+                        IdentifierType@10..16 "Number"
                     ParenClose@16..17 ")"
                   Whitespace@17..18 " "
                   FatArrow@18..20 "=>"
                   Newline@20..21 "\n"
                   FunctionBody@21..27
-                    BlockExpr@21..27
+                    ExpressionBlock@21..27
                       Indent@21..25 "    "
-                      VariableRef@25..26
-                        Identifier@25..26 "x"
+                      ExpressionReference@25..26
+                        IdentifierValue@25..26 "x"
                       Newline@26..27 "\n"
                       Dedent@27..27 """#]],
         );
@@ -524,44 +521,44 @@ mod tests {
                     prop is_alive: Boolean = True
             "},
             expect![[r#"
-                StructDecl@0..91
+                DeclarationStruct@0..91
                   Struct@0..6 "struct"
                   Whitespace@6..7 " "
-                  Identifier@7..13 "Person"
+                  IdentifierType@7..13 "Person"
                   Newline@13..14 "\n"
                   Indent@14..18 "    "
-                  PropDecl@18..35
+                  DeclarationProp@18..35
                     Prop@18..22 "prop"
                     Whitespace@22..23 " "
-                    Identifier@23..27 "name"
+                    IdentifierValue@23..27 "name"
                     Colon@27..28 ":"
                     Whitespace@28..29 " "
-                    TypeName@29..35
-                      Identifier@29..35 "String"
+                    TypeReference@29..35
+                      IdentifierType@29..35 "String"
                   Newline@35..36 "\n"
                   Whitespace@36..40 "    "
-                  PropDecl@40..56
+                  DeclarationProp@40..56
                     Prop@40..44 "prop"
                     Whitespace@44..45 " "
-                    Identifier@45..48 "age"
+                    IdentifierValue@45..48 "age"
                     Colon@48..49 ":"
                     Whitespace@49..50 " "
-                    TypeName@50..56
-                      Identifier@50..56 "Number"
+                    TypeReference@50..56
+                      IdentifierType@50..56 "Number"
                   Newline@56..57 "\n"
                   Whitespace@57..61 "    "
-                  PropDecl@61..90
+                  DeclarationProp@61..90
                     Prop@61..65 "prop"
                     Whitespace@65..66 " "
-                    Identifier@66..74 "is_alive"
+                    IdentifierValue@66..74 "is_alive"
                     Colon@74..75 ":"
                     Whitespace@75..76 " "
-                    TypeName@76..83
-                      Identifier@76..83 "Boolean"
+                    TypeReference@76..83
+                      IdentifierType@76..83 "Boolean"
                     Whitespace@83..84 " "
                     Equal@84..85 "="
                     Whitespace@85..86 " "
-                    BooleanLiteral@86..90
+                    ExpressionLiteral@86..90
                       Boolean@86..90 "True"
                   Newline@90..91 "\n"
                   Dedent@91..91 """#]],
@@ -577,27 +574,29 @@ mod tests {
                     fn add(self, other: Self)
             "},
             expect![[r#"
-                TraitDecl@0..40
+                DeclarationTrait@0..40
                   Trait@0..5 "trait"
                   Whitespace@5..6 " "
-                  Identifier@6..9 "Add"
+                  IdentifierType@6..9 "Add"
                   Newline@9..10 "\n"
                   Indent@10..14 "    "
-                  FunctionDecl@14..39
+                  DeclarationFunction@14..39
                     Fn@14..16 "fn"
                     Whitespace@16..17 " "
-                    Identifier@17..20 "add"
+                    IdentifierValue@17..20 "add"
                     FunctionParamList@20..39
                       ParenOpen@20..21 "("
                       FunctionParam@21..25
-                        SelfLower@21..25 "self"
+                        FunctionParamLabel@21..25
+                          SelfLower@21..25 "self"
                       Comma@25..26 ","
                       Whitespace@26..27 " "
                       FunctionParam@27..38
-                        Identifier@27..32 "other"
+                        FunctionParamLabel@27..32
+                          IdentifierValue@27..32 "other"
                         Colon@32..33 ":"
                         Whitespace@33..34 " "
-                        TypeName@34..38
+                        TypeReference@34..38
                           SelfUpper@34..38 "Self"
                       ParenClose@38..39 ")"
                   Newline@39..40 "\n"
@@ -615,22 +614,22 @@ mod tests {
                         1
             "},
             expect![[r#"
-                ImplTraitDecl@0..58
+                DeclarationImplTrait@0..58
                   Impl@0..4 "impl"
                   Whitespace@4..5 " "
-                  TypeName@5..12
-                    Identifier@5..12 "MyTrait"
+                  TypeReference@5..12
+                    IdentifierType@5..12 "MyTrait"
                   Whitespace@12..13 " "
                   For@13..16 "for"
                   Whitespace@16..17 " "
-                  TypeName@17..25
-                    Identifier@17..25 "MyStruct"
+                  TypeReference@17..25
+                    IdentifierType@17..25 "MyStruct"
                   Newline@25..26 "\n"
                   Indent@26..30 "    "
-                  FunctionDecl@30..58
+                  DeclarationFunction@30..58
                     Fn@30..32 "fn"
                     Whitespace@32..33 " "
-                    Identifier@33..42 "my_method"
+                    IdentifierValue@33..42 "my_method"
                     FunctionParamList@42..44
                       ParenOpen@42..43 "("
                       ParenClose@43..44 ")"
@@ -639,9 +638,9 @@ mod tests {
                     Newline@47..48 "\n"
                     Whitespace@48..52 "    "
                     FunctionBody@52..58
-                      BlockExpr@52..58
+                      ExpressionBlock@52..58
                         Indent@52..56 "    "
-                        NumberLiteral@56..57
+                        ExpressionLiteral@56..57
                           Number@56..57 "1"
                         Newline@57..58 "\n"
                         Dedent@58..58 ""
@@ -669,22 +668,22 @@ mod tests {
         check(
             "type = List[Thing]",
             expect![[r#"
-                TypeDecl@0..18
+                DeclarationType@0..18
                   Type@0..4 "type"
                   Whitespace@4..5 " "
                   Missing@5..5
                   Equal@5..6 "="
                   Whitespace@6..7 " "
                   TypeGeneric@7..18
-                    TypeName@7..11
-                      Identifier@7..11 "List"
+                    TypeReference@7..11
+                      IdentifierType@7..11 "List"
                     GenericArgList@11..18
                       BracketOpen@11..12 "["
                       GenericArgPositional@12..17
-                        TypeName@12..17
-                          Identifier@12..17 "Thing"
+                        TypeReference@12..17
+                          IdentifierType@12..17 "Thing"
                       BracketClose@17..18 "]"
-                error at 5: missing identifier"#]],
+                error at 5: missing type-id"#]],
         );
     }
 
@@ -697,21 +696,21 @@ mod tests {
                     type Assoc = Concrete
             "},
             expect![[r#"
-                TraitDecl@0..40
+                DeclarationTrait@0..40
                   Trait@0..5 "trait"
                   Whitespace@5..6 " "
-                  Identifier@6..13 "MyTrait"
+                  IdentifierType@6..13 "MyTrait"
                   Newline@13..14 "\n"
                   Indent@14..18 "    "
-                  TypeDecl@18..39
+                  DeclarationType@18..39
                     Type@18..22 "type"
                     Whitespace@22..23 " "
-                    Identifier@23..28 "Assoc"
+                    IdentifierType@23..28 "Assoc"
                     Whitespace@28..29 " "
                     Equal@29..30 "="
                     Whitespace@30..31 " "
-                    TypeName@31..39
-                      Identifier@31..39 "Concrete"
+                    TypeReference@31..39
+                      IdentifierType@31..39 "Concrete"
                   Newline@39..40 "\n"
                   Dedent@40..40 """#]],
         );
@@ -723,23 +722,23 @@ mod tests {
         check(
             indoc! {"
                 trait MyTrait
-                    const PI: Number
+                    const pi: Number
             "},
             expect![[r#"
-                TraitDecl@0..35
+                DeclarationTrait@0..35
                   Trait@0..5 "trait"
                   Whitespace@5..6 " "
-                  Identifier@6..13 "MyTrait"
+                  IdentifierType@6..13 "MyTrait"
                   Newline@13..14 "\n"
                   Indent@14..18 "    "
-                  ConstantDecl@18..34
+                  DeclarationConstant@18..34
                     Const@18..23 "const"
                     Whitespace@23..24 " "
-                    Identifier@24..26 "PI"
+                    IdentifierValue@24..26 "pi"
                     Colon@26..27 ":"
                     Whitespace@27..28 " "
-                    TypeName@28..34
-                      Identifier@28..34 "Number"
+                    TypeReference@28..34
+                      IdentifierType@28..34 "Number"
                   Newline@34..35 "\n"
                   Dedent@35..35 """#]],
         );
@@ -752,49 +751,49 @@ mod tests {
             indoc! {"
                 impl MyTrait for MyStruct
                     type Assoc = Concrete
-                    const VERSION = 1
+                    const version = 1
                     fn do_something() => 0
                     prop field = default
             "},
             expect![[r#"
-                ImplTraitDecl@0..126
+                DeclarationImplTrait@0..126
                   Impl@0..4 "impl"
                   Whitespace@4..5 " "
-                  TypeName@5..12
-                    Identifier@5..12 "MyTrait"
+                  TypeReference@5..12
+                    IdentifierType@5..12 "MyTrait"
                   Whitespace@12..13 " "
                   For@13..16 "for"
                   Whitespace@16..17 " "
-                  TypeName@17..25
-                    Identifier@17..25 "MyStruct"
+                  TypeReference@17..25
+                    IdentifierType@17..25 "MyStruct"
                   Newline@25..26 "\n"
                   Indent@26..30 "    "
-                  TypeDecl@30..51
+                  DeclarationType@30..51
                     Type@30..34 "type"
                     Whitespace@34..35 " "
-                    Identifier@35..40 "Assoc"
+                    IdentifierType@35..40 "Assoc"
                     Whitespace@40..41 " "
                     Equal@41..42 "="
                     Whitespace@42..43 " "
-                    TypeName@43..51
-                      Identifier@43..51 "Concrete"
+                    TypeReference@43..51
+                      IdentifierType@43..51 "Concrete"
                   Newline@51..52 "\n"
                   Whitespace@52..56 "    "
-                  ConstantDecl@56..73
+                  DeclarationConstant@56..73
                     Const@56..61 "const"
                     Whitespace@61..62 " "
-                    Identifier@62..69 "VERSION"
+                    IdentifierValue@62..69 "version"
                     Whitespace@69..70 " "
                     Equal@70..71 "="
                     Whitespace@71..72 " "
-                    NumberLiteral@72..73
+                    ExpressionLiteral@72..73
                       Number@72..73 "1"
                   Newline@73..74 "\n"
                   Whitespace@74..78 "    "
-                  FunctionDecl@78..100
+                  DeclarationFunction@78..100
                     Fn@78..80 "fn"
                     Whitespace@80..81 " "
-                    Identifier@81..93 "do_something"
+                    IdentifierValue@81..93 "do_something"
                     FunctionParamList@93..95
                       ParenOpen@93..94 "("
                       ParenClose@94..95 ")"
@@ -802,19 +801,19 @@ mod tests {
                     FatArrow@96..98 "=>"
                     Whitespace@98..99 " "
                     FunctionBody@99..100
-                      NumberLiteral@99..100
+                      ExpressionLiteral@99..100
                         Number@99..100 "0"
                   Newline@100..101 "\n"
                   Whitespace@101..105 "    "
-                  PropDecl@105..125
+                  DeclarationProp@105..125
                     Prop@105..109 "prop"
                     Whitespace@109..110 " "
-                    Identifier@110..115 "field"
+                    IdentifierValue@110..115 "field"
                     Whitespace@115..116 " "
                     Equal@116..117 "="
                     Whitespace@117..118 " "
-                    VariableRef@118..125
-                      Identifier@118..125 "default"
+                    ExpressionReference@118..125
+                      IdentifierValue@118..125 "default"
                   Newline@125..126 "\n"
                   Dedent@126..126 """#]],
         );
@@ -830,16 +829,16 @@ mod tests {
                     unknown_token
             "},
             expect![[r#"
-                TraitDecl@0..31
+                DeclarationTrait@0..31
                   Trait@0..5 "trait"
                   Whitespace@5..6 " "
-                  Identifier@6..12 "Broken"
+                  IdentifierType@6..12 "Broken"
                   Newline@12..13 "\n"
                   Indent@13..17 "    "
                   Error@17..30
-                    Identifier@17..30 "unknown_token"
+                    IdentifierValue@17..30 "unknown_token"
                   Newline@30..31 "\n"
-                error at 17..30: expected dedent, but found identifier"#]],
+                error at 17..30: expected dedent, but found value-id"#]],
         );
     }
 
@@ -852,34 +851,30 @@ mod tests {
                     fn missing_brace(
             "},
             expect![[r#"
-                StructDecl@0..40
+                DeclarationStruct@0..40
                   Struct@0..6 "struct"
                   Whitespace@6..7 " "
-                  Identifier@7..17 "Incomplete"
+                  IdentifierType@7..17 "Incomplete"
                   Newline@17..18 "\n"
                   Indent@18..22 "    "
-                  FunctionDecl@22..40
+                  DeclarationFunction@22..40
                     Fn@22..24 "fn"
                     Whitespace@24..25 " "
-                    Identifier@25..38 "missing_brace"
+                    IdentifierValue@25..38 "missing_brace"
                     FunctionParamList@38..40
                       ParenOpen@38..39 "("
                       Newline@39..40 "\n"
                       FunctionParam@40..40
-                        Missing@40..40
-                        Missing@40..40
                         Missing@40..40
                       Missing@40..40
                     Missing@40..40
                     FunctionBody@40..40
                       Missing@40..40
                   Dedent@40..40 ""
-                error at 40: missing identifier
-                error at 40: missing ‘:’
-                error at 40: missing identifier, ‘Self’, ‘(’, ‘Fn’, or ‘impl’
+                error at 40: missing ‘)’, value-id, or ‘self’
                 error at 40: missing ‘)’
                 error at 40: missing ‘=>’
-                error at 40: missing ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’"#]],
+                error at 40: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’"#]],
         );
     }
 
@@ -889,32 +884,32 @@ mod tests {
         check(
             indoc! {"
                 struct Complex
-                    const A = 10
+                    const a = 10
                     fn do_it() => A
                     prop b: Number = 20
             "},
             expect![[r#"
-                StructDecl@0..76
+                DeclarationStruct@0..76
                   Struct@0..6 "struct"
                   Whitespace@6..7 " "
-                  Identifier@7..14 "Complex"
+                  IdentifierType@7..14 "Complex"
                   Newline@14..15 "\n"
                   Indent@15..19 "    "
-                  ConstantDecl@19..31
+                  DeclarationConstant@19..31
                     Const@19..24 "const"
                     Whitespace@24..25 " "
-                    Identifier@25..26 "A"
+                    IdentifierValue@25..26 "a"
                     Whitespace@26..27 " "
                     Equal@27..28 "="
                     Whitespace@28..29 " "
-                    NumberLiteral@29..31
+                    ExpressionLiteral@29..31
                       Number@29..31 "10"
                   Newline@31..32 "\n"
                   Whitespace@32..36 "    "
-                  FunctionDecl@36..51
+                  DeclarationFunction@36..51
                     Fn@36..38 "fn"
                     Whitespace@38..39 " "
-                    Identifier@39..44 "do_it"
+                    IdentifierValue@39..44 "do_it"
                     FunctionParamList@44..46
                       ParenOpen@44..45 "("
                       ParenClose@45..46 ")"
@@ -922,22 +917,22 @@ mod tests {
                     FatArrow@47..49 "=>"
                     Whitespace@49..50 " "
                     FunctionBody@50..51
-                      VariableRef@50..51
-                        Identifier@50..51 "A"
+                      TypeReference@50..51
+                        IdentifierType@50..51 "A"
                   Newline@51..52 "\n"
                   Whitespace@52..56 "    "
-                  PropDecl@56..75
+                  DeclarationProp@56..75
                     Prop@56..60 "prop"
                     Whitespace@60..61 " "
-                    Identifier@61..62 "b"
+                    IdentifierValue@61..62 "b"
                     Colon@62..63 ":"
                     Whitespace@63..64 " "
-                    TypeName@64..70
-                      Identifier@64..70 "Number"
+                    TypeReference@64..70
+                      IdentifierType@64..70 "Number"
                     Whitespace@70..71 " "
                     Equal@71..72 "="
                     Whitespace@72..73 " "
-                    NumberLiteral@73..75
+                    ExpressionLiteral@73..75
                       Number@73..75 "20"
                   Newline@75..76 "\n"
                   Dedent@76..76 """#]],
@@ -950,30 +945,31 @@ mod tests {
         check(
             "fn foo[T](x: T) => x",
             expect![[r#"
-                FunctionDecl@0..20
+                DeclarationFunction@0..20
                   Fn@0..2 "fn"
                   Whitespace@2..3 " "
-                  Identifier@3..6 "foo"
+                  IdentifierValue@3..6 "foo"
                   GenericParamList@6..9
                     BracketOpen@6..7 "["
                     GenericParam@7..8
-                      Identifier@7..8 "T"
+                      IdentifierType@7..8 "T"
                     BracketClose@8..9 "]"
                   FunctionParamList@9..15
                     ParenOpen@9..10 "("
                     FunctionParam@10..14
-                      Identifier@10..11 "x"
+                      FunctionParamLabel@10..11
+                        IdentifierValue@10..11 "x"
                       Colon@11..12 ":"
                       Whitespace@12..13 " "
-                      TypeName@13..14
-                        Identifier@13..14 "T"
+                      TypeReference@13..14
+                        IdentifierType@13..14 "T"
                     ParenClose@14..15 ")"
                   Whitespace@15..16 " "
                   FatArrow@16..18 "=>"
                   Whitespace@18..19 " "
                   FunctionBody@19..20
-                    VariableRef@19..20
-                      Identifier@19..20 "x""#]],
+                    ExpressionReference@19..20
+                      IdentifierValue@19..20 "x""#]],
         );
     }
 }

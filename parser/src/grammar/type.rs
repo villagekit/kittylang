@@ -2,13 +2,11 @@ use kitty_syntax::{NodeKind, TokenKind};
 
 use crate::{marker::CompletedMarker, parser::Parser, token_set::TokenSet};
 
-use super::identifier::{trait_name, type_name, TYPE_NAME_FIRST};
-
-pub(crate) const TYPE_PATH_FIRST: [TokenKind; 2] = TYPE_NAME_FIRST;
+pub(crate) const TYPE_PATH_FIRST: [TokenKind; 2] = TYPE_REFERENCE_START;
 
 /// A qualified type
 pub(crate) fn type_path(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
-    let mut lhs = type_name(p, recovery)?;
+    let mut lhs = type_reference(p, recovery)?;
 
     loop {
         if p.at(TokenKind::BracketOpen) {
@@ -25,6 +23,17 @@ pub(crate) fn type_path(p: &mut Parser, recovery: TokenSet) -> Option<CompletedM
     Some(lhs)
 }
 
+const TYPE_REFERENCE_START: [TokenKind; 2] = [TokenKind::IdentifierType, TokenKind::SelfUpper];
+
+fn type_reference(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
+    if p.at_set(TYPE_REFERENCE_START) {
+        Some(p.mark_kind(NodeKind::TypeReference))
+    } else {
+        p.error(recovery);
+        None
+    }
+}
+
 /// Parametrized type with type arguments (e.g. `List[Number]`, same as `Vec<f64>` in Rust)
 fn type_generic(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> CompletedMarker {
     assert!(p.at(TokenKind::BracketOpen));
@@ -39,7 +48,7 @@ fn type_projection(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> 
     let recovery_projection = recovery.union([TokenKind::BracketClose]);
     let m = lhs.precede(p);
     p.bump(); // Consume '.['.
-    type_name(p, recovery_projection);
+    p.expect(TokenKind::IdentifierType, recovery_projection);
     p.expect(TokenKind::BracketClose, recovery);
     m.complete(p, NodeKind::TypeProjection)
 }
@@ -49,7 +58,7 @@ fn type_association(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) ->
     assert!(p.at(TokenKind::Dot));
     let m = lhs.precede(p);
     p.bump(); // Consume '.'.
-    type_name(p, recovery);
+    p.expect(TokenKind::IdentifierType, recovery);
     m.complete(p, NodeKind::TypeAssociation)
 }
 
@@ -133,7 +142,7 @@ fn type_impl_trait(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let recovery_trait = recovery.union(TYPE_PATH_FIRST);
     let m = p.start();
     p.bump(); // Consume 'impl'
-    trait_name(p, recovery_trait);
+    p.expect(TokenKind::IdentifierType, recovery_trait);
     m.complete(p, NodeKind::TypeTrait)
 }
 
@@ -158,8 +167,8 @@ pub(crate) fn generic_param_list(p: &mut Parser, recovery: TokenSet) -> Complete
 
 fn generic_param(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
-    // Parse generic type name
-    type_name(p, recovery);
+    // Parse generic type label
+    p.expect(TokenKind::IdentifierType, recovery);
     // Parse generic type bounds
     if p.at(TokenKind::Colon) {
         p.bump(); // Consume ':'
@@ -220,7 +229,7 @@ fn generic_positional_arg(p: &mut Parser, recovery: TokenSet) -> CompletedMarker
 fn generic_labelled_arg(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     assert!(p.at(TokenKind::IdentifierType));
     let m = p.start();
-    type_name(p, recovery);
+    p.expect(TokenKind::IdentifierType, recovery);
     p.expect(TokenKind::Colon, recovery);
     type_annotation(p, recovery);
     m.complete(p, NodeKind::GenericArgLabelled)
@@ -239,7 +248,7 @@ pub(crate) fn generic_bound_list(p: &mut Parser, recovery: TokenSet) -> Complete
 
 fn generic_bound(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
-    trait_name(p, recovery);
+    p.expect(TokenKind::IdentifierType, recovery);
     m.complete(p, NodeKind::GenericBound)
 }
 
@@ -258,7 +267,7 @@ pub(crate) fn generic_where_clause(p: &mut Parser, recovery: TokenSet) -> Comple
 
 pub(crate) fn generic_where_bound(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
-    type_name(p, recovery);
+    type_path(p, recovery);
     p.expect(TokenKind::Colon, recovery);
     generic_bound_list(p, recovery);
     m.complete(p, NodeKind::GenericWhereBound)
@@ -298,8 +307,8 @@ mod tests {
         check_type_path(
             "Number",
             expect![[r#"
-                TypeName@0..6
-                  Identifier@0..6 "Number""#]],
+                TypeReference@0..6
+                  IdentifierType@0..6 "Number""#]],
         );
     }
 
@@ -309,8 +318,8 @@ mod tests {
         check_type_annotation(
             "Number",
             expect![[r#"
-                TypeName@0..6
-                  Identifier@0..6 "Number""#]],
+                TypeReference@0..6
+                  IdentifierType@0..6 "Number""#]],
         );
     }
 
@@ -321,13 +330,13 @@ mod tests {
             "List[Number]",
             expect![[r#"
                 TypeGeneric@0..12
-                  TypeName@0..4
-                    Identifier@0..4 "List"
+                  TypeReference@0..4
+                    IdentifierType@0..4 "List"
                   GenericArgList@4..12
                     BracketOpen@4..5 "["
                     GenericArgPositional@5..11
-                      TypeName@5..11
-                        Identifier@5..11 "Number"
+                      TypeReference@5..11
+                        IdentifierType@5..11 "Number"
                     BracketClose@11..12 "]""#]],
         );
     }
@@ -339,18 +348,18 @@ mod tests {
             "Map[Key, Value]",
             expect![[r#"
                 TypeGeneric@0..15
-                  TypeName@0..3
-                    Identifier@0..3 "Map"
+                  TypeReference@0..3
+                    IdentifierType@0..3 "Map"
                   GenericArgList@3..15
                     BracketOpen@3..4 "["
                     GenericArgPositional@4..7
-                      TypeName@4..7
-                        Identifier@4..7 "Key"
+                      TypeReference@4..7
+                        IdentifierType@4..7 "Key"
                     Comma@7..8 ","
                     Whitespace@8..9 " "
                     GenericArgPositional@9..14
-                      TypeName@9..14
-                        Identifier@9..14 "Value"
+                      TypeReference@9..14
+                        IdentifierType@9..14 "Value"
                     BracketClose@14..15 "]""#]],
         );
     }
@@ -362,10 +371,10 @@ mod tests {
             "T.[Iterator]",
             expect![[r#"
                 TypeProjection@0..12
-                  TypeName@0..1
-                    Identifier@0..1 "T"
+                  TypeReference@0..1
+                    IdentifierType@0..1 "T"
                   DotBracketOpen@1..3 ".["
-                  Identifier@3..11 "Iterator"
+                  IdentifierType@3..11 "Iterator"
                   BracketClose@11..12 "]""#]],
         );
     }
@@ -377,10 +386,10 @@ mod tests {
             "Iterator.Item",
             expect![[r#"
                 TypeAssociation@0..13
-                  TypeName@0..8
-                    Identifier@0..8 "Iterator"
+                  TypeReference@0..8
+                    IdentifierType@0..8 "Iterator"
                   Dot@8..9 "."
-                  Identifier@9..13 "Item""#]],
+                  IdentifierType@9..13 "Item""#]],
         );
     }
 
@@ -392,21 +401,21 @@ mod tests {
             expect![[r#"
                 TypeAssociation@0..21
                   TypeGeneric@0..15
-                    TypeName@0..6
-                      Identifier@0..6 "Result"
+                    TypeReference@0..6
+                      IdentifierType@0..6 "Result"
                     GenericArgList@6..15
                       BracketOpen@6..7 "["
                       GenericArgPositional@7..9
-                        TypeName@7..9
-                          Identifier@7..9 "Ok"
+                        TypeReference@7..9
+                          IdentifierType@7..9 "Ok"
                       Comma@9..10 ","
                       Whitespace@10..11 " "
                       GenericArgPositional@11..14
-                        TypeName@11..14
-                          Identifier@11..14 "Err"
+                        TypeReference@11..14
+                          IdentifierType@11..14 "Err"
                       BracketClose@14..15 "]"
                   Dot@15..16 "."
-                  Identifier@16..21 "Error""#]],
+                  IdentifierType@16..21 "Error""#]],
         );
     }
 
@@ -418,12 +427,12 @@ mod tests {
             expect![[r#"
                 TypeTuple@0..16
                   ParenOpen@0..1 "("
-                  TypeName@1..7
-                    Identifier@1..7 "Number"
+                  TypeReference@1..7
+                    IdentifierType@1..7 "Number"
                   Comma@7..8 ","
                   Whitespace@8..9 " "
-                  TypeName@9..15
-                    Identifier@9..15 "String"
+                  TypeReference@9..15
+                    IdentifierType@9..15 "String"
                   ParenClose@15..16 ")""#]],
         );
     }
@@ -437,18 +446,18 @@ mod tests {
                 TypeFunction@0..29
                   FnUpper@0..2 "Fn"
                   ParenOpen@2..3 "("
-                  TypeName@3..9
-                    Identifier@3..9 "Number"
+                  TypeReference@3..9
+                    IdentifierType@3..9 "Number"
                   Comma@9..10 ","
                   Whitespace@10..11 " "
-                  TypeName@11..17
-                    Identifier@11..17 "String"
+                  TypeReference@11..17
+                    IdentifierType@11..17 "String"
                   ParenClose@17..18 ")"
                   Whitespace@18..19 " "
                   Arrow@19..21 "->"
                   Whitespace@21..22 " "
-                  TypeName@22..29
-                    Identifier@22..29 "Boolean""#]],
+                  TypeReference@22..29
+                    IdentifierType@22..29 "Boolean""#]],
         );
     }
 
@@ -461,8 +470,7 @@ mod tests {
                 TypeTrait@0..11
                   Impl@0..4 "impl"
                   Whitespace@4..5 " "
-                  TypeName@5..11
-                    Identifier@5..11 "Number""#]],
+                  IdentifierType@5..11 "Number""#]],
         );
     }
 
@@ -473,13 +481,13 @@ mod tests {
             "List[Number",
             expect![[r#"
                 TypeGeneric@0..11
-                  TypeName@0..4
-                    Identifier@0..4 "List"
+                  TypeReference@0..4
+                    IdentifierType@0..4 "List"
                   GenericArgList@4..11
                     BracketOpen@4..5 "["
                     GenericArgPositional@5..11
-                      TypeName@5..11
-                        Identifier@5..11 "Number"
+                      TypeReference@5..11
+                        IdentifierType@5..11 "Number"
                     Missing@11..11
                 error at 11: missing ‘]’"#]],
         );
@@ -492,12 +500,12 @@ mod tests {
             "T.[]",
             expect![[r#"
                 TypeProjection@0..4
-                  TypeName@0..1
-                    Identifier@0..1 "T"
+                  TypeReference@0..1
+                    IdentifierType@0..1 "T"
                   DotBracketOpen@1..3 ".["
                   Missing@3..3
                   BracketClose@3..4 "]"
-                error at 3: missing identifier"#]],
+                error at 3: missing type-id"#]],
         );
     }
 
@@ -508,10 +516,10 @@ mod tests {
             "T.[Iterator",
             expect![[r#"
                 TypeProjection@0..11
-                  TypeName@0..1
-                    Identifier@0..1 "T"
+                  TypeReference@0..1
+                    IdentifierType@0..1 "T"
                   DotBracketOpen@1..3 ".["
-                  Identifier@3..11 "Iterator"
+                  IdentifierType@3..11 "Iterator"
                   Missing@11..11
                 error at 11: missing ‘]’"#]],
         );
@@ -524,11 +532,11 @@ mod tests {
             "Iterator.",
             expect![[r#"
                 TypeAssociation@0..9
-                  TypeName@0..8
-                    Identifier@0..8 "Iterator"
+                  TypeReference@0..8
+                    IdentifierType@0..8 "Iterator"
                   Dot@8..9 "."
                   Missing@9..9
-                error at 9: missing identifier"#]],
+                error at 9: missing type-id"#]],
         );
     }
 
@@ -540,12 +548,12 @@ mod tests {
             expect![[r#"
                 TypeTuple@0..15
                   ParenOpen@0..1 "("
-                  TypeName@1..7
-                    Identifier@1..7 "Number"
+                  TypeReference@1..7
+                    IdentifierType@1..7 "Number"
                   Comma@7..8 ","
                   Whitespace@8..9 " "
-                  TypeName@9..15
-                    Identifier@9..15 "String"
+                  TypeReference@9..15
+                    IdentifierType@9..15 "String"
                   Missing@15..15
                 error at 15: missing ‘)’"#]],
         );
@@ -560,17 +568,17 @@ mod tests {
                 TypeFunction@0..18
                   FnUpper@0..2 "Fn"
                   ParenOpen@2..3 "("
-                  TypeName@3..9
-                    Identifier@3..9 "Number"
+                  TypeReference@3..9
+                    IdentifierType@3..9 "Number"
                   Comma@9..10 ","
                   Whitespace@10..11 " "
-                  TypeName@11..17
-                    Identifier@11..17 "String"
+                  TypeReference@11..17
+                    IdentifierType@11..17 "String"
                   ParenClose@17..18 ")"
                   Missing@18..18
                   Missing@18..18
                 error at 18: missing ‘->’
-                error at 18: missing identifier, ‘Self’, ‘(’, ‘Fn’, or ‘impl’"#]],
+                error at 18: missing type-id, ‘Self’, ‘(’, ‘Fn’, or ‘impl’"#]],
         );
     }
 
@@ -585,8 +593,8 @@ mod tests {
                   ParenOpen@2..3 "("
                   ParenClose@3..4 ")"
                   Missing@4..4
-                  TypeName@4..11
-                    Identifier@4..11 "Boolean"
+                  TypeReference@4..11
+                    IdentifierType@4..11 "Boolean"
                 error at 4: missing ‘->’"#]],
         );
     }
@@ -600,7 +608,7 @@ mod tests {
                 TypeTrait@0..4
                   Impl@0..4 "impl"
                   Missing@4..4
-                error at 4: missing identifier or ‘Self’"#]],
+                error at 4: missing type-id"#]],
         );
     }
 
@@ -612,28 +620,28 @@ mod tests {
             expect![[r#"
                 TypeAssociation@0..35
                   TypeGeneric@0..30
-                    TypeName@0..6
-                      Identifier@0..6 "Option"
+                    TypeReference@0..6
+                      IdentifierType@0..6 "Option"
                     GenericArgList@6..30
                       BracketOpen@6..7 "["
                       GenericArgPositional@7..29
                         TypeGeneric@7..29
-                          TypeName@7..13
-                            Identifier@7..13 "Result"
+                          TypeReference@7..13
+                            IdentifierType@7..13 "Result"
                           GenericArgList@13..29
                             BracketOpen@13..14 "["
                             GenericArgPositional@14..20
-                              TypeName@14..20
-                                Identifier@14..20 "Number"
+                              TypeReference@14..20
+                                IdentifierType@14..20 "Number"
                             Comma@20..21 ","
                             Whitespace@21..22 " "
                             GenericArgPositional@22..28
-                              TypeName@22..28
-                                Identifier@22..28 "String"
+                              TypeReference@22..28
+                                IdentifierType@22..28 "String"
                             BracketClose@28..29 "]"
                       BracketClose@29..30 "]"
                   Dot@30..31 "."
-                  Identifier@31..35 "Item""#]],
+                  IdentifierType@31..35 "Item""#]],
         );
     }
 
@@ -647,23 +655,23 @@ mod tests {
                   Whitespace@0..1 " "
                   TypeProjection@1..38
                     TypeGeneric@1..27
-                      TypeName@1..6
-                        Identifier@1..6 "Outer"
+                      TypeReference@1..6
+                        IdentifierType@1..6 "Outer"
                       Whitespace@6..7 " "
                       GenericArgList@7..27
                         BracketOpen@7..8 "["
                         Whitespace@8..9 " "
                         GenericArgPositional@9..25
                           TypeGeneric@9..25
-                            TypeName@9..14
-                              Identifier@9..14 "Inner"
+                            TypeReference@9..14
+                              IdentifierType@9..14 "Inner"
                             Whitespace@14..15 " "
                             GenericArgList@15..25
                               BracketOpen@15..16 "["
                               Whitespace@16..17 " "
                               GenericArgPositional@17..23
-                                TypeName@17..23
-                                  Identifier@17..23 "Number"
+                                TypeReference@17..23
+                                  IdentifierType@17..23 "Number"
                               Whitespace@23..24 " "
                               BracketClose@24..25 "]"
                         Whitespace@25..26 " "
@@ -671,12 +679,12 @@ mod tests {
                     Whitespace@27..28 " "
                     DotBracketOpen@28..30 ".["
                     Whitespace@30..31 " "
-                    Identifier@31..36 "Trait"
+                    IdentifierType@31..36 "Trait"
                     Whitespace@36..37 " "
                     BracketClose@37..38 "]"
                   Whitespace@38..39 " "
                   Dot@39..40 "."
-                  Identifier@40..46 "Member"
+                  IdentifierType@40..46 "Member"
                   Whitespace@46..47 " ""#]],
         );
     }
@@ -703,22 +711,22 @@ mod tests {
             expect![[r#"
                 TypeAssociation@0..16
                   TypeGeneric@0..15
-                    TypeName@0..3
-                      Identifier@0..3 "Map"
+                    TypeReference@0..3
+                      IdentifierType@0..3 "Map"
                     GenericArgList@3..15
                       BracketOpen@3..4 "["
                       GenericArgPositional@4..7
-                        TypeName@4..7
-                          Identifier@4..7 "Key"
+                        TypeReference@4..7
+                          IdentifierType@4..7 "Key"
                       Comma@7..8 ","
                       Whitespace@8..9 " "
                       GenericArgPositional@9..14
-                        TypeName@9..14
-                          Identifier@9..14 "Value"
+                        TypeReference@9..14
+                          IdentifierType@9..14 "Value"
                       BracketClose@14..15 "]"
                   Dot@15..16 "."
                   Missing@16..16
-                error at 16: missing identifier"#]],
+                error at 16: missing type-id"#]],
         );
     }
 
@@ -731,12 +739,12 @@ mod tests {
                 GenericParamList@0..12
                   BracketOpen@0..1 "["
                   GenericParam@1..11
-                    Identifier@1..2 "T"
+                    IdentifierType@1..2 "T"
                     Colon@2..3 ":"
                     Whitespace@3..4 " "
-                    TypeBoundList@4..11
-                      TypeBound@4..11
-                        Identifier@4..11 "Display"
+                    GenericBoundList@4..11
+                      GenericBound@4..11
+                        IdentifierType@4..11 "Display"
                   BracketClose@11..12 "]""#]],
         );
     }
@@ -751,21 +759,21 @@ mod tests {
                 GenericParamList@0..24
                   BracketOpen@0..1 "["
                   GenericParam@1..11
-                    Identifier@1..2 "T"
+                    IdentifierType@1..2 "T"
                     Colon@2..3 ":"
                     Whitespace@3..4 " "
-                    TypeBoundList@4..11
-                      TypeBound@4..11
-                        Identifier@4..11 "Display"
+                    GenericBoundList@4..11
+                      GenericBound@4..11
+                        IdentifierType@4..11 "Display"
                   Comma@11..12 ","
                   Whitespace@12..13 " "
                   GenericParam@13..23
-                    Identifier@13..14 "U"
+                    IdentifierType@13..14 "U"
                     Whitespace@14..15 " "
                     Equal@15..16 "="
                     Whitespace@16..17 " "
-                    TypeName@17..23
-                      Identifier@17..23 "Number"
+                    TypeReference@17..23
+                      IdentifierType@17..23 "Number"
                   BracketClose@23..24 "]""#]],
         );
     }
@@ -779,10 +787,10 @@ mod tests {
                 GenericParamList@0..10
                   BracketOpen@0..1 "["
                   GenericParam@1..9
-                    Identifier@1..2 "T"
+                    IdentifierType@1..2 "T"
                     Equal@2..3 "="
-                    TypeName@3..9
-                      Identifier@3..9 "Number"
+                    TypeReference@3..9
+                      IdentifierType@3..9 "Number"
                   BracketClose@9..10 "]""#]],
         );
     }
@@ -796,13 +804,13 @@ mod tests {
                 GenericParamList@0..4
                   BracketOpen@0..1 "["
                   GenericParam@1..3
-                    Identifier@1..2 "T"
+                    IdentifierType@1..2 "T"
                     Colon@2..3 ":"
-                    TypeBoundList@3..3
-                      TypeBound@3..3
+                    GenericBoundList@3..3
+                      GenericBound@3..3
                         Missing@3..3
                   BracketClose@3..4 "]"
-                error at 3: missing identifier"#]],
+                error at 3: missing type-id"#]],
         );
     }
 
@@ -815,11 +823,11 @@ mod tests {
                 GenericParamList@0..4
                   BracketOpen@0..1 "["
                   GenericParam@1..3
-                    Identifier@1..2 "T"
+                    IdentifierType@1..2 "T"
                     Equal@2..3 "="
                     Missing@3..3
                   BracketClose@3..4 "]"
-                error at 3: missing identifier or ‘Self’"#]],
+                error at 3: missing type-id, ‘Self’, ‘(’, ‘Fn’, or ‘impl’"#]],
         );
     }
 
@@ -827,19 +835,19 @@ mod tests {
     fn generic_arg_labelled() {
         // Happy path: A generic type with a single labelled generic argument.
         check_type_path(
-            "Foo[bar: Number]",
+            "Foo[Bar: Number]",
             expect![[r#"
                 TypeGeneric@0..16
-                  TypeName@0..3
-                    Identifier@0..3 "Foo"
+                  TypeReference@0..3
+                    IdentifierType@0..3 "Foo"
                   GenericArgList@3..16
                     BracketOpen@3..4 "["
                     GenericArgLabelled@4..15
-                      Identifier@4..7 "bar"
+                      IdentifierType@4..7 "Bar"
                       Colon@7..8 ":"
                       Whitespace@8..9 " "
-                      TypeName@9..15
-                        Identifier@9..15 "Number"
+                      TypeReference@9..15
+                        IdentifierType@9..15 "Number"
                     BracketClose@15..16 "]""#]],
         );
     }
@@ -848,24 +856,24 @@ mod tests {
     fn generic_arg_mixed() {
         // Happy path: A generic type with a positional generic argument followed by a labelled one.
         check_type_path(
-            "Foo[Number, bar: String]",
+            "Foo[Number, Bar: String]",
             expect![[r#"
                 TypeGeneric@0..24
-                  TypeName@0..3
-                    Identifier@0..3 "Foo"
+                  TypeReference@0..3
+                    IdentifierType@0..3 "Foo"
                   GenericArgList@3..24
                     BracketOpen@3..4 "["
                     GenericArgPositional@4..10
-                      TypeName@4..10
-                        Identifier@4..10 "Number"
+                      TypeReference@4..10
+                        IdentifierType@4..10 "Number"
                     Comma@10..11 ","
                     Whitespace@11..12 " "
                     GenericArgLabelled@12..23
-                      Identifier@12..15 "bar"
+                      IdentifierType@12..15 "Bar"
                       Colon@15..16 ":"
                       Whitespace@16..17 " "
-                      TypeName@17..23
-                        Identifier@17..23 "String"
+                      TypeReference@17..23
+                        IdentifierType@17..23 "String"
                     BracketClose@23..24 "]""#]],
         );
     }
@@ -874,20 +882,20 @@ mod tests {
     fn generic_arg_labelled_missing_colon() {
         // Unhappy path: labelled generic argument missing the colon.
         check_type_path(
-            "Foo[bar Number]",
+            "Foo[Bar Number]",
             expect![[r#"
                 TypeGeneric@0..14
-                  TypeName@0..3
-                    Identifier@0..3 "Foo"
+                  TypeReference@0..3
+                    IdentifierType@0..3 "Foo"
                   GenericArgList@3..14
                     BracketOpen@3..4 "["
                     GenericArgPositional@4..7
-                      TypeName@4..7
-                        Identifier@4..7 "bar"
+                      TypeReference@4..7
+                        IdentifierType@4..7 "Bar"
                     Whitespace@7..8 " "
                     Error@8..14
-                      Identifier@8..14 "Number"
-                error at 8..14: expected ‘]’, but found identifier"#]],
+                      IdentifierType@8..14 "Number"
+                error at 8..14: expected ‘]’, but found type-id"#]],
         );
     }
 }

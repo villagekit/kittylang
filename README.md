@@ -68,3 +68,14 @@
     - This is what Julia does.
     - Because we don't need `{}` for blocks or objects.
     - But we could use `[]` for field get.
+
+## Decisions
+
+- Separated value and type identifiers, to be able to distinguish them in a pattern:
+  - Otherwise no way to know if `None` is an existing type or a new variable name
+
+```
+match maybe_thing
+  Some(thing) => ()
+  None => ()
+```

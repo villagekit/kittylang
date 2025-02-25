@@ -116,11 +116,6 @@ macro_rules! define_compound_token {
 define_node!(Error);
 define_node!(Missing);
 
-// Identifier
-define_node!(ValueName);
-define_node!(TypeName);
-define_node!(TraitName);
-
 // Module
 define_node!(Module);
 define_node!(ModuleImport);
@@ -138,6 +133,7 @@ impl Module {
 }
 
 // Expression
+define_node!(ExpressionReference);
 define_node!(ExpressionLiteral);
 define_node!(LiteralBoolean);
 define_node!(LiteralNumber);
@@ -145,8 +141,8 @@ define_node!(LiteralString);
 define_node!(ExpressionBlock);
 define_node!(ExpressionLet);
 impl ExpressionLet {
-    pub fn name(self, tree: &SyntaxTree) -> Option<ValueName> {
-        node(self, tree)
+    pub fn name(self, tree: &SyntaxTree) -> Option<IdentifierValue> {
+        token(self, tree)
     }
 
     pub fn value(self, tree: &SyntaxTree) -> Option<Expression> {
@@ -186,7 +182,7 @@ define_node!(ExpressionGet);
 define_compound_node!(
     Expression,
     kinds: [
-        ValueName,
+        ExpressionReference,
         ExpressionLiteral,
         ExpressionBlock,
         ExpressionLet,
@@ -201,10 +197,13 @@ define_compound_node!(
 );
 
 // Type Path
+define_node!(TypeReference);
 define_node!(TypeGeneric);
+define_node!(GenericWhereClause);
+define_node!(GenericWhereBound);
 define_node!(TypeProjection);
 define_node!(TypeAssociation);
-define_compound_node!(TypePath, kinds: [TypeName, TypeGeneric, TypeProjection, TypeAssociation]);
+define_compound_node!(TypePath, kinds: [TypeReference, TypeGeneric, TypeProjection, TypeAssociation]);
 
 // Type Annotation
 define_node!(TypeTuple);
@@ -222,7 +221,7 @@ pub enum TypeAnnotation {
 impl CstNode for TypeAnnotation {
     fn cast(syntax: SyntaxNode, tree: &SyntaxTree) -> Option<Self> {
         match syntax.kind(tree) {
-            NodeKind::TypeName
+            NodeKind::TypeReference
             | NodeKind::TypeGeneric
             | NodeKind::TypeProjection
             | NodeKind::TypeAssociation => TypePath::cast(syntax, tree).map(Self::TypePath),
@@ -255,6 +254,10 @@ define_node!(GenericArgList);
 // Type Bounds
 define_node!(GenericBound);
 define_node!(GenericBoundList);
+
+// Identifier
+define_token!(IdentifierValue);
+define_token!(IdentifierType);
 
 // Literal
 define_token!(Boolean);
@@ -307,20 +310,22 @@ define_compound_token!(UnaryOperator, kinds: [
 
 // Pattern
 define_node!(PatternOr);
+define_node!(PatternName);
 define_node!(PatternWildcard);
 define_node!(PatternLiteral);
 define_node!(PatternTuple);
 define_node!(PatternType);
+define_node!(PatternTypeArgList);
+define_node!(PatternTypeArgPositional);
+define_node!(PatternTypeArgLabelled);
 define_compound_node!(Pattern, kinds: [
-    PatternType,
+    PatternOr,
+    PatternName,
+    PatternWildcard,
     PatternLiteral,
     PatternTuple,
-    PatternWildcard,
-    PatternOr
+    PatternType
 ]);
-define_node!(PatternFieldList);
-define_node!(PatternFieldPositional);
-define_node!(PatternFieldLabelled);
 
 // Declaration
 define_node!(DeclarationType);
@@ -328,8 +333,8 @@ define_node!(DeclarationConstant);
 
 define_node!(DeclarationFunction);
 impl DeclarationFunction {
-    pub fn name(self, tree: &SyntaxTree) -> Option<ValueName> {
-        node(self, tree)
+    pub fn name(self, tree: &SyntaxTree) -> Option<IdentifierValue> {
+        token(self, tree)
     }
 
     pub fn body(self, tree: &SyntaxTree) -> Option<Expression> {
@@ -338,6 +343,7 @@ impl DeclarationFunction {
 }
 
 define_node!(FunctionParam);
+define_node!(FunctionParamLabel);
 define_node!(FunctionParamList);
 define_node!(FunctionArgPositional);
 define_node!(FunctionArgLabelled);
@@ -348,8 +354,8 @@ define_node!(EnumCase);
 
 define_node!(DeclarationProp);
 impl DeclarationProp {
-    pub fn name(self, tree: &SyntaxTree) -> Option<ValueName> {
-        node(self, tree)
+    pub fn name(self, tree: &SyntaxTree) -> Option<IdentifierValue> {
+        token(self, tree)
     }
 
     // e.g. the type annotation or some other child node
@@ -361,8 +367,8 @@ impl DeclarationProp {
 // Struct
 define_node!(DeclarationStruct);
 impl DeclarationStruct {
-    pub fn name(self, tree: &SyntaxTree) -> Option<TypeName> {
-        node(self, tree)
+    pub fn name(self, tree: &SyntaxTree) -> Option<IdentifierType> {
+        token(self, tree)
     }
 
     pub fn properties(self, tree: &SyntaxTree) -> impl Iterator<Item = DeclarationProp> + '_ {

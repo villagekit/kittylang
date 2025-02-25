@@ -1,8 +1,7 @@
 use kitty_syntax::{NodeKind, TokenKind};
 
 use super::{
-    function::{function_arg_list, function_declaration_optional_name_types_body},
-    identifier::{value_name, VALUE_NAME_FIRST},
+    function::{function_arg_list, function_declaration_option_name_body},
     pattern::pattern,
     r#type::{type_annotation, type_path, TYPE_PATH_FIRST},
 };
@@ -70,12 +69,12 @@ fn expression_lhs(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker>
 
 /// Parse a primary expression.
 fn expression_primary(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
-    let cm = if p.at_set(VALUE_NAME_FIRST) {
-        value_name(p, recovery)?
+    let cm = if p.at_set(EXPRESSION_REFERENCE_FIRST) {
+        expression_reference(p)
     } else if p.at_set(TYPE_PATH_FIRST) {
         type_path(p, recovery)?
     } else if p.at_set(LITERAL_FIRST) {
-        expression_literal(p, recovery)?
+        expression_literal(p)
     } else if p.at(TokenKind::ParenOpen) {
         expression_tuple(p, recovery)
     } else if p.at(TokenKind::Indent) {
@@ -93,15 +92,19 @@ fn expression_primary(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMar
     Some(cm)
 }
 
+pub(crate) const EXPRESSION_REFERENCE_FIRST: [TokenKind; 2] =
+    [TokenKind::IdentifierValue, TokenKind::SelfLower];
+
+fn expression_reference(p: &mut Parser) -> CompletedMarker {
+    assert!(p.at_set(EXPRESSION_REFERENCE_FIRST));
+    p.mark_kind(NodeKind::ExpressionReference)
+}
+
 const LITERAL_FIRST: [TokenKind; 3] = [TokenKind::Boolean, TokenKind::Number, TokenKind::String];
 
-fn expression_literal(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
-    if p.at_set(LITERAL_FIRST) {
-        Some(p.mark_kind(NodeKind::ExpressionLiteral))
-    } else {
-        p.error(recovery);
-        None
-    }
+fn expression_literal(p: &mut Parser) -> CompletedMarker {
+    assert!(p.at_set(LITERAL_FIRST));
+    p.mark_kind(NodeKind::ExpressionLiteral)
 }
 
 /// Parse an apply expression given an existing `lhs`.
@@ -117,7 +120,7 @@ fn expression_get(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> C
     assert!(p.at(TokenKind::Dot));
     let m = lhs.precede(p);
     p.bump(); // Consume '.'.
-    value_name(p, recovery);
+    p.expect(TokenKind::IdentifierValue, recovery);
     m.complete(p, NodeKind::ExpressionGet)
 }
 
@@ -149,7 +152,7 @@ fn expression_block(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 /// Parse a function expression: `fn <identifier>(<identifier>: <type annotation>) => <expr>`
 fn expression_function(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     assert!(p.at(TokenKind::Fn));
-    function_declaration_optional_name_types_body(p, recovery, false, true, true)
+    function_declaration_option_name_body(p, recovery, false, true)
 }
 
 /// Parse a let expression: `let <identifier> = <expr> in <expr>`
@@ -259,7 +262,7 @@ mod tests {
         check(
             "123",
             expect![[r#"
-                NumberLiteral@0..3
+                ExpressionLiteral@0..3
                   Number@0..3 "123""#]],
         );
     }
@@ -270,7 +273,7 @@ mod tests {
         check(
             "   9876",
             expect![[r#"
-                NumberLiteral@0..7
+                ExpressionLiteral@0..7
                   Whitespace@0..3 "   "
                   Number@3..7 "9876""#]],
         );
@@ -282,7 +285,7 @@ mod tests {
         check(
             "999   ",
             expect![[r#"
-                NumberLiteral@0..6
+                ExpressionLiteral@0..6
                   Number@0..3 "999"
                   Whitespace@3..6 "   ""#]],
         );
@@ -294,7 +297,7 @@ mod tests {
         check(
             " 123     ",
             expect![[r#"
-                NumberLiteral@0..9
+                ExpressionLiteral@0..9
                   Whitespace@0..1 " "
                   Number@1..4 "123"
                   Whitespace@4..9 "     ""#]],
@@ -307,8 +310,8 @@ mod tests {
         check(
             "counter",
             expect![[r#"
-                VariableRef@0..7
-                  Identifier@0..7 "counter""#]],
+                ExpressionReference@0..7
+                  IdentifierValue@0..7 "counter""#]],
         );
     }
 
@@ -318,11 +321,11 @@ mod tests {
         check(
             "1+2",
             expect![[r#"
-                BinaryExpression@0..3
-                  NumberLiteral@0..1
+                ExpressionBinary@0..3
+                  ExpressionLiteral@0..1
                     Number@0..1 "1"
                   Plus@1..2 "+"
-                  NumberLiteral@2..3
+                  ExpressionLiteral@2..3
                     Number@2..3 "2""#]],
         );
     }
@@ -333,19 +336,19 @@ mod tests {
         check(
             "1+2+3+4",
             expect![[r#"
-                BinaryExpression@0..7
-                  BinaryExpression@0..5
-                    BinaryExpression@0..3
-                      NumberLiteral@0..1
+                ExpressionBinary@0..7
+                  ExpressionBinary@0..5
+                    ExpressionBinary@0..3
+                      ExpressionLiteral@0..1
                         Number@0..1 "1"
                       Plus@1..2 "+"
-                      NumberLiteral@2..3
+                      ExpressionLiteral@2..3
                         Number@2..3 "2"
                     Plus@3..4 "+"
-                    NumberLiteral@4..5
+                    ExpressionLiteral@4..5
                       Number@4..5 "3"
                   Plus@5..6 "+"
-                  NumberLiteral@6..7
+                  ExpressionLiteral@6..7
                     Number@6..7 "4""#]],
         );
     }
@@ -356,19 +359,19 @@ mod tests {
         check(
             "1+2*3-4",
             expect![[r#"
-                BinaryExpression@0..7
-                  BinaryExpression@0..5
-                    NumberLiteral@0..1
+                ExpressionBinary@0..7
+                  ExpressionBinary@0..5
+                    ExpressionLiteral@0..1
                       Number@0..1 "1"
                     Plus@1..2 "+"
-                    BinaryExpression@2..5
-                      NumberLiteral@2..3
+                    ExpressionBinary@2..5
+                      ExpressionLiteral@2..3
                         Number@2..3 "2"
                       Multiply@3..4 "*"
-                      NumberLiteral@4..5
+                      ExpressionLiteral@4..5
                         Number@4..5 "3"
                   Minus@5..6 "-"
-                  NumberLiteral@6..7
+                  ExpressionLiteral@6..7
                     Number@6..7 "4""#]],
         );
     }
@@ -379,19 +382,19 @@ mod tests {
         check(
             " 1 +   2* 3 ",
             expect![[r#"
-                BinaryExpression@0..12
+                ExpressionBinary@0..12
                   Whitespace@0..1 " "
-                  NumberLiteral@1..2
+                  ExpressionLiteral@1..2
                     Number@1..2 "1"
                   Whitespace@2..3 " "
                   Plus@3..4 "+"
                   Whitespace@4..7 "   "
-                  BinaryExpression@7..11
-                    NumberLiteral@7..8
+                  ExpressionBinary@7..11
+                    ExpressionLiteral@7..8
                       Number@7..8 "2"
                     Multiply@8..9 "*"
                     Whitespace@9..10 " "
-                    NumberLiteral@10..11
+                    ExpressionLiteral@10..11
                       Number@10..11 "3"
                   Whitespace@11..12 " ""#]],
         );
@@ -406,20 +409,20 @@ mod tests {
 1
 + 1",
             expect![[r#"
-                BinaryExpression@0..10
+                ExpressionBinary@0..10
                   Newline@0..1 "\n"
-                  BinaryExpression@1..6
-                    NumberLiteral@1..2
+                  ExpressionBinary@1..6
+                    ExpressionLiteral@1..2
                       Number@1..2 "1"
                     Whitespace@2..3 " "
                     Plus@3..4 "+"
                     Newline@4..5 "\n"
-                    NumberLiteral@5..6
+                    ExpressionLiteral@5..6
                       Number@5..6 "1"
                   Newline@6..7 "\n"
                   Plus@7..8 "+"
                   Whitespace@8..9 " "
-                  NumberLiteral@9..10
+                  ExpressionLiteral@9..10
                     Number@9..10 "1""#]],
         );
     }
@@ -433,17 +436,17 @@ mod tests {
   1 # Add one
   + 10 # Add ten",
             expect![[r##"
-                BinaryExpression@0..35
+                ExpressionBinary@0..35
                   Newline@0..1 "\n"
-                  NumberLiteral@1..2
+                  ExpressionLiteral@1..2
                     Number@1..2 "1"
                   Whitespace@2..3 " "
                   Plus@3..4 "+"
                   Newline@4..5 "\n"
-                  BlockExpression@5..35
+                  ExpressionBlock@5..35
                     Indent@5..7 "  "
-                    BinaryExpression@7..25
-                      NumberLiteral@7..8
+                    ExpressionBinary@7..25
+                      ExpressionLiteral@7..8
                         Number@7..8 "1"
                       Whitespace@8..9 " "
                       Comment@9..18 "# Add one"
@@ -451,7 +454,7 @@ mod tests {
                       Whitespace@19..21 "  "
                       Plus@21..22 "+"
                       Whitespace@22..23 " "
-                      NumberLiteral@23..25
+                      ExpressionLiteral@23..25
                         Number@23..25 "10"
                     Whitespace@25..26 " "
                     Comment@26..35 "# Add ten"
@@ -465,15 +468,15 @@ mod tests {
         check(
             "(1+",
             expect![[r#"
-                ParenExpression@0..3
+                ExpressionTuple@0..3
                   ParenOpen@0..1 "("
-                  BinaryExpression@1..3
-                    NumberLiteral@1..2
+                  ExpressionBinary@1..3
+                    ExpressionLiteral@1..2
                       Number@1..2 "1"
                     Plus@2..3 "+"
                     Missing@3..3
                   Missing@3..3
-                error at 3: missing ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’
+                error at 3: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’
                 error at 3: missing ‘)’"#]],
         );
     }
@@ -484,9 +487,9 @@ mod tests {
         check(
             "-10",
             expect![[r#"
-                UnaryExpression@0..3
+                ExpressionUnary@0..3
                   Minus@0..1 "-"
-                  NumberLiteral@1..3
+                  ExpressionLiteral@1..3
                     Number@1..3 "10""#]],
         );
     }
@@ -497,13 +500,13 @@ mod tests {
         check(
             "-20+20",
             expect![[r#"
-                BinaryExpression@0..6
-                  UnaryExpression@0..3
+                ExpressionBinary@0..6
+                  ExpressionUnary@0..3
                     Minus@0..1 "-"
-                    NumberLiteral@1..3
+                    ExpressionLiteral@1..3
                       Number@1..3 "20"
                   Plus@3..4 "+"
-                  NumberLiteral@4..6
+                  ExpressionLiteral@4..6
                     Number@4..6 "20""#]],
         );
     }
@@ -514,19 +517,19 @@ mod tests {
         check(
             "((((((10))))))",
             expect![[r#"
-                ParenExpression@0..14
+                ExpressionTuple@0..14
                   ParenOpen@0..1 "("
-                  ParenExpression@1..13
+                  ExpressionTuple@1..13
                     ParenOpen@1..2 "("
-                    ParenExpression@2..12
+                    ExpressionTuple@2..12
                       ParenOpen@2..3 "("
-                      ParenExpression@3..11
+                      ExpressionTuple@3..11
                         ParenOpen@3..4 "("
-                        ParenExpression@4..10
+                        ExpressionTuple@4..10
                           ParenOpen@4..5 "("
-                          ParenExpression@5..9
+                          ExpressionTuple@5..9
                             ParenOpen@5..6 "("
-                            NumberLiteral@6..8
+                            ExpressionLiteral@6..8
                               Number@6..8 "10"
                             ParenClose@8..9 ")"
                           ParenClose@9..10 ")"
@@ -543,17 +546,17 @@ mod tests {
         check(
             "5*(2+1)",
             expect![[r#"
-                BinaryExpression@0..7
-                  NumberLiteral@0..1
+                ExpressionBinary@0..7
+                  ExpressionLiteral@0..1
                     Number@0..1 "5"
                   Multiply@1..2 "*"
-                  ParenExpression@2..7
+                  ExpressionTuple@2..7
                     ParenOpen@2..3 "("
-                    BinaryExpression@3..6
-                      NumberLiteral@3..4
+                    ExpressionBinary@3..6
+                      ExpressionLiteral@3..4
                         Number@3..4 "2"
                       Plus@4..5 "+"
-                      NumberLiteral@5..6
+                      ExpressionLiteral@5..6
                         Number@5..6 "1"
                     ParenClose@6..7 ")""#]],
         );
@@ -565,10 +568,10 @@ mod tests {
         check(
             "(foo",
             expect![[r#"
-                ParenExpression@0..4
+                ExpressionTuple@0..4
                   ParenOpen@0..1 "("
-                  VariableRef@1..4
-                    Identifier@1..4 "foo"
+                  ExpressionReference@1..4
+                    IdentifierValue@1..4 "foo"
                   Missing@4..4
                 error at 4: missing ‘)’"#]],
         );
@@ -580,15 +583,15 @@ mod tests {
         check(
             "foo(",
             expect![[r#"
-                CallExpression@0..4
-                  VariableRef@0..3
-                    Identifier@0..3 "foo"
+                ExpressionApply@0..4
+                  ExpressionReference@0..3
+                    IdentifierValue@0..3 "foo"
                   FunctionArgList@3..4
                     ParenOpen@3..4 "("
                     FunctionArgPositional@4..4
                       Missing@4..4
                     Missing@4..4
-                error at 4: missing ‘)’, identifier, ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’
+                error at 4: missing ‘)’, value-id, ‘self’, ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’
                 error at 4: missing ‘)’"#]],
         );
     }
@@ -599,12 +602,12 @@ mod tests {
         check(
             "foo.",
             expect![[r#"
-                GetExpression@0..4
-                  VariableRef@0..3
-                    Identifier@0..3 "foo"
+                ExpressionGet@0..4
+                  ExpressionReference@0..3
+                    IdentifierValue@0..3 "foo"
                   Dot@3..4 "."
                   Missing@4..4
-                error at 4: missing identifier"#]],
+                error at 4: missing value-id"#]],
         );
     }
 
@@ -614,20 +617,20 @@ mod tests {
         check(
             "let = 1 in 2",
             expect![[r#"
-                LetExpression@0..12
+                ExpressionLet@0..12
                   Let@0..3 "let"
                   Whitespace@3..4 " "
                   Missing@4..4
                   Equal@4..5 "="
                   Whitespace@5..6 " "
-                  NumberLiteral@6..7
+                  ExpressionLiteral@6..7
                     Number@6..7 "1"
                   Whitespace@7..8 " "
                   In@8..10 "in"
                   Whitespace@10..11 " "
-                  NumberLiteral@11..12
+                  ExpressionLiteral@11..12
                     Number@11..12 "2"
-                error at 4: missing identifier"#]],
+                error at 4: missing value-id, _, boolean, number, string, ‘(’, type-id, or ‘Self’"#]],
         );
     }
 
@@ -637,10 +640,11 @@ mod tests {
         check(
             "let x 1 in 2",
             expect![[r#"
-                LetExpression@0..12
+                ExpressionLet@0..12
                   Let@0..3 "let"
                   Whitespace@3..4 " "
-                  Identifier@4..5 "x"
+                  PatternName@4..5
+                    IdentifierValue@4..5 "x"
                   Whitespace@5..6 " "
                   Error@6..7
                     Number@6..7 "1"
@@ -652,9 +656,9 @@ mod tests {
                     Number@11..12 "2"
                   Missing@12..12
                 error at 6..7: expected ‘=’, but found number
-                error at 8..10: expected ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’, but found ‘in’
+                error at 8..10: expected ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’, but found ‘in’
                 error at 11..12: expected ‘in’, but found number
-                error at 12: missing ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’"#]],
+                error at 12: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’"#]],
         );
     }
 
@@ -664,10 +668,11 @@ mod tests {
         check(
             "let x =  in 2",
             expect![[r#"
-                LetExpression@0..13
+                ExpressionLet@0..13
                   Let@0..3 "let"
                   Whitespace@3..4 " "
-                  Identifier@4..5 "x"
+                  PatternName@4..5
+                    IdentifierValue@4..5 "x"
                   Whitespace@5..6 " "
                   Equal@6..7 "="
                   Whitespace@7..9 "  "
@@ -677,9 +682,9 @@ mod tests {
                   Error@12..13
                     Number@12..13 "2"
                   Missing@13..13
-                error at 9..11: expected ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’, but found ‘in’
+                error at 9..11: expected ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’, but found ‘in’
                 error at 12..13: expected ‘in’, but found number
-                error at 13: missing ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’"#]],
+                error at 13: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’"#]],
         );
     }
 
@@ -689,21 +694,22 @@ mod tests {
         check(
             "let x = 1 2",
             expect![[r#"
-                LetExpression@0..11
+                ExpressionLet@0..11
                   Let@0..3 "let"
                   Whitespace@3..4 " "
-                  Identifier@4..5 "x"
+                  PatternName@4..5
+                    IdentifierValue@4..5 "x"
                   Whitespace@5..6 " "
                   Equal@6..7 "="
                   Whitespace@7..8 " "
-                  NumberLiteral@8..9
+                  ExpressionLiteral@8..9
                     Number@8..9 "1"
                   Whitespace@9..10 " "
                   Error@10..11
                     Number@10..11 "2"
                   Missing@11..11
                 error at 10..11: expected ‘in’, but found number
-                error at 11: missing ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’"#]],
+                error at 11: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’"#]],
         );
     }
 
@@ -713,20 +719,20 @@ mod tests {
         check(
             "if then 1 else 2",
             expect![[r#"
-                IfExpression@0..16
+                ExpressionIf@0..16
                   If@0..2 "if"
                   Whitespace@2..3 " "
                   Missing@3..3
                   Then@3..7 "then"
                   Whitespace@7..8 " "
-                  NumberLiteral@8..9
+                  ExpressionLiteral@8..9
                     Number@8..9 "1"
                   Whitespace@9..10 " "
                   Else@10..14 "else"
                   Whitespace@14..15 " "
-                  NumberLiteral@15..16
+                  ExpressionLiteral@15..16
                     Number@15..16 "2"
-                error at 3: missing ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’"#]],
+                error at 3: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’"#]],
         );
     }
 
@@ -736,15 +742,15 @@ mod tests {
         check(
             "if 1 then",
             expect![[r#"
-                IfExpression@0..9
+                ExpressionIf@0..9
                   If@0..2 "if"
                   Whitespace@2..3 " "
-                  NumberLiteral@3..4
+                  ExpressionLiteral@3..4
                     Number@3..4 "1"
                   Whitespace@4..5 " "
                   Then@5..9 "then"
                   Missing@9..9
-                error at 9: missing ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’"#]],
+                error at 9: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’"#]],
         );
     }
 
@@ -754,19 +760,19 @@ mod tests {
         check(
             "foo(1,)",
             expect![[r#"
-                CallExpression@0..7
-                  VariableRef@0..3
-                    Identifier@0..3 "foo"
+                ExpressionApply@0..7
+                  ExpressionReference@0..3
+                    IdentifierValue@0..3 "foo"
                   FunctionArgList@3..7
                     ParenOpen@3..4 "("
                     FunctionArgPositional@4..5
-                      NumberLiteral@4..5
+                      ExpressionLiteral@4..5
                         Number@4..5 "1"
                     Comma@5..6 ","
                     FunctionArgPositional@6..6
                       Missing@6..6
                     ParenClose@6..7 ")"
-                error at 6: missing identifier, ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’"#]],
+                error at 6: missing value-id, ‘self’, ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’"#]],
         );
     }
 
@@ -789,13 +795,13 @@ mod tests {
         check(
             "if (1+) then 2",
             expect![[r#"
-                IfExpression@0..14
+                ExpressionIf@0..14
                   If@0..2 "if"
                   Whitespace@2..3 " "
-                  ParenExpression@3..8
+                  ExpressionTuple@3..8
                     ParenOpen@3..4 "("
-                    BinaryExpression@4..7
-                      NumberLiteral@4..5
+                    ExpressionBinary@4..7
+                      ExpressionLiteral@4..5
                         Number@4..5 "1"
                       Plus@5..6 "+"
                       Error@6..7
@@ -804,9 +810,9 @@ mod tests {
                     Missing@8..8
                   Then@8..12 "then"
                   Whitespace@12..13 " "
-                  NumberLiteral@13..14
+                  ExpressionLiteral@13..14
                     Number@13..14 "2"
-                error at 6..7: expected ‘+’, ‘-’, ‘not’, identifier, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’, but found ‘)’
+                error at 6..7: expected ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’, but found ‘)’
                 error at 8: missing ‘)’"#]],
         );
     }
@@ -817,29 +823,30 @@ mod tests {
         check(
             "let x: Number = 10 in x + 20",
             expect![[r#"
-                LetExpression@0..28
+                ExpressionLet@0..28
                   Let@0..3 "let"
                   Whitespace@3..4 " "
-                  Identifier@4..5 "x"
+                  PatternName@4..5
+                    IdentifierValue@4..5 "x"
                   Colon@5..6 ":"
                   Whitespace@6..7 " "
-                  TypeName@7..13
-                    Identifier@7..13 "Number"
+                  TypeReference@7..13
+                    IdentifierType@7..13 "Number"
                   Whitespace@13..14 " "
                   Equal@14..15 "="
                   Whitespace@15..16 " "
-                  NumberLiteral@16..18
+                  ExpressionLiteral@16..18
                     Number@16..18 "10"
                   Whitespace@18..19 " "
                   In@19..21 "in"
                   Whitespace@21..22 " "
-                  BinaryExpression@22..28
-                    VariableRef@22..23
-                      Identifier@22..23 "x"
+                  ExpressionBinary@22..28
+                    ExpressionReference@22..23
+                      IdentifierValue@22..23 "x"
                     Whitespace@23..24 " "
                     Plus@24..25 "+"
                     Whitespace@25..26 " "
-                    NumberLiteral@26..28
+                    ExpressionLiteral@26..28
                       Number@26..28 "20""#]],
         );
     }
@@ -853,60 +860,63 @@ mod tests {
                 add(10, 20)
             "},
             expect![[r#"
-                LetExpression@0..60
+                ExpressionLet@0..60
                   Let@0..3 "let"
                   Whitespace@3..4 " "
-                  Identifier@4..7 "add"
+                  PatternName@4..7
+                    IdentifierValue@4..7 "add"
                   Whitespace@7..8 " "
                   Equal@8..9 "="
                   Whitespace@9..10 " "
-                  FunctionDecl@10..44
+                  DeclarationFunction@10..44
                     Fn@10..12 "fn"
                     Whitespace@12..13 " "
                     FunctionParamList@13..35
                       ParenOpen@13..14 "("
                       FunctionParam@14..23
-                        Identifier@14..15 "a"
+                        FunctionParamLabel@14..15
+                          IdentifierValue@14..15 "a"
                         Colon@15..16 ":"
                         Whitespace@16..17 " "
-                        TypeName@17..23
-                          Identifier@17..23 "Number"
+                        TypeReference@17..23
+                          IdentifierType@17..23 "Number"
                       Comma@23..24 ","
                       Whitespace@24..25 " "
                       FunctionParam@25..34
-                        Identifier@25..26 "b"
+                        FunctionParamLabel@25..26
+                          IdentifierValue@25..26 "b"
                         Colon@26..27 ":"
                         Whitespace@27..28 " "
-                        TypeName@28..34
-                          Identifier@28..34 "Number"
+                        TypeReference@28..34
+                          IdentifierType@28..34 "Number"
                       ParenClose@34..35 ")"
                     Whitespace@35..36 " "
                     FatArrow@36..38 "=>"
                     Whitespace@38..39 " "
                     FunctionBody@39..44
-                      BinaryExpression@39..44
-                        VariableRef@39..40
-                          Identifier@39..40 "a"
+                      ExpressionBinary@39..44
+                        ExpressionReference@39..40
+                          IdentifierValue@39..40 "a"
                         Whitespace@40..41 " "
                         Plus@41..42 "+"
                         Whitespace@42..43 " "
-                        VariableRef@43..44
-                          Identifier@43..44 "b"
+                        ExpressionReference@43..44
+                          IdentifierValue@43..44 "b"
                   Whitespace@44..45 " "
                   In@45..47 "in"
                   Newline@47..48 "\n"
-                  CallExpression@48..59
-                    VariableRef@48..51
-                      Identifier@48..51 "add"
+                  ExpressionApply@48..59
+                    ExpressionReference@48..51
+                      IdentifierValue@48..51 "add"
                     FunctionArgList@51..59
                       ParenOpen@51..52 "("
                       FunctionArgPositional@52..54
-                        NumberLiteral@52..54
+                        ExpressionLiteral@52..54
                           Number@52..54 "10"
                       Comma@54..55 ","
                       Whitespace@55..56 " "
                       FunctionArgPositional@56..58
-                        NumberLiteral@56..58
+                        ExpressionLiteral@56..58
                           Number@56..58 "20"
                       ParenClose@58..59 ")"
                   Newline@59..60 "\n""#]],
