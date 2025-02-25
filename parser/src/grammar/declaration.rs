@@ -874,7 +874,7 @@ mod tests {
                 error at 40: missing ‘)’, value-id, or ‘self’
                 error at 40: missing ‘)’
                 error at 40: missing ‘=>’
-                error at 40: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, or ‘if’"#]],
+                error at 40: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
         );
     }
 
