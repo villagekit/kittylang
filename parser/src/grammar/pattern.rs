@@ -28,10 +28,6 @@ pub(crate) fn pattern(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMar
     Some(m.complete(p, NodeKind::PatternOr))
 }
 
-// TODO pattern_identifier
-// - how to distinguish between pattern type and pattern identifier?
-// - e.g. Thing.Cat vs thing
-
 pub(crate) fn pattern_single(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
     let cm = if p.at(TokenKind::IdentifierValue) {
         pattern_name(p, recovery)
@@ -84,14 +80,14 @@ pub(crate) fn pattern_type(p: &mut Parser, recovery: TokenSet) -> CompletedMarke
     let m = p.start();
     type_path(p, recovery);
     if p.at(TokenKind::ParenOpen) {
-        pattern_field_list(p, recovery);
+        pattern_type_arg_list(p, recovery);
     }
     m.complete(p, NodeKind::PatternType)
 }
 
-pub(crate) fn pattern_field_list(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+pub(crate) fn pattern_type_arg_list(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     assert!(p.at(TokenKind::ParenOpen));
-    let recovery_field_list = recovery.union([TokenKind::Comma, TokenKind::ParenClose]);
+    let recovery_type_arg_list = recovery.union([TokenKind::Comma, TokenKind::ParenClose]);
     let m = p.start();
     p.bump(); // Consume '('.
     'all: {
@@ -104,7 +100,7 @@ pub(crate) fn pattern_field_list(p: &mut Parser, recovery: TokenSet) -> Complete
                 break 'positional; // End positional fields
             }
 
-            pattern_field_positional(p, recovery_field_list);
+            pattern_type_arg_positional(p, recovery_type_arg_list);
 
             if !p.at(TokenKind::Comma) {
                 break 'all; // End all fields
@@ -113,7 +109,7 @@ pub(crate) fn pattern_field_list(p: &mut Parser, recovery: TokenSet) -> Complete
         }
         // Then process labelled fields
         loop {
-            pattern_field_labelled(p, recovery_field_list);
+            pattern_type_arg_labelled(p, recovery_type_arg_list);
 
             if !p.at(TokenKind::Comma) {
                 break 'all;
@@ -125,20 +121,22 @@ pub(crate) fn pattern_field_list(p: &mut Parser, recovery: TokenSet) -> Complete
     m.complete(p, NodeKind::PatternTypeArgList)
 }
 
-// TODO handle this with ':' to rename
-fn pattern_field_positional(p: &mut Parser, _recovery: TokenSet) -> CompletedMarker {
+/// E.g. `let Thing(name, description) = thing`
+fn pattern_type_arg_positional(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
-    // expr(p, recovery);
+    p.expect(TokenKind::IdentifierValue, recovery);
     m.complete(p, NodeKind::PatternTypeArgPositional)
 }
 
-// TODO handle this like Julia does (?)
-fn pattern_field_labelled(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+/// E.g. `let Thing(name: title, description:) = thing`
+fn pattern_type_arg_labelled(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     assert!(p.at(TokenKind::IdentifierValue));
     let m = p.start();
     p.expect(TokenKind::IdentifierValue, recovery);
     p.expect(TokenKind::Colon, recovery);
-    // expr(p, recovery);
+    if !(p.at(TokenKind::Comma) || p.at(TokenKind::ParenClose)) {
+        p.expect(TokenKind::IdentifierValue, recovery);
+    }
     m.complete(p, NodeKind::PatternTypeArgLabelled)
 }
 
@@ -146,4 +144,182 @@ fn pattern_name(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
     p.expect(TokenKind::IdentifierValue, recovery);
     m.complete(p, NodeKind::PatternName)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{pattern, Parser, TokenSet};
+    use crate::check_grammar;
+    use expect_test::expect;
+    use kitty_cst::Pattern;
+
+    fn check(input: &str, expected: expect_test::Expect) {
+        let grammar = |p: &mut Parser| {
+            pattern(p, TokenSet::NONE);
+        };
+        check_grammar::<Pattern>(grammar, input, expected);
+    }
+
+    #[test]
+    fn pattern_name() {
+        // Happy path
+        check(
+            "thing",
+            expect![[r#"
+                PatternName@0..5
+                  IdentifierValue@0..5 "thing""#]],
+        );
+    }
+
+    #[test]
+    fn pattern_wildcard() {
+        // Happy path
+        check(
+            "_",
+            expect![[r#"
+                PatternWildcard@0..1
+                  Underscore@0..1 "_""#]],
+        );
+    }
+
+    #[test]
+    fn pattern_literal_string() {
+        // Happy path
+        check(
+            "\"apple\"",
+            expect![[r#"
+                PatternLiteral@0..7
+                  String@0..7 "\"apple\"""#]],
+        );
+    }
+
+    #[test]
+    fn pattern_literal_number_or() {
+        // Happy path
+        check(
+            "2 | 3 | 4",
+            expect![[r#"
+                PatternLiteral@0..2
+                  Number@0..1 "2"
+                  Whitespace@1..2 " ""#]],
+        );
+    }
+
+    #[test]
+    fn pattern_tuple() {
+        // Happy path
+        check(
+            "(a, b)",
+            expect![[r#"
+                PatternTuple@0..6
+                  ParenOpen@0..1 "("
+                  PatternName@1..2
+                    IdentifierValue@1..2 "a"
+                  Comma@2..3 ","
+                  Whitespace@3..4 " "
+                  PatternName@4..5
+                    IdentifierValue@4..5 "b"
+                  ParenClose@5..6 ")""#]],
+        );
+    }
+
+    #[test]
+    fn pattern_type_no_args() {
+        // Happy path
+        check(
+            "Thing",
+            expect![[r#"
+                PatternType@0..5
+                  TypeReference@0..5
+                    IdentifierType@0..5 "Thing""#]],
+        );
+    }
+
+    #[test]
+    fn pattern_type_positional_args() {
+        // Happy path
+        check(
+            "Thing(name, description)",
+            expect![[r#"
+                PatternType@0..24
+                  TypeReference@0..5
+                    IdentifierType@0..5 "Thing"
+                  PatternTypeArgList@5..24
+                    ParenOpen@5..6 "("
+                    PatternTypeArgPositional@6..10
+                      IdentifierValue@6..10 "name"
+                    Comma@10..11 ","
+                    Whitespace@11..12 " "
+                    PatternTypeArgPositional@12..23
+                      IdentifierValue@12..23 "description"
+                    ParenClose@23..24 ")""#]],
+        );
+    }
+
+    #[test]
+    fn pattern_type_labelled_args() {
+        // Happy path
+        check(
+            "Thing(name: title, description:)",
+            expect![[r#"
+                PatternType@0..32
+                  TypeReference@0..5
+                    IdentifierType@0..5 "Thing"
+                  PatternTypeArgList@5..32
+                    ParenOpen@5..6 "("
+                    PatternTypeArgLabelled@6..17
+                      IdentifierValue@6..10 "name"
+                      Colon@10..11 ":"
+                      Whitespace@11..12 " "
+                      IdentifierValue@12..17 "title"
+                    Comma@17..18 ","
+                    Whitespace@18..19 " "
+                    PatternTypeArgLabelled@19..31
+                      IdentifierValue@19..30 "description"
+                      Colon@30..31 ":"
+                    ParenClose@31..32 ")""#]],
+        );
+    }
+
+    #[test]
+    fn pattern_type_mixed_arg() {
+        // Happy path
+        check(
+            "Thing(name, description: desc, age:)",
+            expect![[r#"
+                PatternType@0..36
+                  TypeReference@0..5
+                    IdentifierType@0..5 "Thing"
+                  PatternTypeArgList@5..36
+                    ParenOpen@5..6 "("
+                    PatternTypeArgPositional@6..10
+                      IdentifierValue@6..10 "name"
+                    Comma@10..11 ","
+                    Whitespace@11..12 " "
+                    PatternTypeArgLabelled@12..29
+                      IdentifierValue@12..23 "description"
+                      Colon@23..24 ":"
+                      Whitespace@24..25 " "
+                      IdentifierValue@25..29 "desc"
+                    Comma@29..30 ","
+                    Whitespace@30..31 " "
+                    PatternTypeArgLabelled@31..35
+                      IdentifierValue@31..34 "age"
+                      Colon@34..35 ":"
+                    ParenClose@35..36 ")""#]],
+        );
+    }
+
+    #[test]
+    fn pattern_type_or() {
+        // Happy path
+        check(
+            "This | That",
+            expect![[r#"
+                PatternType@0..5
+                  TypeReference@0..4
+                    IdentifierType@0..4 "This"
+                  Whitespace@4..5 " ""#]],
+        );
+    }
 }

@@ -113,7 +113,9 @@ fn function_labelled_arg(p: &mut Parser, recovery: TokenSet) -> CompletedMarker 
     let m = p.start();
     function_param_label(p, recovery);
     p.expect(TokenKind::Colon, recovery);
-    expression(p, recovery);
+    if !(p.at(TokenKind::Comma) || p.at(TokenKind::ParenClose)) {
+        expression(p, recovery);
+    }
     m.complete(p, NodeKind::FunctionArgLabelled)
 }
 

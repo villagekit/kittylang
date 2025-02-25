@@ -259,7 +259,7 @@ pub(crate) fn generic_where_clause(p: &mut Parser, recovery: TokenSet) -> Comple
     p.bump(); // Consume 'where'
     p.expect(TokenKind::Indent, recovery);
     while !p.at(TokenKind::Dedent) {
-        generic_bound(p, recovery_where);
+        generic_where_bound(p, recovery_where);
     }
     p.bump(); // Consume <dedent>
     m.complete(p, NodeKind::GenericWhereClause)

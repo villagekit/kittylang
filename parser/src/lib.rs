@@ -326,35 +326,29 @@ mod tests {
                         Newline@69..70 "\n"
                         Whitespace@70..72 "  "
                         Indent@72..74 "  "
-                        GenericBound@74..75
-                          IdentifierType@74..75 "N"
-                        GenericBound@75..76
-                          Error@75..76
-                            Colon@75..76 ":"
-                        Whitespace@76..77 " "
-                        GenericBound@77..84
-                          IdentifierType@77..84 "Default"
-                        Whitespace@84..85 " "
-                        GenericBound@85..86
-                          Error@85..86
+                        GenericWhereBound@74..103
+                          TypeReference@74..75
+                            IdentifierType@74..75 "N"
+                          Colon@75..76 ":"
+                          Whitespace@76..77 " "
+                          GenericBoundList@77..103
+                            GenericBound@77..84
+                              IdentifierType@77..84 "Default"
+                            Whitespace@84..85 " "
                             Plus@85..86 "+"
-                        Whitespace@86..87 " "
-                        GenericBound@87..90
-                          IdentifierType@87..90 "Add"
-                        Whitespace@90..91 " "
-                        GenericBound@91..92
-                          Error@91..92
+                            Whitespace@86..87 " "
+                            GenericBound@87..90
+                              IdentifierType@87..90 "Add"
+                            Whitespace@90..91 " "
                             Plus@91..92 "+"
-                        Whitespace@92..93 " "
-                        GenericBound@93..96
-                          IdentifierType@93..96 "Mul"
-                        Whitespace@96..97 " "
-                        GenericBound@97..98
-                          Error@97..98
+                            Whitespace@92..93 " "
+                            GenericBound@93..96
+                              IdentifierType@93..96 "Mul"
+                            Whitespace@96..97 " "
                             Plus@97..98 "+"
-                        Whitespace@98..99 " "
-                        GenericBound@99..103
-                          IdentifierType@99..103 "Sqrt"
+                            Whitespace@98..99 " "
+                            GenericBound@99..103
+                              IdentifierType@99..103 "Sqrt"
                         Newline@103..104 "\n"
                         Newline@104..105 "\n"
                         Whitespace@105..107 "  "
@@ -606,10 +600,6 @@ mod tests {
                       Newline@386..387 "\n"
                       Dedent@387..387 ""
                 error at 23..26: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found value-id
-                error at 75..76: expected type-id, but found ‘:’
-                error at 85..86: expected type-id, but found ‘+’
-                error at 91..92: expected type-id, but found ‘+’
-                error at 97..98: expected type-id, but found ‘+’
                 error at 121..128: expected type-id, but found value-id
                 error at 148..155: expected type-id, but found value-id
                 error at 175..182: expected type-id, but found value-id
