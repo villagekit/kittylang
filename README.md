@@ -1,50 +1,50 @@
-## Resources
+# Kitty Lang
 
-- \*[tuqqu/oxide-lang](https://github.com/tuqqu/oxide-lang)
-- \*[gadt.pdf](https://www.cl.cam.ac.uk/~nk480/gadt.pdf)
-- \*[bidirectional.pdf](https://davidchristiansen.dk/tutorials/bidirectional.pdf)
-- \*[rmehri01/bidirectional](https://github.com/rmehri01/bidirectional)
-- https://www.reddit.com/r/ProgrammingLanguages/comments/14czkbu/comment/joppssr/
-    - [nbe](https://davidchristiansen.dk/tutorials/nbe/)
-- [JDemler/BidirectionalTypechecking](https://github.com/JDemler/BidirectionalTypechecking)
-- [minirust/minirust](https://github.com/minirust/minirust)
-- [Class notes on Type Inference](https://cs.hofstra.edu/~cscccl/csc123/typing.pdf)
-- [zesterer/tao](https://github.com/zesterer/tao/)
-- [roc-lang/roc](https://github.com/roc-lang/roc)
-- [gleam-lang/gleam](https://github.com/gleam-lang/gleam)
-- [flix/flix](https://github.com/flix/flix)
-- [sway/sway](https://docs.fuel.network/docs/sway/)
-- https://mckayla.blog/posts/all-you-need-is-data-and-functions.html
-- https://lunacookies.github.io/lang/
-  - https://github.com/lunacookies/eldiro
-  - https://github.com/lunacookies/fictional-dollop
-  - https://github.com/lunacookies/haze
-  - https://github.com/gingerbread-lang/gingerbread
-  - https://github.com/capy-language/capy
-- https://github.com/naalit/pika/
-- https://steveklabnik.com/writing/the-language-strangeness-budget
-- [rhombus](https://docs.racket-lang.org/rhombus)
-  - [shrubbery](https://docs.racket-lang.org/shrubbery/)
+Kitty Lang is a _work_in_progress_ programming language, basically "what if Rust was a friendly scripting language".
 
-- Used
-  - https://lunacookies.github.io/lang/
-  - https://matklad.github.io/2023/05/21/resilient-ll-parsing-tutorial.html
-  - https://thunderseethe.dev/series/making-a-language/
-  - https://astexplorer.net/
+Kitty Lang is intended to be used as the foundation for [Village Kit](https://github.com/villagekit/villagekit), a future-thinking code-as-CAD system for open source makers.
 
-## TODO
+## Principles
 
-- rename to Ako ("to learn" in Maori)?
-  - https://maoridictionary.co.nz/word/158
+- Accessible to beginners, like [Logo](https://en.wikipedia.org/wiki/Logo_(programming_language))
+- Powerful for experts, like [Haskell](https://www.haskell.org/)
+- Structs and traits, like [Rust](https://rust-lang.org)
+- Embeddable, so can be used in web or native apps
+- Language-aware, so compiler can be used as linter, formatter, language server, etc
+  - Even if some syntax is wrong, the compiler is able to parse the remaining correct syntax and still give useful feedback
+- Debug-friendly, so you know exactly how and why something went wrong
+- Evaluation-aware, so you even know where values come from
+  - Every value has a reference to the code span which created it
+  - This is important for code-as-CAD editors where you can interact with an object in 3d space and it performs a macro on the code
+- Secure, so you are safe with untrusted input
+- Inspired by future-thinking languages: [Julia](https://julialang.org/), [Flix](https://flix.dev/), [Gleam](https://gleam.run/)
 
-- write ItemTree like https://github.com/rust-lang/rust-analyzer/blob/master/crates/hir-def/src/item_tree.rs
-- Add `++` operator for append / concatenate
-- Add `value.[Trait]` to cast value as trait object, to call trait method (with no ambiguity).
+## Progress
 
+At the moment
+
+- [x] Lexer (String -> Tokens)
+- [x] Parser (Tokens -> Concrete Syntax Tree)
+- [ ] Analysis (Concrete Syntax Tree -> High-level Intermediate Representation)
+- [ ] Evaluator (High-level Intermediate Representation -> Value)
+- ???
 
 ## Language
 
+(_Incomplete_)
+
 - Rust-like type system
+  - Primitives
+    - `()`: Unit type
+    - `Number`
+    - `String`
+  - Compound types:
+    - `(T, U...)`: Tuple
+    - `List`
+  - Enum types:
+    - `Boolean`
+    - `Option`
+    - `Result`
 - Functions can be called with either positional args or keyword args
   - Type generics are the same
 - Functions can describe multi-arity multi-type overloads
@@ -58,30 +58,3 @@
 - Match like Gleam: https://tour.gleam.run/everything/#data-types-record-pattern-matching
 - `True` and `False` are part of a `Boolean` enum
   - but they are aliased so you can use as `True` and `False`.
-
-## Requirements
-
-- Compiler can be used as linter, formatter, language server, etc
-  - Even if some syntax is wrong, the compiler is able to parse the remaining correct syntax and still give useful feedback
-- Every value has a reference to the code span which created it.
-  - This is important for code-as-CAD editors where you can interact with an object in 3d space and it performs a macro on the code.
-
-## Open questions
-
-- Use `choice` instead of `enum`?
-- Use `{}` instead of `[]` for type arguments?
-    - This is what Julia does.
-    - Because we don't need `{}` for blocks or objects.
-    - But we could use `[]` for field get.
-
-## Decisions
-
-- Separated value and type identifiers, to be able to distinguish them in a pattern:
-  - Otherwise no way to know if `None` is an existing type or a new variable name
-  - Also helps for unifying `.` across both values and types.
-
-```
-match maybe_thing
-  Some(thing) => ()
-  None => ()
-```
