@@ -4,6 +4,14 @@ Kitty Lang is a _work_in_progress_ programming language, basically "what if Rust
 
 Kitty Lang is intended to be used as the foundation for [Village Kit](https://github.com/villagekit/villagekit), a future-thinking code-as-CAD system for open source makers.
 
+## Working on this repo
+
+Start with [DESIGN.md](DESIGN.md), then the glossary
+[docs/context.md](docs/context.md). The work is in [plans/](plans/README.md);
+the decisions in [decisions/](decisions/README.md); the methodology for
+humans and agents in [CLAUDE.md](CLAUDE.md). `just check` is the quality
+gate.
+
 ## Principles
 
 - Accessible to beginners, like [Logo](https://en.wikipedia.org/wiki/Logo_(programming_language))

@@ -1,0 +1,20 @@
+[package]
+name = "extract-transcript"
+version = "0.1.0"
+edition = "2024"
+# Let chains; also the floor for repos this skill gets copied into.
+rust-version = "1.88"
+publish = false
+
+# Standalone tool, deliberately outside the repo workspace: the skill must
+# build the same way from any repo it is copied into.
+[workspace]
+
+[dependencies]
+# preserve_order is load-bearing: tool-call args must render in the order
+# the model emitted them.
+serde_json = { version = "1", features = ["preserve_order"] }
+
+[[bin]]
+name = "extract-transcript"
+path = "src/main.rs"

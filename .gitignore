@@ -3,3 +3,8 @@
 /.repl-history.txt
 /node_modules
 /npm-debug.log*
+
+# Claude Code: skills are shared, everything else is per-machine
+/.claude/*
+!/.claude/skills
+/.claude/skills/transcripts/scripts/target/
