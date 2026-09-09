@@ -19,6 +19,8 @@ recall, when the work reaches them.
 
 - [tuqqu/oxide-lang](https://github.com/tuqqu/oxide-lang)
 - [rmehri01/bidirectional](https://github.com/rmehri01/bidirectional)
+  (404 as of 2026-09-09; JDemler's implementation below covers the same
+  2013 algorithm, but has no license file: read, never transcribe)
 - [JDemler/BidirectionalTypechecking](https://github.com/JDemler/BidirectionalTypechecking)
 - [minirust/minirust](https://github.com/minirust/minirust)
 - [zesterer/tao](https://github.com/zesterer/tao/)
@@ -51,3 +53,7 @@ recall, when the work reaches them.
 - https://steveklabnik.com/writing/the-language-strangeness-budget
 
 ## Log
+
+- 2026-09-09: the eldiro lineage, thunderseethe, the type-checking papers,
+  oxide-lang, Gleam and rust-analyzer were read by the research sweep in
+  `research/20260909-rust-like-compiler-architecture-synthesis.md`.

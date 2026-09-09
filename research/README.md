@@ -11,4 +11,8 @@ This file is the session index.
 
 ## Sessions
 
-None yet.
+- 2026-09-09 [The simplest good architecture for a Rust-like compiler](20260909-rust-like-compiler-architecture-synthesis.md):
+  seven Opus sub-agents over the eldiro lineage, the thunderseethe series,
+  the bidirectional typing papers, oxide-lang, Gleam and rust-analyzer;
+  feeds the M3 grilling. Reports in
+  `../transcripts/kittylang/2026-09-09-rust-like-compiler-architecture/`.
