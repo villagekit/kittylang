@@ -30,7 +30,6 @@ pub(crate) fn parse_grammar<Node: CstNode>(
 ) -> Parse<Node> {
     let tokens: Vec<Token> = lex(input).collect();
     let (events, errors) = Parser::new(&tokens).parse(grammar);
-    println!("events: {:?}", events);
     let tree = Sink::new(input, &tokens).process(&events);
     let node = Node::cast(tree.root(), &tree).unwrap();
     Parse { tree, node, errors }

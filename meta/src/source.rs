@@ -9,7 +9,7 @@ pub struct SourceId(Intern<Vec<String>>);
 
 impl fmt::Display for SourceId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if self.0.len() == 0 {
+        if self.0.is_empty() {
             write!(f, "?")
         } else {
             write!(f, "{}", self.0.clone().join("/"))

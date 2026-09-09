@@ -13,9 +13,9 @@ No epic and no milestone record yet. The milestones in
 [DESIGN.md](../DESIGN.md#milestones) become records here through a
 grilling and `/to-plan`, then slices through `/to-plan-slices`.
 
-1. [Make just check green](8f370f53521b-make-just-check-green.md)
-   (`8f370f53`, todo). The first slice, so the working loop has a green
-   gate to stand on.
+Nothing is ready. The first slice,
+[Make just check green](8f370f53521b-make-just-check-green.md)
+(`8f370f53`), is done: the gate is green and every later slice ends on it.
 
 ## Writing a plan
 

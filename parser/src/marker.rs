@@ -1,6 +1,5 @@
 use drop_bomb::DropBomb;
 use kitty_syntax::NodeKind;
-use std::mem;
 
 use crate::sink::Event;
 use crate::Parser;
@@ -21,7 +20,7 @@ impl Marker {
 
     pub(crate) fn complete(mut self, p: &mut Parser<'_>, kind: NodeKind) -> CompletedMarker {
         self.bomb.defuse();
-        let old_event = mem::replace(&mut p.events[self.pos], Some(Event::StartNode(kind)));
+        let old_event = p.events[self.pos].replace(Event::StartNode(kind));
         debug_assert!(old_event.is_none());
         p.events.push(Some(Event::FinishNode));
 
@@ -30,9 +29,14 @@ impl Marker {
 
     /// Abandons the syntax tree node. All its children
     /// are attached to its parent instead.
+    // TODO(cc): drop the allow once a recovery rule abandons a node.
+    #[allow(dead_code)]
     pub(crate) fn abandon(mut self, p: &mut Parser<'_>) {
         self.bomb.defuse();
         if self.pos == p.events.len() - 1 {
+            // Note(cc): the pop is load-bearing, so this cannot be a
+            // debug_assert; the parser's no-panic rule holds only while
+            // every marker is completed or abandoned exactly once.
             assert!(matches!(p.events.pop(), Some(None)));
         }
     }

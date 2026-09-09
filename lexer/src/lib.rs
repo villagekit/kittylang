@@ -1,13 +1,15 @@
 mod indenter;
 mod token;
 
+#[cfg(test)]
+use std::fmt;
+
 use logos::{Logos, SpannedIter};
-use std::{fmt, vec::Vec};
 
 use crate::indenter::Indenter;
 pub use crate::token::{Token, TokenKind};
 
-pub fn lex(source: &str) -> Lexer {
+pub fn lex(source: &str) -> Lexer<'_> {
     Lexer::new(source)
 }
 
@@ -35,14 +37,18 @@ impl Iterator for Lexer<'_> {
     }
 }
 
+/// The lexer's output, one token per line, for snapshot tests.
+#[cfg(test)]
 struct Tokens(Vec<Token>);
 
+#[cfg(test)]
 impl From<Lexer<'_>> for Tokens {
-    fn from(value: Lexer) -> Self {
+    fn from(value: Lexer<'_>) -> Self {
         Self(value.collect())
     }
 }
 
+#[cfg(test)]
 impl fmt::Debug for Tokens {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for token in self.0.iter() {

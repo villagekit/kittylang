@@ -127,7 +127,7 @@ impl<'t> Parser<'t> {
     }
 
     fn at_set_raw(&mut self, set: &TokenSet) -> bool {
-        self.peek().map_or(false, |k| set.contains(k))
+        self.peek().is_some_and(|k| set.contains(k))
     }
 
     pub(crate) fn at_end(&mut self) -> bool {

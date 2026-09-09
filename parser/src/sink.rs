@@ -89,7 +89,7 @@ impl<'t> Sink<'t> {
     fn next_token_is_trivia(&self) -> bool {
         self.tokens
             .get(self.cursor)
-            .map_or(false, |tok| tok.kind.is_trivia())
+            .is_some_and(|tok| tok.kind.is_trivia())
     }
 
     #[inline(always)]

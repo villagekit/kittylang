@@ -3,17 +3,6 @@ use kitty_syntax::{NodeKind, TokenKind};
 use super::r#type::{type_path, TYPE_PATH_FIRST};
 use crate::{marker::CompletedMarker, parser::Parser, token_set::TokenSet};
 
-const PATTERN_FIRST: [TokenKind; 8] = [
-    TokenKind::IdentifierValue,
-    TokenKind::Underscore,
-    TokenKind::Boolean,
-    TokenKind::Number,
-    TokenKind::String,
-    TokenKind::ParenOpen,
-    TokenKind::IdentifierType,
-    TokenKind::SelfUpper,
-];
-
 pub(crate) fn pattern(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
     let lhs = pattern_single(p, recovery)?;
 
@@ -76,6 +65,9 @@ pub(crate) fn pattern_tuple(p: &mut Parser, recovery: TokenSet) -> CompletedMark
 }
 
 pub(crate) fn pattern_type(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+    // TODO(cc): pattern_single dispatches here on TYPE_PATH_FIRST, which
+    // includes SelfUpper, so a `Self` pattern panics against the
+    // parser's no-panic rule. Accept the set here and test it.
     assert!(p.at(TokenKind::IdentifierType));
     let m = p.start();
     type_path(p, recovery);

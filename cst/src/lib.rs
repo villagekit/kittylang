@@ -431,12 +431,3 @@ fn nodes<Parent: CstNode, Child: CstNode>(
         .child_nodes(tree)
         .filter_map(move |c| Child::cast(c, tree))
 }
-
-fn tokens<Parent: CstNode, Child: CstToken>(
-    node: Parent,
-    tree: &SyntaxTree,
-) -> impl Iterator<Item = Child> + '_ {
-    node.syntax()
-        .child_tokens(tree)
-        .filter_map(move |c| Child::cast(c, tree))
-}
