@@ -16,12 +16,16 @@ and the questions it could not settle held as design plans until the
 tooling makes them visible.
 
 1. [Tooling for language design](5c5f4b9256b3-tooling-for-language-design.md)
-   (`5c5f4b92`): the `kitty` command, the examples test, the playground.
-   Blocked by nothing.
-2. [M2: the parser](1cee599ce218-m2-the-parser.md) (`1cee599c`): the
-   lexing and grammar specs first, then the lexer, the never-panic rule,
-   the grammar the grilling settled, the examples rewritten. Its first
-   slices wait on the command and the examples test.
+   (`5c5f4b92`), `doing`, its slices: the `kitty` command (`f280931f`),
+   the examples test (`942ff7a4`), then the playground (`45a1b9e9`).
+2. [M2: the parser](1cee599ce218-m2-the-parser.md) (`1cee599c`),
+   `doing`, its slices: the lexing and grammar specs (`0248a546`) first,
+   then, each waiting on the specs and the examples test, the lexer
+   (`9d84d1f9`), the parser never panics (`277624e4`), function return
+   types (`466ffceb`), keyword arguments with `=` and spread
+   (`4423cd0a`), value segments after a type path (`1493e2aa`); then attributes (`328c0a99`), `let with` (`94bcf824`)
+   and the fuzz target (`378fe0c3`); last, the examples rewritten
+   (`75d0d7ee`), the record's exit demo.
 3. The design plans, tagged `design`, blocked by the tooling record:
    [newlines inside brackets](d0658cb19697-design-newlines-inside-brackets.md),
    [supertraits and blanket impls](3738718cde03-design-supertraits-and-blanket-impls.md),

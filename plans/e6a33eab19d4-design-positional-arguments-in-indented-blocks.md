@@ -15,6 +15,11 @@ parts with a nested block per part is the Village Kit idiom. The
 grilling of 2026-09-12 deferred it until the playground
 ([[5c5f4b9256b3]]) shows both spellings side by side.
 
+The `if should_include_back` line inside that block, an `if` with no
+`then` whose branch is the indented block below it, is this plan's too:
+what may stand as a line in such a block, and whether `if` has a block
+form without `then`.
+
 The options: amend the decision so an indented block holds positional
 lines or keyword lines, never mixed; or rewrite those two sites with
 `( )` (which [[d0658cb19697]] may make multi-line). Interacts with

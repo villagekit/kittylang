@@ -1,6 +1,6 @@
 ---
 title: Tooling for language design
-status: todo
+status: doing
 parent: 436aea0e22af
 ---
 
@@ -53,7 +53,8 @@ gains the terms this work needs (the playground, the command).
 
 `cargo run -p kitty-cli -- parse examples/units.kitty` prints the tree
 and the errors rendered by `ariadne`; `just test` runs the examples test
-and its expectation lists the errors per file; the playground page
+and its expectations list the errors for the three files that parse,
+the other three marked `should_panic` until [[277624e4f5fe]] lands; the playground page
 opened in a browser shows tokens, tree and errors for a pasted example
 and updates as it is edited.
 

@@ -1,6 +1,6 @@
 ---
 title: "M2: the parser"
-status: todo
+status: doing
 parent: 436aea0e22af
 ---
 
@@ -23,34 +23,44 @@ Specs first, then the lexer, then the grammar, then the examples.
   `False` are ordinary `Boolean` variants and no keyword
   ([[f2708b12e004]] makes `false` a value identifier); string literals
   are double-quoted only; `=>` is mandatory on every function body, then
-  an inline expression or an indented block; `let with <expr>` followed
+  an inline expression or an indented block (already held); `let with <expr>` followed
   by an indented list of names destructures over several lines, and `let
   ... in` stays for a single line, a newline being the implicit `in`.
 - **The lexer**: the package regex, which today truncates `@std/math` to
-  `@std/m`; an `@` token for attributes; the metadata comment kinds
-  removed ([[03212e993893]]); the `:1` version suffix on an import
-  accepted and kept in the tree, its meaning deferred to
-  [[a89ddd383a16]].
-- **The parser never panics**: the parameter-list assertion in
-  `function.rs` and the `Self` pattern assertion in `pattern.rs` become
-  parse errors with recovery, and a fuzz target over lex and parse,
-  seeded with `examples/`, guards the rule.
+  `@std/m`; an `@` token for attributes; the `Boolean` token kind
+  removed so `True` and `False` lex as type identifiers; the `#= =#`
+  multi-line comment, which the lexer lacks; the `from` token accepted as a
+  function name so `fn from` parses; the `with` keyword for `let with`; the glossary's metadata
+  comment term deleted ([[03212e993893]] found nothing to remove in the
+  lexer); the `:1` version suffix on an import accepted and kept in the
+  tree, its meaning deferred to [[a89ddd383a16]].
+- **The parser never panics**: every assertion and unwrap reachable
+  from `parse`, starting with the parameter-list assertion in
+  `function.rs` and the `Self` pattern assertion in `pattern.rs`,
+  becomes a parse error with recovery or is made unreachable; then a
+  fuzz target over lex and parse, seeded with `examples/`, guards the
+  rule.
 - **Grammar**: return type annotations on functions and the mandatory
-  `=>`; keyword arguments with `=` in `( )`, `{ }` and indented blocks
-  ([[95cd2585f916]], [[881178303bc8]]) and `...spread`; attributes
+  `=>`; keyword arguments with `=` in `( )`, `{ }` and indented blocks,
+  brace-delimited constructor patterns with shorthand and `=` fields
+  ([[95cd2585f916]], [[881178303bc8]]) and `...spread`; a value segment
+  after a type path in an expression (`N.default()`, `GridBeam.Z`), which
+  [[f2708b12e004]] promises and the grammar lacks; attributes
   ([[03212e993893]]) reusing the call argument list; `let with`.
-- **The examples**, rewritten to the settled surface in whichever slice
-  first makes them parse: `seatHeight` to `seat_height`, `GridPanel`
+- **The examples**, rewritten to the settled surface in one slice,
+  [[75d0d7eea26c]]; no other slice edits `examples/`: `seatHeight` to `seat_height`, `GridPanel`
   imported, `fn parts: Parts` to `fn parts(self): Parts`, `regular(self)`
   to `regular()`, `fn plugins()` a method of `impl Assembly for Chair`
   returning `List(SmartFasteners())`, `false` and `true` to `False` and
   `True`, `'top'` to `"top"`, `[0, seat_width]` to `(0, seat_width)`
   ([[ec7345d92813]]), `fn default()` in `3d-object.kitty` given `=>`,
-  every `x: 0` argument and `Self { x: ... }` to `=`. Left as they are
+  every `x: 0` argument and `Self { x: ... }` to `=`, the bare `in`
+  line after `let with` in `chair.kitty` removed. Left as they are
   until their design plans close: `impl Object3d for Assembly`
-  ([[3738718cde03]]), `struct Parts(...)` and `PartsItem.None`
-  ([[dd325e81ad2c]]), the positional indented blocks under `Vector3` and
-  `Parts` ([[e6a33eab19d4]]), and any bracket spanning lines
+  ([[3738718cde03]]), `struct Parts(...)`, `PartsItem.None` and the `case Name(Type)`
+  payloads ([[dd325e81ad2c]]), the positional indented blocks under
+  `Vector3` and `Parts` with the `then`-less `if` among them
+  ([[e6a33eab19d4]]), and any bracket spanning lines
   ([[d0658cb19697]]).
 
 Specs: every section of `lexing.md` and `grammar.md` this record

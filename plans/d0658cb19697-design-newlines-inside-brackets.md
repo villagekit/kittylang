@@ -7,7 +7,10 @@ blocked_by: 5c5f4b9256b3
 priority: medium
 ---
 
-What a newline means inside `( )`, `[ ]` or `{ }`. Today the indenter
+What a newline means inside `( )`, `[ ]` or `{ }`, and where a newline
+ends an expression outside them (today the parser sees newlines as
+trivia, so `let x = f` followed by `(1)` on the next line reads as a
+call). Today the indenter
 emits indent and dedent tokens for every newline, brackets included, so
 `Self {` followed by fields on their own lines cannot parse. The
 grilling of 2026-09-12 deferred this until the playground
