@@ -67,3 +67,5 @@ diagnostics, which do not exist yet.
 ## Outcome
 
 ## Log
+
+- 2026-09-12: Minted by the grilling of 2026-09-12; its transcripts are in the shared transcripts repo under kittylang/2026-09-12-surface-syntax-grilling (grill.md, the parser-coverage probe, three slice review rounds).
