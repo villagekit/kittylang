@@ -35,7 +35,7 @@ slice also carries `derived_from` to it); `blocked_by` for every plan whose
 deliverable this one consumes, hard unless `strength: soft` with a `note`
 for an ordering preference; `priority` only on a slice, `medium` unless
 it is pulled ahead (`urgent`, `high`) or pushed back (`low`); `tags` for
-the two process tags this store uses, `gate` and `epic`. Sequence lives in
+the three process tags this store uses, `gate`, `epic` and `design`. Sequence lives in
 edges and nowhere else: priority is the weight that breaks ties among
 ready items, and a record carries none. An edge target is the full
 twelve-hex id, never a prefix. Citations in a body are `[[<full id>]]`;
@@ -71,5 +71,13 @@ Process terms, defined here because no spec owns them:
   It takes the slice body though it is no PR, and it is the user's to
   move.
 - **Epic**: the record tagged `epic` that parents the milestones.
+- **Design plan**: a plan tagged `design` that holds a language-design
+  question too open to settle in one grilling: the question, the evidence
+  so far and the options. Its Work is fixed, in this order: Opus
+  sub-agents research the question against primary sources; the main
+  session proposes designs; Opus sub-agents review the proposals
+  adversarially; then a grilling, where the user decides. Its Outcome is
+  the decision item it produced. It takes the slice body though it is no
+  PR.
 - **Order of work**: the sequence `blocked_by` and `priority` give, which
   `kipu ready` prints. The **run sheet** is this file, its commentary.

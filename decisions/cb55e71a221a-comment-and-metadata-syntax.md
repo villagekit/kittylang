@@ -1,6 +1,6 @@
 ---
 title: "Comment and metadata syntax"
-status: accepted
+status: superseded
 date: "2025-02-10"
 tags: [syntax, lexer]
 ---
