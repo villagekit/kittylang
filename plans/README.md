@@ -9,11 +9,31 @@ numbered.
 
 ## Order of work
 
-No epic and no milestone record yet. The milestones in
-[DESIGN.md](../DESIGN.md#milestones) become records here through a
-grilling and `/to-plan`, then slices through `/to-plan-slices`.
+The epic [Kitty Lang to M4](436aea0e22af-kitty-lang-to-m4.md)
+(`436aea0e`) parents the milestone records. The grilling of 2026-09-12
+set the order: specs and fixtures before grammar, tooling before both,
+and the questions it could not settle held as design plans until the
+tooling makes them visible.
 
-Nothing is ready. The first slice,
+1. [Tooling for language design](5c5f4b9256b3-tooling-for-language-design.md)
+   (`5c5f4b92`): the `kitty` command, the examples test, the playground.
+   Blocked by nothing.
+2. [M2: the parser](1cee599ce218-m2-the-parser.md) (`1cee599c`): the
+   lexing and grammar specs first, then the lexer, the never-panic rule,
+   the grammar the grilling settled, the examples rewritten. Its first
+   slices wait on the command and the examples test.
+3. The design plans, tagged `design`, blocked by the tooling record:
+   [newlines inside brackets](d0658cb19697-design-newlines-inside-brackets.md),
+   [supertraits and blanket impls](3738718cde03-design-supertraits-and-blanket-impls.md),
+   [positional arguments in indented blocks](e6a33eab19d4-design-positional-arguments-in-indented-blocks.md),
+   [tuple structs and Parts](dd325e81ad2c-design-tuple-structs-and-parts.md);
+   and [modules and imports](a89ddd383a16-design-modules-and-imports.md),
+   blocked by M2 because it belongs to the M3 conversation.
+4. [Gate: M2 accepted](0ccbdb209358-gate-m2-accepted.md) (`0ccbdb20`),
+   the user's, then the [M3 grilling](5890c35571be-m3-grilling.md)
+   (`5890c355`), which mints the M3 record.
+
+The first slice,
 [Make just check green](8f370f53521b-make-just-check-green.md)
 (`8f370f53`), is done: the gate is green and every later slice ends on it.
 
