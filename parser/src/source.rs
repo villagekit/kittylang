@@ -1,5 +1,5 @@
 use kitty_lexer::{Token, TokenKind};
-use text_size::TextRange;
+use text_size::TextSize;
 
 pub(crate) struct Source<'t> {
     tokens: &'t [Token],
@@ -11,9 +11,16 @@ impl<'t> Source<'t> {
         Self { tokens, cursor: 0 }
     }
 
-    pub(crate) fn bump(&mut self) {
+    /// Moves past the current token. Returns `false` at the end of the
+    /// input, where the cursor stays put.
+    pub(crate) fn bump(&mut self) -> bool {
         self.eat_trivia();
-        self.cursor += 1;
+        if self.cursor < self.tokens.len() {
+            self.cursor += 1;
+            true
+        } else {
+            false
+        }
     }
 
     pub(crate) fn peek_kind(&mut self) -> Option<TokenKind> {
@@ -45,8 +52,12 @@ impl<'t> Source<'t> {
         self.peek_kind_raw().is_some_and(TokenKind::is_trivia)
     }
 
-    pub(crate) fn last_token_range(&self) -> Option<TextRange> {
-        self.tokens.last().map(|Token { range, .. }| *range)
+    /// The offset just past the last token, or zero when there are no
+    /// tokens.
+    pub(crate) fn end_offset(&self) -> TextSize {
+        self.tokens
+            .last()
+            .map_or(TextSize::default(), |Token { range, .. }| range.end())
     }
 
     fn peek_kind_raw(&self) -> Option<TokenKind> {

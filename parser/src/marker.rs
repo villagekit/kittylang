@@ -1,20 +1,26 @@
-use drop_bomb::DropBomb;
+use drop_bomb::DebugDropBomb;
 use kitty_syntax::NodeKind;
 
 use crate::sink::Event;
 use crate::Parser;
 
+/// The start of a node the parser has not finished yet.
+///
+/// A rule that starts a marker must complete or abandon it before it
+/// returns. Leaking one is a grammar bug, never an input the parser can
+/// meet: the bomb catches it in a debug build, and a release build drops
+/// the marker's `None` event as if the marker had been abandoned.
 #[derive(Debug)]
 pub(crate) struct Marker {
     pos: usize,
-    bomb: DropBomb,
+    bomb: DebugDropBomb,
 }
 
 impl Marker {
     pub(super) fn new(pos: usize) -> Self {
         Self {
             pos,
-            bomb: DropBomb::new("Marker must be either completed or abandoned"),
+            bomb: DebugDropBomb::new("Marker must be either completed or abandoned"),
         }
     }
 
@@ -29,15 +35,16 @@ impl Marker {
 
     /// Abandons the syntax tree node. All its children
     /// are attached to its parent instead.
+    ///
+    /// The marker's `None` event is popped when it is the last one;
+    /// otherwise it stays and `Parser::parse` drops it.
     // TODO(cc): drop the allow once a recovery rule abandons a node.
     #[allow(dead_code)]
     pub(crate) fn abandon(mut self, p: &mut Parser<'_>) {
         self.bomb.defuse();
-        if self.pos == p.events.len() - 1 {
-            // Note(cc): the pop is load-bearing, so this cannot be a
-            // debug_assert; the parser's no-panic rule holds only while
-            // every marker is completed or abandoned exactly once.
-            assert!(matches!(p.events.pop(), Some(None)));
+        if self.pos + 1 == p.events.len() {
+            let own = p.events.pop();
+            debug_assert!(matches!(own, Some(None)));
         }
     }
 }

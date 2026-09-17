@@ -30,11 +30,10 @@ impl<'t> Parser<'t> {
     pub(crate) fn parse(mut self, grammar: impl Fn(&mut Self)) -> (Vec<Event>, Vec<ParseError>) {
         grammar(&mut self);
 
-        let events = self
-            .events
-            .into_iter()
-            .map(|ev| ev.expect("Expected no empty events"))
-            .collect();
+        // A `None` event is where a marker was started and then
+        // abandoned mid-stream: the node was never made, so the event
+        // is dropped and the node's children attach to its parent.
+        let events = self.events.into_iter().flatten().collect();
 
         (events, self.errors)
     }
@@ -55,35 +54,35 @@ impl<'t> Parser<'t> {
         }
     }
 
-    pub(crate) fn error(&mut self, recovery_set: TokenSet) -> Option<CompletedMarker> {
-        let expected = self.expected_kinds.clone();
-        self.expected_kinds.clear();
+    /// Records an error at the current token and returns the node that
+    /// stands in for what was expected.
+    ///
+    /// A token the caller cannot continue from is consumed into an `Error`
+    /// node. A token in the recovery set, or the end of the input, is left
+    /// for the caller and an empty `Missing` node marks where it was
+    /// expected.
+    pub(crate) fn error(&mut self, recovery_set: TokenSet) -> CompletedMarker {
+        let expected = std::mem::take(&mut self.expected_kinds);
 
-        if self.at_set_raw(&recovery_set) || self.at_end() {
-            let current_token = self.source.peek_token();
-            let offset = if let Some(Token { range, .. }) = current_token {
-                range.start()
-            } else {
-                self.source.last_token_range().unwrap().end()
-            };
-            self.errors.push(ParseError::Missing { expected, offset });
-
-            Some(self.mark_kind_empty(NodeKind::Missing))
-        } else {
-            let current_token = self.source.peek_token();
-            let (found, range) = if let Some(Token { kind, range, .. }) = current_token {
-                (Some(*kind), *range)
-            } else {
-                // If we’re at the end of the input we use the range of the very last token in the input.
-                (None, self.source.last_token_range().unwrap())
-            };
-            self.errors.push(ParseError::Unexpected {
-                expected,
-                found,
-                range,
-            });
-
-            Some(self.mark_kind(NodeKind::Error))
+        match self.source.peek_token() {
+            Some(&Token { kind, range, .. }) if !recovery_set.contains(kind) => {
+                self.errors.push(ParseError::Unexpected {
+                    expected,
+                    found: Some(kind),
+                    range,
+                });
+                self.mark_kind(NodeKind::Error)
+            }
+            current => {
+                // At the end of the input the `Missing` node sits after
+                // the last token, or at the start of an input with none.
+                let offset = match current {
+                    Some(token) => token.range.start(),
+                    None => self.source.end_offset(),
+                };
+                self.errors.push(ParseError::Missing { expected, offset });
+                self.mark_kind_empty(NodeKind::Missing)
+            }
         }
     }
 
@@ -98,10 +97,17 @@ impl<'t> Parser<'t> {
         m.complete(self, kind)
     }
 
+    /// Consumes the current token into the tree.
+    ///
+    /// A rule only bumps a token it has looked at, so the end of the input
+    /// is never bumped; if it were, nothing happens.
     pub(crate) fn bump(&mut self) {
         self.expected_kinds.clear();
-        self.source.bump();
-        self.events.push(Some(Event::AddToken));
+        let consumed = self.source.bump();
+        debug_assert!(consumed, "bump at the end of the input");
+        if consumed {
+            self.events.push(Some(Event::AddToken));
+        }
     }
 
     pub(crate) fn bump_if_at(&mut self, kind: TokenKind) -> bool {

@@ -43,7 +43,13 @@ of a production and are not written.
 
 - The parser must produce a tree for every input, however malformed
   (`struct_incomplete_fn`, `parser/src/grammar/declaration.rs`).
-- The parser must not panic on any input (review only).
+- The parser must not panic on any input: a rule's first token is
+  guaranteed by the rule that dispatches to it, and everything else is an
+  error with recovery (`assembly_lists_its_parse_errors`,
+  `parser/src/examples.rs`; `unary_operator_without_an_operand_is_missing`,
+  `parser/src/grammar/expression.rs`).
+- Empty input must parse to an empty module with no errors
+  (`empty_input_parses_to_an_empty_module`, `parser/src/lib.rs`).
 - The parser must return on every input (review only).
 - The tree must be lossless: every token the lexer yields, trivia
   included, must appear in the tree in source order, so the tree's text is
@@ -70,10 +76,11 @@ of a production and are not written.
   (`infix_expression_interspersed_with_newlines`,
   `parser/src/grammar/expression.rs`).
 
-Gap: the grammar rules assert their first token, so three of the six
-examples abort today instead of reporting errors; and the `match` arm
-and `where` bound loops consume nothing at end of input, so `fn f() =>
-match x` never returns.
+Gap: the `match` arm and `where` bound loops end only at a dedent, and
+an arm or a bound consumes nothing when the next token is in its
+recovery set or the input has ended, so the parser never returns on
+`fn f() => match x` or `fn f() where T: T => 1`; in a release build the
+spin grows the event list until the process aborts.
 
 ## Recovery
 
@@ -82,9 +89,11 @@ Each rule is given a recovery set: the tokens a caller can continue from.
 - When a rule expects a token and the next token is another, then: if the
   next token is in the recovery set or the input has ended, the parser must
   record a `Missing` error at the next token's start, or at the end of the
-  last token when the input has ended, and produce an empty `Missing`
-  node, consuming nothing (`type_decl_missing_identifier`,
-  `parser/src/grammar/declaration.rs`); otherwise it must record an
+  input when it has ended (offset zero when the input is empty), and
+  produce an empty `Missing` node, consuming nothing
+  (`type_decl_missing_identifier`, `parser/src/grammar/declaration.rs`;
+  `empty_input_is_a_missing_pattern`, `parser/src/grammar/pattern.rs`);
+  otherwise it must record an
   `Unexpected` error, consume the token into an `Error` node, and continue
   (`trait_unknown_item`, `parser/src/grammar/declaration.rs`).
 - A rule must produce its node whether or not it recorded an error, so a
@@ -94,6 +103,18 @@ Each rule is given a recovery set: the tokens a caller can continue from.
   node with a `Missing` right operand and stop the operator loop
   (`do_not_operator_if_getting_rhs_failed`,
   `parser/src/grammar/expression.rs`).
+- A unary expression whose operand fails must produce the unary node with
+  a `Missing` operand (`unary_operator_without_an_operand_is_missing`,
+  `parser/src/grammar/expression.rs`).
+- In a list of labelled arguments, only the first is known to start with
+  a label; one after a comma that does not is an error inside its
+  argument node, and the list goes on
+  (`labelled_arg_after_a_labelled_arg_recovers`,
+  `parser/src/grammar/expression.rs`;
+  `generic_labelled_arg_after_a_labelled_arg_recovers`,
+  `parser/src/grammar/type.rs`;
+  `type_pattern_labelled_arg_after_a_labelled_arg_recovers`,
+  `parser/src/grammar/pattern.rs`).
 - An error's `expected` list must name the kinds the rule tested since
   the parser last consumed a token, in the order tested, or the one kind
   an `expect` asked for (`call_expression_trailing_comma`,
@@ -228,7 +249,18 @@ Lambda            = "fn" [ "IdentifierValue" ] [ GenericParamList ] ParamList [ 
 ```
 
 - A function declaration must carry a parameter list, `()` when it has
-  no parameters (`top_impl`, `parser/src/grammar/declaration.rs`).
+  no parameters (`top_impl`, `parser/src/grammar/declaration.rs`). One
+  left out still gives a `FunctionParamList` node, holding only the
+  `Missing` node or the `Error` node the recovery rule gives, and the
+  rule goes on to the `where` clause and the body
+  (`function_without_a_parameter_list_is_missing_one`,
+  `function_with_a_stray_token_for_its_parameter_list_recovers`,
+  `trait_function_without_a_parameter_list_recovers`,
+  `parser/src/grammar/declaration.rs`).
+- A declaration's function name left out is a `Missing` node, and the
+  rule goes on to the parameter list
+  (`function_without_a_name_recovers_at_the_parameter_list`,
+  `parser/src/grammar/declaration.rs`).
 - A function may declare its return type after the parameter list, `fn
   length(self): N`; the colon introduces a type
   ([95cd2585](../decisions/95cd2585f916-colon-introduces-a-type-equals-supplies-a-value.md))
@@ -244,7 +276,8 @@ Lambda            = "fn" [ "IdentifierValue" ] [ GenericParamList ] ParamList [ 
 - The parser must accept `from` as a function name, so `fn from(value)`
   declares the `From` trait's method (review only).
 - A lambda is a function expression: its name is optional and it has no
-  return type (`function_expr`, `parser/src/grammar/expression.rs`).
+  return type (`function_expr`, `lambda_in_an_argument`,
+  `parser/src/grammar/expression.rs`).
 
 Gap: the parser has no return-type rule and rejects `from` as a name.
 
@@ -436,8 +469,8 @@ PatternField    = "IdentifierValue" [ "=" "IdentifierValue" ]    (PatternTypeArg
   (`pattern_type_mixed_arg`, `parser/src/grammar/pattern.rs`).
 - `True` and `False` in a pattern are type patterns, as in an expression
   (review only).
-- `Self` must be accepted where a type path starts a pattern (review
-  only).
+- `Self` must be accepted where a type path starts a pattern
+  (`self_type_is_a_type_pattern`, `parser/src/grammar/pattern.rs`).
 - An or-pattern is spelled with the `or` keyword (review only). Note: no
   decision covers the spelling; this is the grammar as built.
 

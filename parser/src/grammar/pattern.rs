@@ -36,7 +36,8 @@ pub(crate) fn pattern_single(p: &mut Parser, recovery: TokenSet) -> Option<Compl
 }
 
 pub(crate) fn pattern_wildcard(p: &mut Parser) -> CompletedMarker {
-    assert!(p.at(TokenKind::Underscore));
+    // `pattern_single` dispatches here on `_`.
+    debug_assert_eq!(p.peek(), Some(TokenKind::Underscore));
     p.mark_kind(NodeKind::PatternWildcard)
 }
 
@@ -44,14 +45,18 @@ const PATTERN_LITERAL_FIRST: [TokenKind; 3] =
     [TokenKind::Boolean, TokenKind::Number, TokenKind::String];
 
 pub(crate) fn pattern_literal(p: &mut Parser) -> CompletedMarker {
-    assert!(p.at_set(PATTERN_LITERAL_FIRST));
+    // `pattern_single` dispatches here on a literal.
+    debug_assert!(p
+        .peek()
+        .is_some_and(|kind| PATTERN_LITERAL_FIRST.contains(&kind)));
     let m = p.start();
     p.bump(); // Consume <boolean>, <number>, or <string>
     m.complete(p, NodeKind::PatternLiteral)
 }
 
 pub(crate) fn pattern_tuple(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at(TokenKind::ParenOpen));
+    // `pattern_single` dispatches here on `(`.
+    debug_assert_eq!(p.peek(), Some(TokenKind::ParenOpen));
     let m = p.start();
     p.bump(); // Consume '('
     loop {
@@ -65,10 +70,8 @@ pub(crate) fn pattern_tuple(p: &mut Parser, recovery: TokenSet) -> CompletedMark
 }
 
 pub(crate) fn pattern_type(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    // TODO(cc): pattern_single dispatches here on TYPE_PATH_FIRST, which
-    // includes SelfUpper, so a `Self` pattern panics against the
-    // parser's no-panic rule. Accept the set here and test it.
-    assert!(p.at(TokenKind::IdentifierType));
+    // `pattern_single` dispatches here on the start of a type path.
+    debug_assert!(p.peek().is_some_and(|kind| TYPE_PATH_FIRST.contains(&kind)));
     let m = p.start();
     type_path(p, recovery);
     if p.at(TokenKind::ParenOpen) {
@@ -78,7 +81,8 @@ pub(crate) fn pattern_type(p: &mut Parser, recovery: TokenSet) -> CompletedMarke
 }
 
 pub(crate) fn pattern_type_arg_list(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at(TokenKind::ParenOpen));
+    // `pattern_type` dispatches here on `(`.
+    debug_assert_eq!(p.peek(), Some(TokenKind::ParenOpen));
     let recovery_type_arg_list = recovery.union([TokenKind::Comma, TokenKind::ParenClose]);
     let m = p.start();
     p.bump(); // Consume '('.
@@ -121,8 +125,11 @@ fn pattern_type_arg_positional(p: &mut Parser, recovery: TokenSet) -> CompletedM
 }
 
 /// E.g. `let Thing(name: title, description:) = thing`
+///
+/// Only the first labelled arg is known to start with a label; the ones
+/// after a comma may start with anything, so the label is expected, not
+/// assumed.
 fn pattern_type_arg_labelled(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at(TokenKind::IdentifierValue));
     let m = p.start();
     p.expect(TokenKind::IdentifierValue, recovery);
     p.expect(TokenKind::Colon, recovery);
@@ -150,6 +157,70 @@ mod tests {
             pattern(p, TokenSet::NONE);
         };
         check_grammar::<Pattern>(grammar, input, expected);
+    }
+
+    #[test]
+    fn empty_input_is_a_missing_pattern() {
+        check(
+            "",
+            expect![[r#"
+            Missing@0..0
+            error at 0: missing value-id, _, boolean, number, string, ‘(’, type-id, or ‘Self’"#]],
+        );
+    }
+
+    #[test]
+    fn self_type_is_a_type_pattern() {
+        check(
+            "Self",
+            expect![[r#"
+            PatternType@0..4
+              TypeReference@0..4
+                SelfUpper@0..4 "Self""#]],
+        );
+    }
+
+    #[test]
+    fn self_type_with_args_is_a_type_pattern() {
+        check(
+            "Self(x)",
+            expect![[r#"
+            PatternType@0..7
+              TypeReference@0..4
+                SelfUpper@0..4 "Self"
+              PatternTypeArgList@4..7
+                ParenOpen@4..5 "("
+                PatternTypeArgPositional@5..6
+                  IdentifierValue@5..6 "x"
+                ParenClose@6..7 ")""#]],
+        );
+    }
+
+    #[test]
+    fn type_pattern_labelled_arg_after_a_labelled_arg_recovers() {
+        check(
+            "Thing(a: b, 1)",
+            expect![[r#"
+            PatternType@0..14
+              TypeReference@0..5
+                IdentifierType@0..5 "Thing"
+              PatternTypeArgList@5..14
+                ParenOpen@5..6 "("
+                PatternTypeArgLabelled@6..10
+                  IdentifierValue@6..7 "a"
+                  Colon@7..8 ":"
+                  Whitespace@8..9 " "
+                  IdentifierValue@9..10 "b"
+                Comma@10..11 ","
+                Whitespace@11..12 " "
+                PatternTypeArgLabelled@12..13
+                  Error@12..13
+                    Number@12..13 "1"
+                  Missing@13..13
+                ParenClose@13..14 ")"
+            error at 12..13: expected value-id, but found number
+            error at 13: missing ‘:’"#]],
+        );
     }
 
     #[test]

@@ -59,9 +59,11 @@ fn expression_pratt(p: &mut Parser, recovery: TokenSet, min_bp: u8) -> Option<Co
 fn expression_lhs(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
     if let Some(bp) = unary_binding_power(p) {
         // A unary operator is present.
+        // The node is made whether or not the operand parses, as the
+        // binary rule does, so the marker is always completed.
         let m = p.start();
         p.bump(); // Consume the unary operator token.
-        expression_pratt(p, recovery, bp)?;
+        expression_pratt(p, recovery, bp);
         return Some(m.complete(p, NodeKind::ExpressionUnary));
     }
     expression_primary(p, recovery)
@@ -98,20 +100,25 @@ pub(crate) const EXPRESSION_REFERENCE_FIRST: [TokenKind; 2] =
     [TokenKind::IdentifierValue, TokenKind::SelfLower];
 
 fn expression_reference(p: &mut Parser) -> CompletedMarker {
-    assert!(p.at_set(EXPRESSION_REFERENCE_FIRST));
+    // `expression_primary` dispatches here on a value name or `self`.
+    debug_assert!(p
+        .peek()
+        .is_some_and(|kind| EXPRESSION_REFERENCE_FIRST.contains(&kind)));
     p.mark_kind(NodeKind::ExpressionReference)
 }
 
 const LITERAL_FIRST: [TokenKind; 3] = [TokenKind::Boolean, TokenKind::Number, TokenKind::String];
 
 fn expression_literal(p: &mut Parser) -> CompletedMarker {
-    assert!(p.at_set(LITERAL_FIRST));
+    // `expression_primary` dispatches here on a literal.
+    debug_assert!(p.peek().is_some_and(|kind| LITERAL_FIRST.contains(&kind)));
     p.mark_kind(NodeKind::ExpressionLiteral)
 }
 
 /// Parse an apply expression given an existing `lhs`.
 fn expression_apply(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at(TokenKind::ParenOpen));
+    // `expression_pratt` dispatches here on `(`.
+    debug_assert_eq!(p.peek(), Some(TokenKind::ParenOpen));
     let m = lhs.precede(p);
     function_arg_list(p, recovery);
     m.complete(p, NodeKind::ExpressionApply)
@@ -119,7 +126,8 @@ fn expression_apply(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) ->
 
 /// Parse a field access (get expression) given an existing `lhs`.
 fn expression_get(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at(TokenKind::Dot));
+    // `expression_pratt` dispatches here on `.`.
+    debug_assert_eq!(p.peek(), Some(TokenKind::Dot));
     let m = lhs.precede(p);
     p.bump(); // Consume '.'.
     p.expect(TokenKind::IdentifierValue, recovery);
@@ -128,9 +136,10 @@ fn expression_get(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> C
 
 /// Parse a tuple expression.
 fn expression_tuple(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at(TokenKind::ParenOpen));
+    // `expression_primary` dispatches here on `(`.
+    debug_assert_eq!(p.peek(), Some(TokenKind::ParenOpen));
     let m = p.start();
-    p.bump(); // Consume ')'
+    p.bump(); // Consume '('
     let recovery_tuple = recovery.union([TokenKind::Comma, TokenKind::ParenClose]);
     while !p.at(TokenKind::ParenClose) {
         expression(p, recovery_tuple);
@@ -154,7 +163,8 @@ fn expression_block(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 
 /// Parse a function expression: `fn <identifier>(<identifier>: <type annotation>) => <expr>`
 fn expression_function(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at(TokenKind::Fn));
+    // `expression_primary` dispatches here on `fn`.
+    debug_assert_eq!(p.peek(), Some(TokenKind::Fn));
     function_declaration_option_name_body(p, recovery, false, true)
 }
 
@@ -280,6 +290,77 @@ mod tests {
             expression(p, TokenSet::NONE);
         };
         check_grammar::<Expression>(grammar, input, expected);
+    }
+
+    #[test]
+    fn unary_operator_without_an_operand_is_missing() {
+        check(
+            "-",
+            expect![[r#"
+            ExpressionUnary@0..1
+              Minus@0..1 "-"
+              Missing@1..1
+            error at 1: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
+        );
+    }
+
+    #[test]
+    fn lambda_in_an_argument() {
+        check(
+            "f(fn (x) => x)",
+            expect![[r#"
+            ExpressionApply@0..14
+              ExpressionReference@0..1
+                IdentifierValue@0..1 "f"
+              FunctionArgList@1..14
+                ParenOpen@1..2 "("
+                FunctionArgPositional@2..13
+                  DeclarationFunction@2..13
+                    Fn@2..4 "fn"
+                    Whitespace@4..5 " "
+                    FunctionParamList@5..8
+                      ParenOpen@5..6 "("
+                      FunctionParam@6..7
+                        FunctionParamLabel@6..7
+                          IdentifierValue@6..7 "x"
+                      ParenClose@7..8 ")"
+                    Whitespace@8..9 " "
+                    FatArrow@9..11 "=>"
+                    Whitespace@11..12 " "
+                    FunctionBody@12..13
+                      ExpressionReference@12..13
+                        IdentifierValue@12..13 "x"
+                ParenClose@13..14 ")""#]],
+        );
+    }
+
+    #[test]
+    fn labelled_arg_after_a_labelled_arg_recovers() {
+        check(
+            "f(a: 1, 2)",
+            expect![[r#"
+            ExpressionApply@0..10
+              ExpressionReference@0..1
+                IdentifierValue@0..1 "f"
+              FunctionArgList@1..10
+                ParenOpen@1..2 "("
+                FunctionArgLabelled@2..6
+                  FunctionParamLabel@2..3
+                    IdentifierValue@2..3 "a"
+                  Colon@3..4 ":"
+                  Whitespace@4..5 " "
+                  ExpressionLiteral@5..6
+                    Number@5..6 "1"
+                Comma@6..7 ","
+                Whitespace@7..8 " "
+                FunctionArgLabelled@8..9
+                  Error@8..9
+                    Number@8..9 "2"
+                  Missing@9..9
+                ParenClose@9..10 ")"
+            error at 8..9: expected value-id or ‘self’, but found number
+            error at 9: missing ‘:’"#]],
+        );
     }
 
     #[test]

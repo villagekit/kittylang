@@ -22,11 +22,13 @@ impl<'t> Sink<'t> {
             cursor: 0,
         }
     }
+    /// Builds the tree from the parser's events.
+    ///
+    /// The events must start and finish exactly one root node, which the
+    /// parser's marker discipline guarantees.
     pub(crate) fn process(mut self, events: &[Event]) -> SyntaxTreeBuf {
-        // the first event always starts the root node,
-        // and the last event always finishes that node
-        assert!(matches!(events.first(), Some(Event::StartNode { .. })));
-        assert!(matches!(events.last(), Some(Event::FinishNode)));
+        debug_assert!(matches!(events.first(), Some(Event::StartNode(_))));
+        debug_assert!(matches!(events.last(), Some(Event::FinishNode)));
 
         // We want to avoid nodes having trailing trivia:
         //
@@ -40,31 +42,25 @@ impl<'t> Sink<'t> {
         //
         // 1 * 2 + 3
         // ^^^^^^
-
-        // we go through all events apart from the last one,
-        // since we can’t peek what the next event is when we’re at the last
-        // and thus need to handle it specially
-
-        let mut current = events.as_ptr();
-        let mut next = unsafe { current.add(1) };
-        let last = &events[events.len() - 1] as *const _;
-
-        while current != last {
-            self.process_event(unsafe { *current });
-
-            match unsafe { *next } {
-                Event::StartNode(_) | Event::AddToken => self.skip_trivia(),
-                Event::FinishNode => {}
+        //
+        // So trivia is added only before a token or a node start, never
+        // before a node finish. The last event is the root's finish, and
+        // the trivia at the end of the input goes before it so the tree
+        // stays lossless.
+        let mut events = events.iter().peekable();
+        while let Some(&event) = events.next() {
+            match events.peek() {
+                Some(Event::StartNode(_) | Event::AddToken) => {
+                    self.process_event(event);
+                    self.skip_trivia();
+                }
+                Some(Event::FinishNode) => self.process_event(event),
+                None => {
+                    self.skip_trivia();
+                    self.process_event(event);
+                }
             }
-
-            current = next;
-            next = unsafe { current.add(1) };
         }
-
-        // unconditionally skip any trivia before processing the last event
-        // to ensure we don’t miss trailing trivia at the end of the input
-        self.skip_trivia();
-        self.process_event(unsafe { *last });
 
         self.builder.finish()
     }

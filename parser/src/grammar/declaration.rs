@@ -44,7 +44,8 @@ pub(crate) fn declaration(p: &mut Parser, recovery: TokenSet) -> Option<Complete
 
 /// Type alias declaration
 fn declaration_type(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at(TokenKind::Type));
+    // `declaration` and `impl_trait_item` dispatch here on `type`.
+    debug_assert_eq!(p.peek(), Some(TokenKind::Type));
     let recovery_type = recovery.union([TokenKind::Equal, TokenKind::Colon]);
     let m = p.start();
     p.bump(); // Consume 'type'
@@ -68,7 +69,8 @@ fn declaration_constant_optional_type_value(
     has_type: bool,
     has_value: bool,
 ) -> CompletedMarker {
-    assert!(p.at(TokenKind::Const));
+    // `declaration` and the item rules dispatch here on `const`.
+    debug_assert_eq!(p.peek(), Some(TokenKind::Const));
     let m = p.start();
     p.bump(); // Consume 'const'
     p.expect(TokenKind::IdentifierValue, recovery);
@@ -88,7 +90,8 @@ fn declaration_function(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 }
 
 fn declaration_struct(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at(TokenKind::Struct));
+    // `declaration` dispatches here on `struct`.
+    debug_assert_eq!(p.peek(), Some(TokenKind::Struct));
     let recovery_struct = recovery.union(STRUCT_ITEM_FIRST).union([TokenKind::Dedent]);
     let m = p.start();
     p.bump(); // Consume 'struct'
@@ -133,7 +136,8 @@ fn declaration_prop_optional_type_value(
     has_type: bool,
     has_value: bool,
 ) -> CompletedMarker {
-    assert!(p.at(TokenKind::Prop));
+    // The item rules dispatch here on `prop`.
+    debug_assert_eq!(p.peek(), Some(TokenKind::Prop));
     let m = p.start();
     p.bump(); // Consume 'prop'
     p.expect(TokenKind::IdentifierValue, recovery);
@@ -149,7 +153,8 @@ fn declaration_prop_optional_type_value(
 }
 
 fn declaration_enum(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at(TokenKind::Enum));
+    // `declaration` dispatches here on `enum`.
+    debug_assert_eq!(p.peek(), Some(TokenKind::Enum));
     let recovery_enum = recovery.union(ENUM_ITEM_FIRST).union([TokenKind::Dedent]);
     let m = p.start();
     p.bump(); // Consume 'enum'
@@ -185,7 +190,8 @@ fn enum_item(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
 }
 
 fn enum_case(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at(TokenKind::Case));
+    // `enum_item` dispatches here on `case`.
+    debug_assert_eq!(p.peek(), Some(TokenKind::Case));
     let m = p.start();
     p.bump(); // Consume 'case'
     p.expect(TokenKind::IdentifierType, recovery);
@@ -197,7 +203,8 @@ fn enum_case(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 }
 
 fn declaration_trait(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at(TokenKind::Trait));
+    // `declaration` dispatches here on `trait`.
+    debug_assert_eq!(p.peek(), Some(TokenKind::Trait));
     let recovery_trait = recovery.union(TRAIT_ITEM_FIRST).union([TokenKind::Dedent]);
     let m = p.start();
     p.bump(); // Consume 'trait'
@@ -240,7 +247,8 @@ fn trait_item(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
 }
 
 fn trait_type(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at(TokenKind::Type));
+    // `trait_item` dispatches here on `type`.
+    debug_assert_eq!(p.peek(), Some(TokenKind::Type));
     let m = p.start();
     p.bump(); // Consume 'type'
     p.expect(TokenKind::IdentifierType, recovery);
@@ -267,7 +275,8 @@ fn trait_function(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 }
 
 fn declaration_impl_trait(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at(TokenKind::Impl));
+    // `declaration` dispatches here on `impl`.
+    debug_assert_eq!(p.peek(), Some(TokenKind::Impl));
     let recovery_trait = recovery
         .union(IMPL_TRAIT_ITEM_FIRST)
         .union([TokenKind::Dedent]);
@@ -338,6 +347,103 @@ mod tests {
             declaration(p, TokenSet::NONE);
         };
         check_grammar::<Declaration>(grammar, input, expected);
+    }
+
+    #[test]
+    fn function_without_a_parameter_list_is_missing_one() {
+        check(
+            "fn f => 1",
+            expect![[r#"
+                DeclarationFunction@0..9
+                  Fn@0..2 "fn"
+                  Whitespace@2..3 " "
+                  IdentifierValue@3..4 "f"
+                  Whitespace@4..5 " "
+                  FunctionParamList@5..5
+                    Missing@5..5
+                  FatArrow@5..7 "=>"
+                  Whitespace@7..8 " "
+                  FunctionBody@8..9
+                    ExpressionLiteral@8..9
+                      Number@8..9 "1"
+                error at 5: missing ‘[’ or ‘(’"#]],
+        );
+    }
+
+    #[test]
+    fn function_with_a_stray_token_for_its_parameter_list_recovers() {
+        check(
+            "fn f 1 => x",
+            expect![[r#"
+                DeclarationFunction@0..11
+                  Fn@0..2 "fn"
+                  Whitespace@2..3 " "
+                  IdentifierValue@3..4 "f"
+                  Whitespace@4..5 " "
+                  FunctionParamList@5..6
+                    Error@5..6
+                      Number@5..6 "1"
+                  Whitespace@6..7 " "
+                  FatArrow@7..9 "=>"
+                  Whitespace@9..10 " "
+                  FunctionBody@10..11
+                    ExpressionReference@10..11
+                      IdentifierValue@10..11 "x"
+                error at 5..6: expected ‘[’ or ‘(’, but found number"#]],
+        );
+    }
+
+    #[test]
+    fn function_without_a_name_recovers_at_the_parameter_list() {
+        check(
+            "fn (x) => x",
+            expect![[r#"
+            DeclarationFunction@0..11
+              Fn@0..2 "fn"
+              Whitespace@2..3 " "
+              Missing@3..3
+              FunctionParamList@3..6
+                ParenOpen@3..4 "("
+                FunctionParam@4..5
+                  FunctionParamLabel@4..5
+                    IdentifierValue@4..5 "x"
+                ParenClose@5..6 ")"
+              Whitespace@6..7 " "
+              FatArrow@7..9 "=>"
+              Whitespace@9..10 " "
+              FunctionBody@10..11
+                ExpressionReference@10..11
+                  IdentifierValue@10..11 "x"
+            error at 3: missing value-id"#]],
+        );
+    }
+
+    #[test]
+    fn trait_function_without_a_parameter_list_recovers() {
+        check(
+            indoc! {"
+                trait Assembly
+                    fn parts: Parts
+            "},
+            expect![[r#"
+                DeclarationTrait@0..29
+                  Trait@0..5 "trait"
+                  Whitespace@5..6 " "
+                  IdentifierType@6..14 "Assembly"
+                  Newline@14..15 "\n"
+                  Indent@15..19 "    "
+                  DeclarationFunction@19..27
+                    Fn@19..21 "fn"
+                    Whitespace@21..22 " "
+                    IdentifierValue@22..27 "parts"
+                    FunctionParamList@27..27
+                      Missing@27..27
+                  Error@27..28
+                    Colon@27..28 ":"
+                  Whitespace@28..29 " "
+                error at 27: missing ‘[’ or ‘(’
+                error at 27..28: expected dedent, but found ‘:’"#]],
+        );
     }
 
     #[test]

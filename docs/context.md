@@ -41,8 +41,9 @@ a spec exists it is the owner; until then the crate is.
 - **Parser**: the resilient recursive-descent grammar over tokens. It
   emits events, never builds the tree itself.
   ([specs/grammar.md](../specs/grammar.md))
-- **Event**: what the parser emits: start node, token, finish node, or an
-  error. (`kitty-parser`)
+- **Event**: what the parser emits: start node, token, or finish node.
+  Errors are collected beside the events, never among them.
+  (`kitty-parser`)
 - **Marker**: the parser's handle on an open node, completed with a kind
   or abandoned. (`kitty-parser`)
 - **Sink**: the pass that turns events into a syntax tree. (`kitty-parser`)

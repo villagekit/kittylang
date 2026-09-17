@@ -36,7 +36,8 @@ fn type_reference(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker>
 
 /// Parametrized type with type arguments (e.g. `List[Number]`, same as `Vec<f64>` in Rust)
 fn type_generic(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at(TokenKind::BracketOpen));
+    // `type_path` dispatches here on `[`.
+    debug_assert_eq!(p.peek(), Some(TokenKind::BracketOpen));
     let m = lhs.precede(p);
     generic_arg_list(p, recovery);
     m.complete(p, NodeKind::TypeGeneric)
@@ -44,7 +45,8 @@ fn type_generic(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> Com
 
 /// Trait projection (e.g. `T.[Iterator]`, same as `<T as Iterator>` in Rust)
 fn type_projection(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at(TokenKind::DotBracketOpen));
+    // `type_path` dispatches here on `.[`.
+    debug_assert_eq!(p.peek(), Some(TokenKind::DotBracketOpen));
     let recovery_projection = recovery.union([TokenKind::BracketClose]);
     let m = lhs.precede(p);
     p.bump(); // Consume '.['.
@@ -55,7 +57,8 @@ fn type_projection(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> 
 
 /// Associated type access (e.g. `Iterator.Item`, same as `Iterator::Item` in Rust)
 fn type_association(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at(TokenKind::Dot));
+    // `type_path` dispatches here on `.`.
+    debug_assert_eq!(p.peek(), Some(TokenKind::Dot));
     let m = lhs.precede(p);
     p.bump(); // Consume '.'.
     p.expect(TokenKind::IdentifierType, recovery);
@@ -89,7 +92,8 @@ pub(crate) fn type_annotation(p: &mut Parser, recovery: TokenSet) -> Option<Comp
 
 /// A tuple type (e.g. `(Number, String)`)
 fn type_tuple(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at(TokenKind::ParenOpen));
+    // `type_annotation` dispatches here on `(`.
+    debug_assert_eq!(p.peek(), Some(TokenKind::ParenOpen));
     let recovery_tuple = recovery
         .union(TYPE_ANNOTATION_FIRST)
         .union([TokenKind::ParenClose]);
@@ -109,7 +113,8 @@ fn type_tuple(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 
 /// A function type (e.g. `Fn (Number, String) -> Boolean`)
 fn type_function(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at(TokenKind::FnUpper));
+    // `type_annotation` dispatches here on `Fn`.
+    debug_assert_eq!(p.peek(), Some(TokenKind::FnUpper));
     let recovery_function = recovery.union(TYPE_ANNOTATION_FIRST);
     let m = p.start();
     p.bump(); // Consume 'Fn"
@@ -138,7 +143,8 @@ fn type_function(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 }
 
 fn type_impl_trait(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at(TokenKind::Impl));
+    // `type_annotation` dispatches here on `impl`.
+    debug_assert_eq!(p.peek(), Some(TokenKind::Impl));
     let recovery_trait = recovery.union(TYPE_PATH_FIRST);
     let m = p.start();
     p.bump(); // Consume 'impl'
@@ -147,7 +153,8 @@ fn type_impl_trait(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 }
 
 pub(crate) fn generic_param_list(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at(TokenKind::BracketOpen));
+    // Every declaration rule dispatches here on `[`.
+    debug_assert_eq!(p.peek(), Some(TokenKind::BracketOpen));
     let recovery_param_list = recovery
         .union(TYPE_PATH_FIRST)
         .union([TokenKind::Comma, TokenKind::BracketClose]);
@@ -183,7 +190,8 @@ fn generic_param(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 }
 
 pub(crate) fn generic_arg_list(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at(TokenKind::BracketOpen));
+    // `type_generic` dispatches here on `[`.
+    debug_assert_eq!(p.peek(), Some(TokenKind::BracketOpen));
     let recovery_arg_list = recovery
         .union(TYPE_PATH_FIRST)
         .union([TokenKind::Comma, TokenKind::BracketClose]);
@@ -226,8 +234,10 @@ fn generic_positional_arg(p: &mut Parser, recovery: TokenSet) -> CompletedMarker
     m.complete(p, NodeKind::GenericArgPositional)
 }
 
+/// Only the first labelled arg is known to start with a type name; the
+/// ones after a comma may start with anything, so the name is expected,
+/// not assumed.
 fn generic_labelled_arg(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at(TokenKind::IdentifierType));
     let m = p.start();
     p.expect(TokenKind::IdentifierType, recovery);
     p.expect(TokenKind::Colon, recovery);
@@ -253,7 +263,8 @@ fn generic_bound(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 }
 
 pub(crate) fn generic_where_clause(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at(TokenKind::Where));
+    // The function and body rules dispatch here on `where`.
+    debug_assert_eq!(p.peek(), Some(TokenKind::Where));
     let recovery_where = recovery.union([TokenKind::Dedent]);
     let m = p.start();
     p.bump(); // Consume 'where'
@@ -299,6 +310,38 @@ mod tests {
             generic_param_list(p, TokenSet::NONE);
         };
         check_grammar::<GenericParamList>(grammar, input, expected);
+    }
+
+    #[test]
+    fn generic_labelled_arg_after_a_labelled_arg_recovers() {
+        check_type_annotation(
+            "List[A: B, (X)]",
+            expect![[r#"
+            TypeGeneric@0..14
+              TypeReference@0..4
+                IdentifierType@0..4 "List"
+              GenericArgList@4..14
+                BracketOpen@4..5 "["
+                GenericArgLabelled@5..9
+                  IdentifierType@5..6 "A"
+                  Colon@6..7 ":"
+                  Whitespace@7..8 " "
+                  TypeReference@8..9
+                    IdentifierType@8..9 "B"
+                Comma@9..10 ","
+                Whitespace@10..11 " "
+                GenericArgLabelled@11..13
+                  Error@11..12
+                    ParenOpen@11..12 "("
+                  Missing@12..12
+                  TypeReference@12..13
+                    IdentifierType@12..13 "X"
+                Error@13..14
+                  ParenClose@13..14 ")"
+            error at 11..12: expected type-id, but found ‘(’
+            error at 12: missing ‘:’
+            error at 13..14: expected ‘]’, but found ‘)’"#]],
+        );
     }
 
     #[test]

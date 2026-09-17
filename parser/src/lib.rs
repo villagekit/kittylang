@@ -8,71 +8,103 @@ mod sink;
 mod source;
 mod token_set;
 
+use std::fmt;
+
 use kitty_cst::{CstNode, Module};
 use kitty_lexer::{lex, Token};
 use kitty_syntax::SyntaxTreeBuf;
-use std::fmt;
 
 pub use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::sink::Sink;
 
+/// Parses a module from source text.
+///
+/// Every input gives a tree, however malformed. The parser never panics on
+/// an input: what it cannot parse becomes `Error` and `Missing` nodes, and
+/// the errors come back beside the tree.
 pub fn parse(input: &str) -> Parse<Module> {
-    parse_grammar(
+    let (tree, errors) = parse_grammar(
         |p: &mut Parser<'_>| {
             grammar::module(p);
         },
         input,
-    )
-}
-
-pub(crate) fn parse_grammar<Node: CstNode>(
-    grammar: impl Fn(&mut Parser<'_>),
-    input: &str,
-) -> Parse<Node> {
-    let tokens: Vec<Token> = lex(input).collect();
-    let (events, errors) = Parser::new(&tokens).parse(grammar);
-    let tree = Sink::new(input, &tokens).process(&events);
-    let node = Node::cast(tree.root(), &tree).unwrap();
+    );
+    // The module rule completes a `Module` node as the root on every
+    // input, so the cast cannot fail.
+    let node = Module::cast(tree.root(), &tree).expect("the module rule makes a Module root");
     Parse { tree, node, errors }
 }
 
+/// Runs one grammar rule over the whole input and builds its tree.
+///
+/// The rule must complete exactly one top-level node, which becomes the
+/// root of the tree.
+pub(crate) fn parse_grammar(
+    grammar: impl Fn(&mut Parser<'_>),
+    input: &str,
+) -> (SyntaxTreeBuf, Vec<ParseError>) {
+    let tokens: Vec<Token> = lex(input).collect();
+    let (events, errors) = Parser::new(&tokens).parse(grammar);
+    let tree = Sink::new(input, &tokens).process(&events);
+    (tree, errors)
+}
+
+/// The result of a parse: the tree, its typed root and the errors found.
 pub struct Parse<N: CstNode> {
+    /// The lossless syntax tree: its text is the source.
     pub tree: SyntaxTreeBuf,
+    /// The typed view over the tree's root.
     pub node: N,
+    /// The parse errors, in source order. Empty when the input is
+    /// well-formed.
     pub errors: Vec<ParseError>,
 }
 
 impl<N: CstNode> fmt::Debug for Parse<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let tree = format!("{:#?}", self.tree);
-        write!(f, "{}", &tree[0..tree.len() - 1])?;
-
-        for error in &self.errors {
-            write!(f, "\n{error}")?;
-        }
-
-        Ok(())
+        f.write_str(&render(&self.tree, &self.errors))
     }
+}
+
+/// Renders the tree and then each error on its own line, the form the
+/// snapshot tests record.
+fn render(tree: &SyntaxTreeBuf, errors: &[ParseError]) -> String {
+    let tree = format!("{tree:#?}");
+    let mut out = tree.strip_suffix('\n').unwrap_or(&tree).to_owned();
+
+    for error in errors {
+        out.push('\n');
+        out.push_str(&error.to_string());
+    }
+
+    out
 }
 
 #[cfg(test)]
 fn check(input: &str, expected: expect_test::Expect) {
-    let grammar = |p: &mut Parser| {
-        grammar::module(p);
-    };
-    check_grammar::<Module>(grammar, input, expected);
+    let result = parse(input);
+    expected.assert_eq(&format!("{result:?}"));
 }
 
+/// Snapshots one grammar rule's tree and errors, and checks that the
+/// rule's node has its typed view `N`. A root that is an `Error` or
+/// `Missing` node has no view.
 #[cfg(test)]
-fn check_grammar<Node: CstNode>(
+fn check_grammar<N: CstNode>(
     grammar: impl Fn(&mut Parser<'_>),
     input: &str,
     expected: expect_test::Expect,
 ) {
-    let result: Parse<Node> = parse_grammar(grammar, input);
-    let actual = format!("{:?}", result);
-    expected.assert_eq(&actual);
+    use kitty_syntax::NodeKind;
+
+    let (tree, errors) = parse_grammar(grammar, input);
+    expected.assert_eq(&render(&tree, &errors));
+
+    let root = tree.root();
+    if !matches!(root.kind(&tree), NodeKind::Error | NodeKind::Missing) {
+        assert!(N::cast(root, &tree).is_some(), "the root has no typed view");
+    }
 }
 
 #[cfg(test)]
@@ -81,6 +113,23 @@ mod tests {
     use indoc::indoc;
 
     use super::*;
+
+    #[test]
+    fn empty_input_parses_to_an_empty_module() {
+        check("", expect![[r#"Module@0..0"#]]);
+    }
+
+    #[test]
+    fn trivia_only_input_parses_to_an_empty_module() {
+        check(
+            "  # a comment\n",
+            expect![[r##"
+                Module@0..14
+                  Whitespace@0..2 "  "
+                  Comment@2..13 "# a comment"
+                  Newline@13..14 "\n""##]],
+        );
+    }
 
     #[test]
     fn lex_example_basic() {

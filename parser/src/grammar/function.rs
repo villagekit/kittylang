@@ -12,11 +12,18 @@ pub(crate) fn function_declaration_option_name_body(
     required_name: bool,
     required_body: bool,
 ) -> CompletedMarker {
-    assert!(p.at(TokenKind::Fn));
+    // `declaration` and its item rules, and `expression_primary`,
+    // dispatch here on `fn`.
+    debug_assert_eq!(p.peek(), Some(TokenKind::Fn));
     let m = p.start();
     p.bump(); // Consume 'fn'
     if required_name || p.at(TokenKind::IdentifierValue) {
-        p.expect(TokenKind::IdentifierValue, recovery);
+        // A name left out is missing, not an error that eats the `(`
+        // after it.
+        p.expect(
+            TokenKind::IdentifierValue,
+            recovery.union([TokenKind::BracketOpen, TokenKind::ParenOpen]),
+        );
     }
     if p.at(TokenKind::BracketOpen) {
         generic_param_list(p, recovery);
@@ -32,20 +39,28 @@ pub(crate) fn function_declaration_option_name_body(
     m.complete(p, NodeKind::DeclarationFunction)
 }
 
+/// The list node is made even when the `(` is not there, so a function's
+/// shape holds; the node then holds only the `Missing` or `Error` node
+/// the recovery rule gives.
 fn function_param_list(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at(TokenKind::ParenOpen));
     let recovery_param_list = recovery.union([TokenKind::Comma, TokenKind::ParenClose]);
     let m = p.start();
-    p.bump(); // Consume '('
-    if !p.at(TokenKind::ParenClose) {
-        loop {
-            function_param(p, recovery_param_list);
-            if !p.bump_if_at(TokenKind::Comma) {
-                break;
+    if p.at(TokenKind::ParenOpen) {
+        p.bump(); // Consume '('
+        if !p.at(TokenKind::ParenClose) {
+            loop {
+                function_param(p, recovery_param_list);
+                if !p.bump_if_at(TokenKind::Comma) {
+                    break;
+                }
             }
         }
+        p.expect(TokenKind::ParenClose, recovery);
+    } else {
+        // The list is missing when what may follow it comes next: a
+        // return type, a `where` clause or a body.
+        p.error(recovery.union([TokenKind::Colon, TokenKind::Where, TokenKind::FatArrow]));
     }
-    p.expect(TokenKind::ParenClose, recovery);
     m.complete(p, NodeKind::FunctionParamList)
 }
 
@@ -67,7 +82,8 @@ fn function_param(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 }
 
 pub(crate) fn function_arg_list(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at(TokenKind::ParenOpen));
+    // `expression_apply` dispatches here on `(`.
+    debug_assert_eq!(p.peek(), Some(TokenKind::ParenOpen));
     let recovery_arg_list = recovery.union([TokenKind::Comma, TokenKind::ParenClose]);
     let m = p.start();
     p.bump(); // Consume '('.
@@ -108,8 +124,10 @@ fn function_positional_arg(p: &mut Parser, recovery: TokenSet) -> CompletedMarke
     m.complete(p, NodeKind::FunctionArgPositional)
 }
 
+/// Only the first labelled arg is known to start with a label; the ones
+/// after a comma may start with anything, so `function_param_label`
+/// records the error.
 fn function_labelled_arg(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at_set(FUNCTION_PARAM_LABEL_FIRST));
     let m = p.start();
     function_param_label(p, recovery);
     p.expect(TokenKind::Colon, recovery);

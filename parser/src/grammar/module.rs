@@ -33,7 +33,8 @@ fn module_item(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
 }
 
 fn module_import(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at(TokenKind::Import));
+    // `module_item` dispatches here on `import`.
+    debug_assert_eq!(p.peek(), Some(TokenKind::Import));
     let m = p.start();
     p.bump(); // Consume 'import'
     if p.at(TokenKind::From) {
@@ -109,7 +110,8 @@ fn import_alias_kind(
 }
 
 fn module_export(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    assert!(p.at(TokenKind::Export));
+    // `module_item` dispatches here on `export`.
+    debug_assert_eq!(p.peek(), Some(TokenKind::Export));
     let m = p.start();
     p.bump(); // Consume 'export'
     declaration(p, recovery);
