@@ -217,7 +217,7 @@ ImplItem        = { Attribute } ( TypeAlias | Constant | Function | Prop )
 | --- | --- | --- | --- | --- | --- | --- |
 | `const` | value required, type optional | value required, type optional | value required, type optional | both optional | value required, type optional | (`top_const_no_type`, `trait_const_decl`, `impl_all_items`, `parser/src/grammar/declaration.rs`) |
 | `prop` | none | type required, value optional | none | type required, value optional | value required, type optional | (`top_struct`, `impl_all_items`, `parser/src/grammar/declaration.rs`) |
-| `fn` | body required | body required | body required | body optional | body required | (`top_trait`, `impl_all_items`, `parser/src/grammar/declaration.rs`) |
+| `fn` | return type optional, body required | return type optional, body required | return type optional, body required | both optional | return type optional, body required | (`top_trait`, `trait_function_ends_at_its_return_type`, `impl_all_items`, `parser/src/grammar/declaration.rs`) |
 | `type` | value required | none | none | bounds and default optional | value required | (`top_type`, `trait_type_decl`, `impl_all_items`, `parser/src/grammar/declaration.rs`) |
 
 - A trait may declare associated types, with bounds and a default; an
@@ -237,12 +237,13 @@ ImplItem        = { Attribute } ( TypeAlias | Constant | Function | Prop )
 ## Functions
 
 ```
-Function          = "fn" FunctionName [ GenericParamList ] ParamList [ ":" TypeAnnotation ] [ WhereClause ] [ "=>" Body ]
+Function          = "fn" FunctionName [ GenericParamList ] ParamList [ ":" ReturnType ] [ WhereClause ] [ "=>" Body ]
                                                                  (DeclarationFunction)
 FunctionName      = "IdentifierValue" | "from"
 ParamList         = "(" [ Param { "," Param } ] ")"                (FunctionParamList)
 Param             = ( "IdentifierValue" | "self" ) [ ":" TypeAnnotation ] [ "=" Expression ]
                                                                  (FunctionParam)
+ReturnType        = TypeAnnotation                               (FunctionReturnType)
 Body              = Expression                                   (FunctionBody)
 Lambda            = "fn" [ "IdentifierValue" ] [ GenericParamList ] ParamList [ WhereClause ] "=>" Expression
                                                                  (DeclarationFunction)
@@ -263,14 +264,28 @@ Lambda            = "fn" [ "IdentifierValue" ] [ GenericParamList ] ParamList [ 
   `parser/src/grammar/declaration.rs`).
 - A function may declare its return type after the parameter list, `fn
   length(self): N`; the colon introduces a type
-  ([95cd2585](../decisions/95cd2585f916-colon-introduces-a-type-equals-supplies-a-value.md))
-  (review only).
+  ([95cd2585](../decisions/95cd2585f916-colon-introduces-a-type-equals-supplies-a-value.md)).
+  The type sits in a `FunctionReturnType` node; the colon stays outside
+  it, as the `=>` stays outside the body, while a parameter's colon
+  sits inside its `FunctionParam` (`function_with_a_return_type`,
+  `parser/src/grammar/declaration.rs`). A type left out after the colon
+  is a `Missing` node in the return type, and the rule goes on to the
+  `where` clause or the body
+  (`function_with_a_return_type_left_out_recovers`,
+  `parser/src/grammar/declaration.rs`).
 - Where a body follows, `=>` must precede it; the body is an inline
   expression or a block (`top_fn_no_indent`, `top_fn_with_indent`,
+  `parser/src/grammar/declaration.rs`). A `=>` left out is an error
+  where it should be, and the rule goes on to take what follows as the
+  body; when that is a block, its indent is what the error eats, so no
+  block forms and the body is the block's first expression alone
+  (`function_with_a_return_type_and_no_fat_arrow_recovers`,
   `parser/src/grammar/declaration.rs`).
 - In a trait, a function with no body must end at its return type, its
   `where` clause or its parameter list (`top_trait`,
-  `parser/src/grammar/declaration.rs`; with a return type review only).
+  `trait_function_ends_at_its_return_type`,
+  `trait_function_ends_at_its_where_clause`,
+  `parser/src/grammar/declaration.rs`).
 - A parameter may carry a type and a default value (`top_fn_no_indent`,
   `parser/src/grammar/declaration.rs`; the default review only).
 - The parser must accept `from` as a function name, so `fn from(value)`
@@ -279,7 +294,7 @@ Lambda            = "fn" [ "IdentifierValue" ] [ GenericParamList ] ParamList [ 
   return type (`function_expr`, `lambda_in_an_argument`,
   `parser/src/grammar/expression.rs`).
 
-Gap: the parser has no return-type rule and rejects `from` as a name.
+Gap: the parser rejects `from` as a name.
 
 ## Expressions
 

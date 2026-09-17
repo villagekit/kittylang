@@ -122,6 +122,7 @@ pub enum NodeKind {
     FunctionParam,
     FunctionParamLabel,
     FunctionParamList,
+    FunctionReturnType,
     FunctionArgPositional,
     FunctionArgLabelled,
     FunctionArgList,

@@ -1,7 +1,7 @@
 use kitty_syntax::{NodeKind, TokenKind};
 
 use super::{
-    function::{function_arg_list, function_declaration_option_name_body},
+    function::{function_arg_list, function_declaration, FunctionForm},
     pattern::pattern,
     r#type::{type_annotation, type_path, TYPE_PATH_FIRST},
 };
@@ -165,7 +165,7 @@ fn expression_block(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 fn expression_function(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     // `expression_primary` dispatches here on `fn`.
     debug_assert_eq!(p.peek(), Some(TokenKind::Fn));
-    function_declaration_option_name_body(p, recovery, false, true)
+    function_declaration(p, recovery, FunctionForm::Lambda)
 }
 
 /// Parse a let expression: `let <identifier> = <expr> in <expr>`

@@ -6,18 +6,46 @@ use super::{
 };
 use crate::{marker::CompletedMarker, parser::Parser, token_set::TokenSet};
 
-pub(crate) fn function_declaration_option_name_body(
+/// Which parts a function rule requires or allows, by where it stands.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum FunctionForm {
+    /// A declaration in a module, struct, enum or impl: named, with an
+    /// optional return type and a required body.
+    Declaration,
+    /// A declaration in a trait: the same, but the body is optional and
+    /// a declaration with none ends at its parameter list, return type
+    /// or `where` clause.
+    TraitDeclaration,
+    /// A lambda in an expression: the name is optional, there is no
+    /// return type and the body is required.
+    Lambda,
+}
+
+impl FunctionForm {
+    fn requires_name(self) -> bool {
+        self != Self::Lambda
+    }
+
+    fn takes_return_type(self) -> bool {
+        self != Self::Lambda
+    }
+
+    fn requires_body(self) -> bool {
+        self != Self::TraitDeclaration
+    }
+}
+
+pub(crate) fn function_declaration(
     p: &mut Parser,
     recovery: TokenSet,
-    required_name: bool,
-    required_body: bool,
+    form: FunctionForm,
 ) -> CompletedMarker {
     // `declaration` and its item rules, and `expression_primary`,
     // dispatch here on `fn`.
     debug_assert_eq!(p.peek(), Some(TokenKind::Fn));
     let m = p.start();
     p.bump(); // Consume 'fn'
-    if required_name || p.at(TokenKind::IdentifierValue) {
+    if form.requires_name() || p.at(TokenKind::IdentifierValue) {
         // A name left out is missing, not an error that eats the `(`
         // after it.
         p.expect(
@@ -29,14 +57,26 @@ pub(crate) fn function_declaration_option_name_body(
         generic_param_list(p, recovery);
     }
     function_param_list(p, recovery);
+    if form.takes_return_type() && p.at(TokenKind::Colon) {
+        p.bump(); // Consume ':'
+        function_return_type(p, recovery);
+    }
     if p.at(TokenKind::Where) {
         generic_where_clause(p, recovery);
     }
-    if required_body || p.at(TokenKind::FatArrow) {
+    if form.requires_body() || p.at(TokenKind::FatArrow) {
         p.expect(TokenKind::FatArrow, recovery);
         function_body(p, recovery);
     }
     m.complete(p, NodeKind::DeclarationFunction)
+}
+
+/// The type after the `:` that follows the parameter list. A type left
+/// out recovers at the `where` clause or the body.
+fn function_return_type(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+    let m = p.start();
+    type_annotation(p, recovery.union([TokenKind::Where, TokenKind::FatArrow]));
+    m.complete(p, NodeKind::FunctionReturnType)
 }
 
 /// The list node is made even when the `(` is not there, so a function's

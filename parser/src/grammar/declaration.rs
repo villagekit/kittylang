@@ -4,7 +4,7 @@ use crate::{marker::CompletedMarker, parser::Parser, token_set::TokenSet};
 
 use super::{
     expression::expression,
-    function::function_declaration_option_name_body,
+    function::{function_declaration, FunctionForm},
     r#type::{
         generic_bound_list, generic_param_list, generic_where_clause, type_annotation, type_path,
     },
@@ -86,7 +86,7 @@ fn declaration_constant_optional_type_value(
 }
 
 fn declaration_function(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    function_declaration_option_name_body(p, recovery, true, true)
+    function_declaration(p, recovery, FunctionForm::Declaration)
 }
 
 fn declaration_struct(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
@@ -271,7 +271,7 @@ fn trait_constant(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 }
 
 fn trait_function(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    function_declaration_option_name_body(p, recovery, true, false)
+    function_declaration(p, recovery, FunctionForm::TraitDeclaration)
 }
 
 fn declaration_impl_trait(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
@@ -327,7 +327,7 @@ fn trait_impl_constant(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 }
 
 fn trait_impl_function(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    function_declaration_option_name_body(p, recovery, true, true)
+    function_declaration(p, recovery, FunctionForm::Declaration)
 }
 
 fn trait_impl_prop(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
@@ -426,23 +426,26 @@ mod tests {
                     fn parts: Parts
             "},
             expect![[r#"
-                DeclarationTrait@0..29
+                DeclarationTrait@0..35
                   Trait@0..5 "trait"
                   Whitespace@5..6 " "
                   IdentifierType@6..14 "Assembly"
                   Newline@14..15 "\n"
                   Indent@15..19 "    "
-                  DeclarationFunction@19..27
+                  DeclarationFunction@19..34
                     Fn@19..21 "fn"
                     Whitespace@21..22 " "
                     IdentifierValue@22..27 "parts"
                     FunctionParamList@27..27
                       Missing@27..27
-                  Error@27..28
                     Colon@27..28 ":"
-                  Whitespace@28..29 " "
-                error at 27: missing ‘[’ or ‘(’
-                error at 27..28: expected dedent, but found ‘:’"#]],
+                    Whitespace@28..29 " "
+                    FunctionReturnType@29..34
+                      TypeReference@29..34
+                        IdentifierType@29..34 "Parts"
+                  Newline@34..35 "\n"
+                  Dedent@35..35 ""
+                error at 27: missing ‘[’ or ‘(’"#]],
         );
     }
 
@@ -577,6 +580,180 @@ mod tests {
                   FunctionBody@21..22
                     ExpressionReference@21..22
                       IdentifierValue@21..22 "x""#]],
+        );
+    }
+
+    #[test]
+    fn function_with_a_return_type() {
+        check(
+            "fn foo(x: Number): Number => x",
+            expect![[r#"
+                DeclarationFunction@0..30
+                  Fn@0..2 "fn"
+                  Whitespace@2..3 " "
+                  IdentifierValue@3..6 "foo"
+                  FunctionParamList@6..17
+                    ParenOpen@6..7 "("
+                    FunctionParam@7..16
+                      FunctionParamLabel@7..8
+                        IdentifierValue@7..8 "x"
+                      Colon@8..9 ":"
+                      Whitespace@9..10 " "
+                      TypeReference@10..16
+                        IdentifierType@10..16 "Number"
+                    ParenClose@16..17 ")"
+                  Colon@17..18 ":"
+                  Whitespace@18..19 " "
+                  FunctionReturnType@19..25
+                    TypeReference@19..25
+                      IdentifierType@19..25 "Number"
+                  Whitespace@25..26 " "
+                  FatArrow@26..28 "=>"
+                  Whitespace@28..29 " "
+                  FunctionBody@29..30
+                    ExpressionReference@29..30
+                      IdentifierValue@29..30 "x""#]],
+        );
+    }
+
+    #[test]
+    fn trait_function_ends_at_its_return_type() {
+        check(
+            indoc! {"
+                trait Default
+                    fn default(): Self
+            "},
+            expect![[r#"
+                DeclarationTrait@0..37
+                  Trait@0..5 "trait"
+                  Whitespace@5..6 " "
+                  IdentifierType@6..13 "Default"
+                  Newline@13..14 "\n"
+                  Indent@14..18 "    "
+                  DeclarationFunction@18..36
+                    Fn@18..20 "fn"
+                    Whitespace@20..21 " "
+                    IdentifierValue@21..28 "default"
+                    FunctionParamList@28..30
+                      ParenOpen@28..29 "("
+                      ParenClose@29..30 ")"
+                    Colon@30..31 ":"
+                    Whitespace@31..32 " "
+                    FunctionReturnType@32..36
+                      TypeReference@32..36
+                        SelfUpper@32..36 "Self"
+                  Newline@36..37 "\n"
+                  Dedent@37..37 """#]],
+        );
+    }
+
+    #[test]
+    fn trait_function_ends_at_its_where_clause() {
+        check(
+            indoc! {"
+                trait Add
+                    fn add(self, other: Self) where
+                        Self: Add
+            "},
+            expect![[r#"
+                DeclarationTrait@0..64
+                  Trait@0..5 "trait"
+                  Whitespace@5..6 " "
+                  IdentifierType@6..9 "Add"
+                  Newline@9..10 "\n"
+                  Indent@10..14 "    "
+                  DeclarationFunction@14..64
+                    Fn@14..16 "fn"
+                    Whitespace@16..17 " "
+                    IdentifierValue@17..20 "add"
+                    FunctionParamList@20..39
+                      ParenOpen@20..21 "("
+                      FunctionParam@21..25
+                        FunctionParamLabel@21..25
+                          SelfLower@21..25 "self"
+                      Comma@25..26 ","
+                      Whitespace@26..27 " "
+                      FunctionParam@27..38
+                        FunctionParamLabel@27..32
+                          IdentifierValue@27..32 "other"
+                        Colon@32..33 ":"
+                        Whitespace@33..34 " "
+                        TypeReference@34..38
+                          SelfUpper@34..38 "Self"
+                      ParenClose@38..39 ")"
+                    Whitespace@39..40 " "
+                    GenericWhereClause@40..64
+                      Where@40..45 "where"
+                      Newline@45..46 "\n"
+                      Whitespace@46..50 "    "
+                      Indent@50..54 "    "
+                      GenericWhereBound@54..63
+                        TypeReference@54..58
+                          SelfUpper@54..58 "Self"
+                        Colon@58..59 ":"
+                        Whitespace@59..60 " "
+                        GenericBoundList@60..63
+                          GenericBound@60..63
+                            IdentifierType@60..63 "Add"
+                      Newline@63..64 "\n"
+                      Dedent@64..64 ""
+                  Dedent@64..64 """#]],
+        );
+    }
+
+    #[test]
+    fn function_with_a_return_type_left_out_recovers() {
+        check(
+            "fn foo(): => 1",
+            expect![[r#"
+                DeclarationFunction@0..14
+                  Fn@0..2 "fn"
+                  Whitespace@2..3 " "
+                  IdentifierValue@3..6 "foo"
+                  FunctionParamList@6..8
+                    ParenOpen@6..7 "("
+                    ParenClose@7..8 ")"
+                  Colon@8..9 ":"
+                  Whitespace@9..10 " "
+                  FunctionReturnType@10..10
+                    Missing@10..10
+                  FatArrow@10..12 "=>"
+                  Whitespace@12..13 " "
+                  FunctionBody@13..14
+                    ExpressionLiteral@13..14
+                      Number@13..14 "1"
+                error at 10: missing type-id, ‘Self’, ‘(’, ‘Fn’, or ‘impl’"#]],
+        );
+    }
+
+    #[test]
+    fn function_with_a_return_type_and_no_fat_arrow_recovers() {
+        check(
+            indoc! {"
+                fn foo(): Number
+                    1
+            "},
+            expect![[r#"
+                DeclarationFunction@0..23
+                  Fn@0..2 "fn"
+                  Whitespace@2..3 " "
+                  IdentifierValue@3..6 "foo"
+                  FunctionParamList@6..8
+                    ParenOpen@6..7 "("
+                    ParenClose@7..8 ")"
+                  Colon@8..9 ":"
+                  Whitespace@9..10 " "
+                  FunctionReturnType@10..16
+                    TypeReference@10..16
+                      IdentifierType@10..16 "Number"
+                  Newline@16..17 "\n"
+                  Error@17..21
+                    Indent@17..21 "    "
+                  FunctionBody@21..22
+                    ExpressionLiteral@21..22
+                      Number@21..22 "1"
+                  Newline@22..23 "\n"
+                error at 17..21: expected ‘=>’, but found indent"#]],
         );
     }
 

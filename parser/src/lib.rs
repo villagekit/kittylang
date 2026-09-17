@@ -352,10 +352,10 @@ mod tests {
                     IdentifierValue@23..26 "ath"
                   Newline@26..27 "\n"
                   Newline@27..28 "\n"
-                  ModuleExport@28..209
+                  ModuleExport@28..275
                     Export@28..34 "export"
                     Whitespace@34..35 " "
-                    DeclarationStruct@35..209
+                    DeclarationStruct@35..275
                       Struct@35..41 "struct"
                       Whitespace@41..42 " "
                       IdentifierType@42..49 "Vector3"
@@ -475,7 +475,7 @@ mod tests {
                       Newline@184..185 "\n"
                       Newline@185..186 "\n"
                       Whitespace@186..188 "  "
-                      DeclarationFunction@188..206
+                      DeclarationFunction@188..275
                         Fn@188..190 "fn"
                         Whitespace@190..191 " "
                         IdentifierValue@191..197 "length"
@@ -485,98 +485,94 @@ mod tests {
                             FunctionParamLabel@198..202
                               SelfLower@198..202 "self"
                           ParenClose@202..203 ")"
-                        Error@203..204
-                          Colon@203..204 ":"
+                        Colon@203..204 ":"
                         Whitespace@204..205 " "
-                        FunctionBody@205..206
+                        FunctionReturnType@205..206
                           TypeReference@205..206
                             IdentifierType@205..206 "N"
-                      Whitespace@206..207 " "
-                      Error@207..209
+                        Whitespace@206..207 " "
                         FatArrow@207..209 "=>"
-                  Newline@209..210 "\n"
-                  Whitespace@210..212 "  "
-                  Error@212..214
-                    Indent@212..214 "  "
-                  Error@214..217
-                    Let@214..217 "let"
-                  Whitespace@217..218 " "
-                  Error@218..222
-                    SelfUpper@218..222 "Self"
-                  Error@222..223
-                    ParenOpen@222..223 "("
-                  Error@223..224
-                    IdentifierValue@223..224 "x"
-                  Error@224..225
-                    Comma@224..225 ","
-                  Whitespace@225..226 " "
-                  Error@226..227
-                    IdentifierValue@226..227 "y"
-                  Error@227..228
-                    Comma@227..228 ","
-                  Whitespace@228..229 " "
-                  Error@229..230
-                    IdentifierValue@229..230 "z"
-                  Error@230..231
-                    ParenClose@230..231 ")"
-                  Whitespace@231..232 " "
-                  Error@232..233
-                    Equal@232..233 "="
-                  Whitespace@233..234 " "
-                  Error@234..238
-                    SelfLower@234..238 "self"
-                  Newline@238..239 "\n"
-                  Whitespace@239..243 "    "
-                  Error@243..244
-                    ParenOpen@243..244 "("
-                  Error@244..245
-                    IdentifierValue@244..245 "x"
-                  Whitespace@245..246 " "
-                  Error@246..247
-                    Multiply@246..247 "*"
-                  Whitespace@247..248 " "
-                  Error@248..249
-                    IdentifierValue@248..249 "x"
-                  Whitespace@249..250 " "
-                  Error@250..251
-                    Plus@250..251 "+"
-                  Whitespace@251..252 " "
-                  Error@252..253
-                    IdentifierValue@252..253 "y"
-                  Whitespace@253..254 " "
-                  Error@254..255
-                    Multiply@254..255 "*"
-                  Whitespace@255..256 " "
-                  Error@256..257
-                    IdentifierValue@256..257 "y"
-                  Whitespace@257..258 " "
-                  Error@258..259
-                    Plus@258..259 "+"
-                  Whitespace@259..260 " "
-                  Error@260..261
-                    IdentifierValue@260..261 "z"
-                  Whitespace@261..262 " "
-                  Error@262..263
-                    Multiply@262..263 "*"
-                  Whitespace@263..264 " "
-                  Error@264..265
-                    IdentifierValue@264..265 "z"
-                  Error@265..266
-                    ParenClose@265..266 ")"
-                  Error@266..267
-                    Dot@266..267 "."
-                  Error@267..271
-                    IdentifierValue@267..271 "sqrt"
-                  Error@271..272
-                    ParenOpen@271..272 "("
-                  Error@272..273
-                    ParenClose@272..273 ")"
-                  Newline@273..274 "\n"
-                  Newline@274..275 "\n"
-                  Error@275..275
-                    Dedent@275..275 ""
-                  Error@275..275
-                    Dedent@275..275 ""
+                        Newline@209..210 "\n"
+                        Whitespace@210..212 "  "
+                        FunctionBody@212..275
+                          ExpressionBlock@212..275
+                            Indent@212..214 "  "
+                            ExpressionLet@214..275
+                              Let@214..217 "let"
+                              Whitespace@217..218 " "
+                              PatternType@218..231
+                                TypeReference@218..222
+                                  SelfUpper@218..222 "Self"
+                                PatternTypeArgList@222..231
+                                  ParenOpen@222..223 "("
+                                  PatternTypeArgPositional@223..224
+                                    IdentifierValue@223..224 "x"
+                                  Comma@224..225 ","
+                                  Whitespace@225..226 " "
+                                  PatternTypeArgPositional@226..227
+                                    IdentifierValue@226..227 "y"
+                                  Comma@227..228 ","
+                                  Whitespace@228..229 " "
+                                  PatternTypeArgPositional@229..230
+                                    IdentifierValue@229..230 "z"
+                                  ParenClose@230..231 ")"
+                              Whitespace@231..232 " "
+                              Equal@232..233 "="
+                              Whitespace@233..234 " "
+                              ExpressionApply@234..273
+                                ExpressionGet@234..271
+                                  ExpressionApply@234..266
+                                    ExpressionReference@234..238
+                                      SelfLower@234..238 "self"
+                                    Newline@238..239 "\n"
+                                    Whitespace@239..243 "    "
+                                    FunctionArgList@243..266
+                                      ParenOpen@243..244 "("
+                                      FunctionArgPositional@244..265
+                                        ExpressionBinary@244..265
+                                          ExpressionBinary@244..257
+                                            ExpressionBinary@244..249
+                                              ExpressionReference@244..245
+                                                IdentifierValue@244..245 "x"
+                                              Whitespace@245..246 " "
+                                              Multiply@246..247 "*"
+                                              Whitespace@247..248 " "
+                                              ExpressionReference@248..249
+                                                IdentifierValue@248..249 "x"
+                                            Whitespace@249..250 " "
+                                            Plus@250..251 "+"
+                                            Whitespace@251..252 " "
+                                            ExpressionBinary@252..257
+                                              ExpressionReference@252..253
+                                                IdentifierValue@252..253 "y"
+                                              Whitespace@253..254 " "
+                                              Multiply@254..255 "*"
+                                              Whitespace@255..256 " "
+                                              ExpressionReference@256..257
+                                                IdentifierValue@256..257 "y"
+                                          Whitespace@257..258 " "
+                                          Plus@258..259 "+"
+                                          Whitespace@259..260 " "
+                                          ExpressionBinary@260..265
+                                            ExpressionReference@260..261
+                                              IdentifierValue@260..261 "z"
+                                            Whitespace@261..262 " "
+                                            Multiply@262..263 "*"
+                                            Whitespace@263..264 " "
+                                            ExpressionReference@264..265
+                                              IdentifierValue@264..265 "z"
+                                      ParenClose@265..266 ")"
+                                  Dot@266..267 "."
+                                  IdentifierValue@267..271 "sqrt"
+                                FunctionArgList@271..273
+                                  ParenOpen@271..272 "("
+                                  ParenClose@272..273 ")"
+                              Newline@273..274 "\n"
+                              Newline@274..275 "\n"
+                              Missing@275..275
+                              Missing@275..275
+                            Dedent@275..275 ""
+                      Dedent@275..275 ""
                   ModuleExport@275..387
                     Export@275..281 "export"
                     Whitespace@281..282 " "
@@ -653,39 +649,8 @@ mod tests {
                 error at 121..128: expected type-id, but found value-id
                 error at 148..155: expected type-id, but found value-id
                 error at 175..182: expected type-id, but found value-id
-                error at 203..204: expected ‘=>’, but found ‘:’
-                error at 207..209: expected dedent, but found ‘=>’
-                error at 212..214: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found indent
-                error at 214..217: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘let’
-                error at 218..222: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘Self’
-                error at 222..223: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘(’
-                error at 223..224: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found value-id
-                error at 224..225: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘,’
-                error at 226..227: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found value-id
-                error at 227..228: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘,’
-                error at 229..230: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found value-id
-                error at 230..231: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘)’
-                error at 232..233: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘=’
-                error at 234..238: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘self’
-                error at 243..244: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘(’
-                error at 244..245: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found value-id
-                error at 246..247: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘*’
-                error at 248..249: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found value-id
-                error at 250..251: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘+’
-                error at 252..253: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found value-id
-                error at 254..255: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘*’
-                error at 256..257: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found value-id
-                error at 258..259: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘+’
-                error at 260..261: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found value-id
-                error at 262..263: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘*’
-                error at 264..265: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found value-id
-                error at 265..266: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘)’
-                error at 266..267: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘.’
-                error at 267..271: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found value-id
-                error at 271..272: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘(’
-                error at 272..273: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘)’
-                error at 275..275: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found dedent
-                error at 275..275: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found dedent"#]],
+                error at 275: missing ‘in’
+                error at 275: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
         );
     }
 }

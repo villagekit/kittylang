@@ -337,6 +337,11 @@ impl DeclarationFunction {
         token(self, tree)
     }
 
+    /// The return type declared after the parameter list, if there is one.
+    pub fn return_type(self, tree: &SyntaxTree) -> Option<FunctionReturnType> {
+        node(self, tree)
+    }
+
     pub fn body(self, tree: &SyntaxTree) -> Option<Expression> {
         node(self, tree)
     }
@@ -345,6 +350,13 @@ impl DeclarationFunction {
 define_node!(FunctionParam);
 define_node!(FunctionParamLabel);
 define_node!(FunctionParamList);
+define_node!(FunctionReturnType);
+impl FunctionReturnType {
+    /// The type itself. `None` when the type was left out after the colon.
+    pub fn annotation(self, tree: &SyntaxTree) -> Option<TypeAnnotation> {
+        node(self, tree)
+    }
+}
 define_node!(FunctionArgPositional);
 define_node!(FunctionArgLabelled);
 define_node!(FunctionArgList);
