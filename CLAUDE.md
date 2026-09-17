@@ -174,7 +174,10 @@ Flix, Julia), read its reference, not a summary of it.
 
 ## Conventions
 
-- Rust edition 2021, `rust-version` 1.83 (`Cargo.toml`).
+- Rust edition 2021, `rust-version` 1.83 (`Cargo.toml`). `Cargo.lock` is
+  committed: it holds the dependency versions the gate tested. A `cargo
+  update` keeps every dependency's own `rust-version` at or under ours;
+  cargo prints `requires Rust x.y` beside a version that is not.
 - **Licensing.** No strong copyleft (GPL) libraries, and no GPL code as a
   reference. Weak copyleft (LGPL) with care: link, never transcribe.
   Prefer permissive.
@@ -220,13 +223,17 @@ The discipline is `/tdd`; the repo's bindings:
 
 ## Tracing
 
-No `println!`/`dbg!` in committed code. `tracing` with structured fields
-where a span adds context, once a consumer exists.
+No `println!`/`dbg!` in library code. `tracing` with structured fields
+where a span adds context, once a consumer exists. A binary's stdout is
+its data channel: it writes through one locked `Write` handle, so the
+output can be captured, and reports failures on stderr.
 
 ## Structure
 
 One cargo workspace, the crates named `kitty-<dir>`:
 
+- `cli/`: the `kitty` command, `lex` and `parse`: prints what the
+  compiler sees.
 - `lexer/`: `logos` token kinds and the indenter that turns indentation
   into block tokens.
 - `syntax/`: the `eventree` tree config: node kinds, the syntax tree types.
@@ -235,7 +242,7 @@ One cargo workspace, the crates named `kitty-<dir>`:
   the parse errors.
 - `hir/`: the high-level intermediate representation the analysis will
   produce. Types only so far.
-- `meta/`: source ids, spans, diagnostics rendering.
+- `meta/`: source ids, spans, diagnostic rendering.
 - `number/`: the `Number` type over `fastnum` decimals.
 - `examples/`: `.kitty` programs, the end-to-end fixtures.
 - `sketches/`: the syntax design history, read-only.

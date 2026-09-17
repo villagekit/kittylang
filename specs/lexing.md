@@ -30,6 +30,9 @@ Token, token kind and indenter are defined in the glossary
   sees blocks, not whitespace (`lex_indent`, `lexer/src/lib.rs`).
 - Every other token must correspond to one match of one spelling in the
   [tokens](#tokens) table (review only).
+- `kitty_lexer::Tokens` must print the stream one token per line as
+  `Kind@start..end`, the form the snapshot tests and the kitty command
+  share (`lex_example_basic`, `lexer/src/lib.rs`).
 - Where two spellings match the same text, the spelling with the higher
   priority must win. `logos` 0.15.0 gives each spelling a static priority
   from its shortest possible match, a literal counting more than a class,

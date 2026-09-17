@@ -15,54 +15,75 @@ pub enum ParseError {
     },
 }
 
-impl fmt::Display for ParseError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fn write_expected(f: &mut fmt::Formatter<'_>, expected: &[TokenKind]) -> fmt::Result {
-            let num_expected = expected.len();
-            let is_first = |idx| idx == 0;
-            let is_last = |idx| idx == num_expected - 1;
-
-            for (idx, expected_kind) in expected.iter().enumerate() {
-                if is_first(idx) {
-                    write!(f, "{}", expected_kind)?;
-                } else if num_expected == 2 && is_last(idx) {
-                    write!(f, " or {}", expected_kind)?;
-                } else if num_expected > 2 && is_last(idx) {
-                    write!(f, ", or {}", expected_kind)?;
-                } else {
-                    write!(f, ", {}", expected_kind)?;
-                }
-            }
-
-            Ok(())
-        }
-
+impl ParseError {
+    /// The range of source text the error points at. A missing token has
+    /// an empty range at the offset where it was expected.
+    pub fn range(&self) -> TextRange {
         match self {
-            ParseError::Missing { expected, offset } => {
-                write!(f, "error at {}: missing ", u32::from(*offset))?;
+            ParseError::Missing { offset, .. } => TextRange::empty(*offset),
+            ParseError::Unexpected { range, .. } => *range,
+        }
+    }
 
-                write_expected(f, expected)?;
+    /// The error's message without its position: what was expected and,
+    /// for an unexpected token, what was found.
+    pub fn message(&self) -> String {
+        let mut message = String::new();
+        match self {
+            ParseError::Missing { expected, .. } => {
+                message.push_str("missing ");
+                write_expected(&mut message, expected);
             }
             ParseError::Unexpected {
-                expected,
-                found,
-                range,
+                expected, found, ..
             } => {
+                message.push_str("expected ");
+                write_expected(&mut message, expected);
+                if let Some(found) = found {
+                    message.push_str(&format!(", but found {found}"));
+                }
+            }
+        }
+        message
+    }
+}
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ParseError::Missing { offset, .. } => {
+                write!(f, "error at {}: ", u32::from(*offset))?;
+            }
+            ParseError::Unexpected { range, .. } => {
                 write!(
                     f,
-                    "error at {}..{}: expected ",
+                    "error at {}..{}: ",
                     u32::from(range.start()),
                     u32::from(range.end()),
                 )?;
-
-                write_expected(f, expected)?;
-
-                if let Some(found) = found {
-                    write!(f, ", but found {}", found)?;
-                }
             }
         }
-        Ok(())
+        f.write_str(&self.message())
+    }
+}
+
+/// Writes the expected kinds as a list: `a`, `a or b`, `a, b, or c`.
+fn write_expected(out: &mut String, expected: &[TokenKind]) {
+    let num_expected = expected.len();
+    for (idx, expected_kind) in expected.iter().enumerate() {
+        let separator = if idx == 0 {
+            ""
+        } else if idx == num_expected - 1 {
+            if num_expected == 2 {
+                " or "
+            } else {
+                ", or "
+            }
+        } else {
+            ", "
+        };
+        out.push_str(separator);
+        out.push_str(&expected_kind.to_string());
     }
 }
 
@@ -88,6 +109,28 @@ mod tests {
         };
 
         assert_eq!(format!("{}", error), output);
+    }
+
+    #[test]
+    fn a_missing_error_has_an_empty_range_at_its_offset_and_a_message_without_it() {
+        let error = ParseError::Missing {
+            expected: vec![TokenKind::ParenClose],
+            offset: 7.into(),
+        };
+        assert_eq!(error.range(), TextRange::empty(7.into()));
+        assert_eq!(error.message(), "missing ‘)’");
+        assert_eq!(format!("{}", error), "error at 7: missing ‘)’");
+    }
+
+    #[test]
+    fn an_unexpected_error_has_its_range_and_a_message_without_it() {
+        let error = ParseError::Unexpected {
+            expected: vec![TokenKind::Equal],
+            found: Some(TokenKind::IdentifierValue),
+            range: TextRange::new(10.into(), 20.into()),
+        };
+        assert_eq!(error.range(), TextRange::new(10.into(), 20.into()));
+        assert_eq!(error.message(), "expected ‘=’, but found value-id");
     }
 
     #[test]

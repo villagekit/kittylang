@@ -1,7 +1,6 @@
 mod indenter;
 mod token;
 
-#[cfg(test)]
 use std::fmt;
 
 use logos::{Logos, SpannedIter};
@@ -9,6 +8,7 @@ use logos::{Logos, SpannedIter};
 use crate::indenter::Indenter;
 pub use crate::token::{Token, TokenKind};
 
+/// Lexes `source` into tokens, indentation included as block tokens.
 pub fn lex(source: &str) -> Lexer<'_> {
     Lexer::new(source)
 }
@@ -37,19 +37,24 @@ impl Iterator for Lexer<'_> {
     }
 }
 
-/// The lexer's output, one token per line, for snapshot tests.
-#[cfg(test)]
-struct Tokens(Vec<Token>);
+/// The lexer's whole output, printed one token per line as `Kind@start..end`.
+/// The snapshot tests and the `kitty lex` command print tokens this way.
+pub struct Tokens(Vec<Token>);
 
-#[cfg(test)]
+impl Tokens {
+    /// The tokens in source order.
+    pub fn iter(&self) -> impl Iterator<Item = &Token> {
+        self.0.iter()
+    }
+}
+
 impl From<Lexer<'_>> for Tokens {
     fn from(value: Lexer<'_>) -> Self {
         Self(value.collect())
     }
 }
 
-#[cfg(test)]
-impl fmt::Debug for Tokens {
+impl fmt::Display for Tokens {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for token in self.0.iter() {
             writeln!(f, "{:?}", token)?;
@@ -61,7 +66,7 @@ impl fmt::Debug for Tokens {
 #[cfg(test)]
 fn check(input: &str, expected: expect_test::Expect) {
     let tokens: Tokens = lex(input).into();
-    let actual = format!("{:?}", tokens);
+    let actual = tokens.to_string();
     expected.assert_eq(&actual);
 }
 

@@ -12,7 +12,7 @@ impl fmt::Display for SourceId {
         if self.0.is_empty() {
             write!(f, "?")
         } else {
-            write!(f, "{}", self.0.clone().join("/"))
+            write!(f, "{}", self.to_path().display())
         }
     }
 }
@@ -43,5 +43,22 @@ impl SourceId {
 
     pub fn to_path(&self) -> PathBuf {
         self.0.iter().map(|e| e.to_string()).collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_absolute_path_displays_as_it_was_given() {
+        assert_eq!(
+            SourceId::from_path("/tmp/a.kitty").to_string(),
+            "/tmp/a.kitty"
+        );
+        assert_eq!(
+            SourceId::from_path("examples/units.kitty").to_string(),
+            "examples/units.kitty"
+        );
     }
 }

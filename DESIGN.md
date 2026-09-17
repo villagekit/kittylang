@@ -53,6 +53,8 @@ order:
 - `hir/`: the high-level intermediate representation the analysis produces.
 - `meta/`: source ids, spans, diagnostic rendering through `ariadne`.
 - `number/`: `Number`, a `fastnum` decimal.
+- `cli/`: the `kitty` command, which prints what the compiler sees: the
+  tokens, the tree, the errors.
 
 Around the code: `specs/`, the normative design; `docs/`, narrative for an
 outside reader, opened by the glossary; `decisions/`, the decision

@@ -12,6 +12,9 @@ keywords.workspace = true
 categories.workspace = true
 
 [dependencies]
-ariadne = { version = "0.5.0" }
+ariadne = { version = "0.5.1" }
 internment = { workspace = true }
 text-size = { workspace = true }
+
+[dev-dependencies]
+expect-test = { workspace = true }

@@ -15,6 +15,9 @@ a spec exists it is the owner; until then the crate is.
   per stage. ([DESIGN.md](../DESIGN.md#structure))
 - **Milestone**: a band of work with a measurable exit bar (M1 to M4).
   ([DESIGN.md](../DESIGN.md#milestones))
+- **Kitty command**: the `kitty` binary that prints what the compiler
+  sees: `kitty lex` the tokens, `kitty parse` the tree and the parse
+  errors. ([cli/README.md](../cli/README.md))
 
 ## Lexing
 
@@ -66,5 +69,9 @@ a spec exists it is the owner; until then the crate is.
   produces from the CST, with names resolved. (`kitty-hir`)
 - **Span**: a source id and a text range: where something came from.
   Every node and value keeps one. (`kitty-meta`)
+- **Diagnostic**: a message with a span that the compiler gives a
+  reader: a parse error today, analysis errors later. It is rendered as
+  a **report** through `ariadne`: a headline, the source line, a label
+  per span. (`kitty-meta`)
 - **Source**: one unit of source text with an id. (`kitty-meta`)
 - **Number**: the language's one numeric type, a decimal. (`kitty-number`)
