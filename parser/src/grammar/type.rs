@@ -303,10 +303,11 @@ pub(crate) fn generic_where_clause(p: &mut Parser, recovery: TokenSet) -> Comple
     let m = p.start();
     p.bump(); // Consume 'where'
     p.expect(TokenKind::Indent, recovery);
-    while !p.at(TokenKind::Dedent) {
+    // The bounds end at the dedent, or where a bound would consume nothing.
+    while !p.at_recovery(recovery_where) {
         generic_where_bound(p, recovery_where);
     }
-    p.bump(); // Consume <dedent>
+    p.expect(TokenKind::Dedent, recovery);
     m.complete(p, NodeKind::GenericWhereClause)
 }
 

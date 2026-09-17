@@ -60,7 +60,8 @@ Around the code: `specs/`, the normative design; `docs/`, narrative for an
 outside reader, opened by the glossary; `decisions/`, the decision
 collection; `plans/`, the plan collection and the run sheet; `research/`,
 dated syntheses of research sweeps; `examples/`, the end-to-end fixtures;
-`sketches/`, the syntax history.
+`fuzz/`, the fuzz target over the parser, outside the workspace, run on
+demand; `sketches/`, the syntax history.
 
 ## Milestones
 

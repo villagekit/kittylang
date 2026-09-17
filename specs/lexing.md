@@ -16,7 +16,8 @@ Token, token kind and indenter are defined in the glossary
 - **Trivia**: the token kinds the parser skips: whitespace, newline and
   comment. `Indent` and `Dedent` are not trivia.
 - **Indentation level**: the width of the whitespace that opens a line, a
-  space counting one and a tab counting four.
+  space counting one and a tab counting four, the count ending at any
+  other character in the run (a form feed).
 
 ## Contract
 
@@ -24,7 +25,8 @@ Token, token kind and indenter are defined in the glossary
   no gap and no overlap (`lex_example_basic`, `lexer/src/lib.rs`).
 - The lexer must yield an `Error` token for each match attempt that
   fails, and continue (review only).
-- The lexer must not panic on any input (review only).
+- The lexer must not panic on any input (review only, with the fuzz
+  target `fuzz/fuzz_targets/parse.rs` run on demand by `just fuzz`).
 - The lexer must yield block tokens (`Indent`, `Dedent`) in place of
   indentation, as the [indenter](#the-indenter) section says, so the parser
   sees blocks, not whitespace (`lex_indent`, `lexer/src/lib.rs`).
@@ -157,8 +159,11 @@ at what follows it.
   indenter must measure the indentation level of that whitespace and
   compare it with the top of the stack (`lex_indent`, `lexer/src/lib.rs`):
   - If it is greater, the indenter must push it, yield `Whitespace` for
-    the part of the run up to the previous level (when that part is not
-    empty), then yield one `Indent` whose range is the rest of the run.
+    the longest prefix of the run whose indentation level is at most the
+    previous level (when that prefix is not empty), then yield one
+    `Indent` whose range is the rest of the run; the split lands between
+    characters, never inside a tab
+    (`lex_indent_tab_inside_a_space_block`, `lexer/src/lib.rs`).
   - If it is less, the indenter must yield the whole run as `Whitespace`,
     then pop each level greater than it and yield one `Dedent` per level
     popped, each with an empty range at the end of the run
@@ -182,12 +187,9 @@ at what follows it.
   ([design plan d0658cb1](../plans/d0658cb19697-design-newlines-inside-brackets.md)).
   Today the indenter applies them to every newline, brackets included.
 
-Gap: the indenter measures a tab as four but splits the whitespace run by
-an indentation width, so a block nested inside a tab-indented block
-yields a `Whitespace` token that overruns the text and aborts in
-`TextRange::new`. And a `Newline` followed by an `Error` token queues no
-`Dedent`; the dedents arrive at the next newline that dedents, or at the
-end of the source.
+Gap: a `Newline` followed by an `Error` token queues no `Dedent`; the
+dedents arrive at the next newline that dedents, or at the end of the
+source.
 
 Example (non-normative). For
 

@@ -34,20 +34,7 @@ impl<'src, I: TokenKindIterator<'src>> Indenter<'src, I> {
     }
 
     fn get_next_indent_level(&self, ws_span: Span) -> usize {
-        let ws = &self.source[ws_span];
-
-        let mut indent = 0;
-
-        for ch in ws.chars() {
-            match ch {
-                ' ' => indent += 1,
-                // TODO handle tabs correctly
-                '\t' => indent += 4,
-                _ => break,
-            }
-        }
-
-        indent
+        indent_level(&self.source[ws_span])
     }
 
     fn pop_and_queue_dedents(&mut self, indent: usize, dedent_span: Span) {
@@ -130,7 +117,9 @@ impl<'src, I: TokenKindIterator<'src>> Iterator for Indenter<'src, I> {
 
                             // Skip and queue whitespace as being up to existing indent level
                             self.tokens.next();
-                            let revised_ws_span = ws_span.start..(ws_span.start + current_indent);
+                            let split = ws_span.start
+                                + split_at_level(&self.source[ws_span.clone()], current_indent);
+                            let revised_ws_span = ws_span.start..split;
                             if !revised_ws_span.is_empty() {
                                 self.queued_tokens
                                     .push_back((TokenKind::Whitespace, revised_ws_span));
@@ -140,7 +129,7 @@ impl<'src, I: TokenKindIterator<'src>> Iterator for Indenter<'src, I> {
                             self.indents.push(indent);
 
                             // Queue an indent token.
-                            let indent_span = (ws_span.start + current_indent)..ws_span.end;
+                            let indent_span = split..ws_span.end;
                             self.queued_tokens
                                 .push_back((TokenKind::Indent, indent_span));
                         }
@@ -174,5 +163,39 @@ impl<'src, I: TokenKindIterator<'src>> Iterator for Indenter<'src, I> {
                 self.pop_dedent(dedent_span)
             }
         }
+    }
+}
+
+/// The indentation level of a whitespace run: the widths of its leading
+/// spaces and tabs summed, the count ending at any other character.
+fn indent_level(ws: &str) -> usize {
+    ws.chars().map_while(char_width).sum()
+}
+
+/// The byte length of the longest prefix of a whitespace run made of
+/// indentation characters whose level is at most `level`. A split by
+/// level alone can land inside a tab, or past the run when tabs are wider
+/// than the level, and the `Indent` range that starts there ends before
+/// it starts, which `TextRange::new` refuses.
+fn split_at_level(ws: &str, level: usize) -> usize {
+    let mut seen = 0;
+    for (offset, ch) in ws.char_indices() {
+        match char_width(ch) {
+            Some(width) if seen + width <= level => seen += width,
+            _ => return offset,
+        }
+    }
+
+    ws.len()
+}
+
+/// The width one character adds to an indentation level: a space one, a
+/// tab four (the measure the lexing spec records under "Non-guarantees"),
+/// and `None` for a character that is not indentation.
+fn char_width(ch: char) -> Option<usize> {
+    match ch {
+        ' ' => Some(1),
+        '\t' => Some(4),
+        _ => None,
     }
 }

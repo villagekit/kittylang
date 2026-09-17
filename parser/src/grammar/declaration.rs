@@ -1647,4 +1647,58 @@ mod tests {
                 error at 1: missing value-id"#]],
         );
     }
+
+    #[test]
+    fn where_clause_with_no_bounds_ends_at_the_input() {
+        check(
+            "fn f() where T: T => 1",
+            expect![[r#"
+                DeclarationFunction@0..22
+                  Fn@0..2 "fn"
+                  Whitespace@2..3 " "
+                  IdentifierValue@3..4 "f"
+                  FunctionParamList@4..6
+                    ParenOpen@4..5 "("
+                    ParenClose@5..6 ")"
+                  Whitespace@6..7 " "
+                  GenericWhereClause@7..22
+                    Where@7..12 "where"
+                    Whitespace@12..13 " "
+                    Error@13..14
+                      IdentifierType@13..14 "T"
+                    GenericWhereBound@14..20
+                      Error@14..15
+                        Colon@14..15 ":"
+                      Whitespace@15..16 " "
+                      Error@16..17
+                        IdentifierType@16..17 "T"
+                      Whitespace@17..18 " "
+                      GenericBoundList@18..20
+                        GenericBound@18..20
+                          Error@18..20
+                            FatArrow@18..20 "=>"
+                    Whitespace@20..21 " "
+                    GenericWhereBound@21..22
+                      Error@21..22
+                        Number@21..22 "1"
+                      Missing@22..22
+                      GenericBoundList@22..22
+                        GenericBound@22..22
+                          Missing@22..22
+                    Missing@22..22
+                  Missing@22..22
+                  FunctionBody@22..22
+                    Missing@22..22
+                error at 13..14: expected indent, but found type-id
+                error at 14..15: expected type-id or ‘Self’, but found ‘:’
+                error at 16..17: expected ‘:’, but found type-id
+                error at 18..20: expected type-id, but found ‘=>’
+                error at 21..22: expected ‘+’, type-id, or ‘Self’, but found number
+                error at 22: missing ‘:’
+                error at 22: missing type-id
+                error at 22: missing dedent
+                error at 22: missing ‘=>’
+                error at 22: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
+        );
+    }
 }

@@ -10,6 +10,9 @@ members = [
   "parser",
   "syntax"
 ]
+# `fuzz/` is its own cargo root, built by `cargo fuzz` on nightly (`just
+# fuzz`) with its own profile and flags; `just check` never touches it.
+exclude = ["fuzz"]
 
 [workspace.package]
 version = "0.1.0"

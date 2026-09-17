@@ -176,6 +176,49 @@ foo()
     }
 
     #[test]
+    fn lex_indent_tab_inside_a_space_block() {
+        // A tab is four wide, so it opens a block inside one two spaces
+        // opened; the split lands on the tab, never inside it.
+        use TokenKind::*;
+        let input = "a\n  b\n\tc\n";
+        let expected = vec![
+            (IdentifierValue, 0..1),
+            (Newline, 1..2),
+            (Indent, 2..4),
+            (IdentifierValue, 4..5),
+            (Newline, 5..6),
+            (Indent, 6..7),
+            (IdentifierValue, 7..8),
+            (Newline, 8..9),
+            (Dedent, 9..9),
+            (Dedent, 9..9),
+        ];
+        check_tokens(input, expected);
+    }
+
+    #[test]
+    fn lex_indent_spaces_after_a_tab() {
+        // The run is a tab and two spaces, level six over a tab-opened
+        // block at four: the whitespace is the tab, the indent the spaces.
+        use TokenKind::*;
+        let input = "a\n\tb\n\t  c\n";
+        let expected = vec![
+            (IdentifierValue, 0..1),
+            (Newline, 1..2),
+            (Indent, 2..3),
+            (IdentifierValue, 3..4),
+            (Newline, 4..5),
+            (Whitespace, 5..6),
+            (Indent, 6..8),
+            (IdentifierValue, 8..9),
+            (Newline, 9..10),
+            (Dedent, 10..10),
+            (Dedent, 10..10),
+        ];
+        check_tokens(input, expected);
+    }
+
+    #[test]
     fn lex_package() {
         use TokenKind::*;
         check_tokens("@std/math", vec![(Package, 0..9)]);

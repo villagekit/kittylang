@@ -156,6 +156,7 @@ prompt carries the context they need. No tool restrictions.
 | `just build` | Build the full workspace |
 | `just clippy` | Clippy with warnings as errors |
 | `just fmt` | Format all crates |
+| `just fuzz` | Fuzz `kitty_parser::parse` for 60 seconds, seeded from `examples/`; needs nightly, installs `cargo-fuzz` on first run; not part of `just check`; bound it once installed: `timeout 120 just fuzz` |
 
 No CI host yet: the gate is run locally.
 
@@ -245,4 +246,6 @@ One cargo workspace, the crates named `kitty-<dir>`:
 - `meta/`: source ids, spans, diagnostic rendering.
 - `number/`: the `Number` type over `fastnum` decimals.
 - `examples/`: `.kitty` programs, the end-to-end fixtures.
+- `fuzz/`: the `cargo-fuzz` target over `kitty_parser::parse`, its own
+  cargo root outside the workspace, run by `just fuzz`.
 - `sketches/`: the syntax design history, read-only.

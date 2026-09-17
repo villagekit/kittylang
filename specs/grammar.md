@@ -51,10 +51,18 @@ of a production and are not written.
   guaranteed by the rule that dispatches to it, and everything else is an
   error with recovery (`assembly_lists_its_parse_errors`,
   `parser/src/examples.rs`; `unary_operator_without_an_operand_is_missing`,
-  `parser/src/grammar/expression.rs`).
+  `parser/src/grammar/expression.rs`; the general rule is review only,
+  with the fuzz target `fuzz/fuzz_targets/parse.rs` run on demand by
+  `just fuzz`).
 - Empty input must parse to an empty module with no errors
   (`empty_input_parses_to_an_empty_module`, `parser/src/lib.rs`).
-- The parser must return on every input (review only).
+- The parser must return on every input (review only, with the fuzz
+  target run on demand). A loop that parses items until a dedent must
+  also end where an item would consume nothing, since the next token is
+  in the recovery set or the input has ended
+  (`where_clause_with_no_bounds_ends_at_the_input`,
+  `parser/src/grammar/declaration.rs`; `match_with_no_arms_ends_at_the_input`,
+  `parser/src/grammar/expression.rs`).
 - The tree must be lossless: every token the lexer yields, trivia
   included, must appear in the tree in source order, so the tree's text is
   the source (`lex_example_basic`, `parser/src/lib.rs`).
@@ -79,14 +87,6 @@ of a production and are not written.
   ([design plan d0658cb1](../plans/d0658cb19697-design-newlines-inside-brackets.md))
   (`infix_expression_interspersed_with_newlines`,
   `parser/src/grammar/expression.rs`).
-
-Gap: the `where` bound loop ends only at a dedent, and a bound consumes
-nothing when the next token is in its recovery set or the input has
-ended, so the parser never returns on `fn f() where T: T => 1`; in a
-release build the spin grows the event list until the process aborts.
-The `match` arm loop had the same fault and now ends where an arm would
-consume nothing (`match_with_no_arms_ends_at_the_input`,
-`parser/src/grammar/expression.rs`).
 
 ## Recovery
 

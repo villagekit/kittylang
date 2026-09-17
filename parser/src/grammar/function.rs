@@ -68,6 +68,9 @@ pub(crate) fn function_declaration(
         function_return_type(p, recovery);
     }
     if p.at(TokenKind::Where) {
+        // TODO(cc): a bound's recovery set does not hold `=>`, so a body
+        // after a malformed `where` clause is read as more bounds
+        // (`where_clause_with_no_bounds_ends_at_the_input`).
         generic_where_clause(p, recovery);
     }
     if form.requires_body() || p.at(TokenKind::FatArrow) {
