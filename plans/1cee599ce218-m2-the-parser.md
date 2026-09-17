@@ -96,3 +96,4 @@ command, in [[5c5f4b9256b3]].
 ## Log
 
 - 2026-09-12: Minted by the grilling of 2026-09-12; its transcripts are in the shared transcripts repo under kittylang/2026-09-12-surface-syntax-grilling (grill.md, the parser-coverage probe, three slice review rounds).
+- 2026-09-17: `specs/lexing.md` and `specs/grammar.md` written ([[0248a546fe20]]). Where the code disagrees with them, the code is the defect; each spec section carries a Gap line until its slice ships. The gaps no slice holds (among them `Name = Type` for labelled generic arguments, a lexer abort on tab indentation and a parser hang at end of input) are listed in that slice's Outcome for the operator.

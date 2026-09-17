@@ -67,10 +67,12 @@ The plans: [plans/README.md](plans/README.md).
 
 - **M1: the lexer.** Source text to tokens, indentation to blocks. Done.
 - **M2: the parser.** Tokens to a concrete syntax tree for the whole
-  surface syntax the sketches settled, resilient to malformed input, every
-  `examples/*.kitty` program parsing clean. The grammar exists on this
-  branch; the exit bar is the examples parsing without error under
-  `just check`, which is not yet checked by a test.
+  surface syntax the grilling of 2026-09-12 settled, resilient to
+  malformed input, never panicking, the lexing and grammar specs written
+  first and kept true. The exit bar: `just check` green, and the examples
+  test showing zero parse errors for `units.kitty`, `3d-math.kitty` and
+  `sample.kitty`, and for the other three only errors at the sites the
+  open design plans own, each listed with its plan beside it.
 - **M3: analysis.** Concrete syntax tree to HIR: name resolution, the
   item tree, types checked bidirectionally, with diagnostics rendered
   through `ariadne`. To be designed by a grilling and sliced before it

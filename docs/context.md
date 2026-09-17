@@ -2,8 +2,8 @@
 
 The domain glossary. When code, specs, plans, decisions, or commit messages
 name one of these concepts, they use the term as defined here. Definitions
-only; each entry links to the crate or spec that owns the mechanism. Until
-the specs exist the crate is the owner.
+only; each entry links to the crate or spec that owns the mechanism. Where
+a spec exists it is the owner; until then the crate is.
 
 ## The shape of the project
 
@@ -18,14 +18,14 @@ the specs exist the crate is the owner.
 
 ## Lexing
 
-- **Token**: a kind and a range of the source text. (`kitty-lexer`)
+- **Token**: a kind and a range of the source text.
+  ([specs/lexing.md](../specs/lexing.md))
 - **Token kind**: the closed enum of token classes, `logos`-derived.
-  Value and type identifiers are distinct kinds. (`kitty-lexer`)
+  Value and type identifiers are distinct kinds.
+  ([specs/lexing.md](../specs/lexing.md#tokens))
 - **Indenter**: the pass that turns changes of indentation into block
   open and close tokens, so the parser sees blocks, not whitespace.
-  (`kitty-lexer`)
-- **Metadata comment**: a `#{ ... }` comment the compiler reads, attached
-  to the declaration below it. (`kitty-lexer`)
+  ([specs/lexing.md](../specs/lexing.md#the-indenter))
 
 ## Parsing
 
@@ -36,16 +36,29 @@ the specs exist the crate is the owner.
 - **Concrete syntax tree (CST)**: typed views over syntax tree nodes, one
   type per node kind, cast on demand. (`kitty-cst`)
 - **Parser**: the resilient recursive-descent grammar over tokens. It
-  emits events, never builds the tree itself. (`kitty-parser`)
+  emits events, never builds the tree itself.
+  ([specs/grammar.md](../specs/grammar.md))
 - **Event**: what the parser emits: start node, token, finish node, or an
   error. (`kitty-parser`)
 - **Marker**: the parser's handle on an open node, completed with a kind
   or abandoned. (`kitty-parser`)
 - **Sink**: the pass that turns events into a syntax tree. (`kitty-parser`)
 - **Parse error**: a missing or unexpected token with the kinds expected
-  and where; collected, never thrown. (`kitty-parser`)
+  and where; collected, never thrown.
+  ([specs/grammar.md](../specs/grammar.md#contract))
 - **Recovery**: how the parser continues after an error so the rest of
-  the source still parses. (`kitty-parser`)
+  the source still parses.
+  ([specs/grammar.md](../specs/grammar.md#recovery))
+- **Attribute**: `@name(args)` on the line before a declaration: data
+  the host reads from the item, its arguments an ordinary call argument
+  list. The names are the host's, not the compiler's.
+  ([specs/grammar.md](../specs/grammar.md#attributes))
+- **Spread**: `...value` among a call's arguments: the fields of `value`
+  supplied as keyword arguments.
+  ([specs/grammar.md](../specs/grammar.md#calls-and-arguments))
+- **let with**: `let with value` followed by an indented list of names,
+  each bound to the field of that name on `value`: destructuring over
+  several lines. ([specs/grammar.md](../specs/grammar.md#let))
 
 ## Analysis
 

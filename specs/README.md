@@ -15,19 +15,20 @@ The contract:
   knowingly and record the call.
 - **One fact, one home.** A spec links to other specs, the glossary
   ([docs/context.md](../docs/context.md)) and decisions; it restates none
-  of them.
+  of them. An undecided point links to the design plan that holds it,
+  and says what the code does meanwhile.
 
-No spec is written yet. The first ones are cut when the language surface
-is settled by a grilling over the decisions in `decisions/`, the README's
-"Language" section and the sketches; the expected set, one per stage of
-the pipeline:
+One spec per stage of the pipeline. Each requirement names what holds it
+as (`test`, `path`), or says `review only`; a line starting **Gap:** marks
+where the code falls short of the spec today, the code being the defect.
 
 | Spec | Subject |
 | --- | --- |
-| `lexing.md` | Tokens, identifiers, literals, comments and metadata, the indenter |
-| `grammar.md` | The surface syntax and the tree it parses to, recovery |
+| [lexing.md](lexing.md) | Tokens, identifiers, literals, comments, the indenter |
+| [grammar.md](grammar.md) | The surface syntax and the tree it parses to, recovery |
 | `types.md` | The type system: primitives, structs, enums, traits, generics |
 | `analysis.md` | Name resolution, the item tree, HIR |
 | `evaluation.md` | Values, spans on values, the embedding surface |
 
-Read in that order once they exist.
+Read in that order. The last three are cut when their milestones are
+designed.

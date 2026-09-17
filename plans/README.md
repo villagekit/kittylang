@@ -19,7 +19,7 @@ tooling makes them visible.
    (`5c5f4b92`), `doing`, its slices: the `kitty` command (`f280931f`),
    the examples test (`942ff7a4`), then the playground (`45a1b9e9`).
 2. [M2: the parser](1cee599ce218-m2-the-parser.md) (`1cee599c`),
-   `doing`, its slices: the lexing and grammar specs (`0248a546`) first,
+   `doing`, its slices: the lexing and grammar specs (`0248a546`, done) first,
    then, each waiting on the specs and the examples test, the lexer
    (`9d84d1f9`), the parser never panics (`277624e4`), function return
    types (`466ffceb`), keyword arguments with `=` and spread
