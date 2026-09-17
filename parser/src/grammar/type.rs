@@ -4,8 +4,39 @@ use crate::{marker::CompletedMarker, parser::Parser, token_set::TokenSet};
 
 pub(crate) const TYPE_PATH_FIRST: [TokenKind; 2] = TYPE_REFERENCE_START;
 
-/// A qualified type
+/// A qualified type, in type position: a `.` is always an association.
+/// An expression calls `type_path_in_expression` instead.
 pub(crate) fn type_path(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
+    type_path_segments(p, recovery, TypePathEnd::Type)
+}
+
+/// A qualified type in expression position: the path ends before a `.`
+/// that no type identifier follows, so `N.default()` is the type `N`
+/// and then a field get the expression rule takes. A segment's kind is
+/// known from its spelling (decision f2708b12).
+pub(crate) fn type_path_in_expression(
+    p: &mut Parser,
+    recovery: TokenSet,
+) -> Option<CompletedMarker> {
+    type_path_segments(p, recovery, TypePathEnd::Expression)
+}
+
+/// What a type path does at a `.` that no type identifier follows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TypePathEnd {
+    /// The `.` is an association missing its type: an error.
+    Type,
+    /// The `.` is the expression's, a value segment: the path ends.
+    Expression,
+}
+
+/// The segment loop both entries share: generic arguments, projections
+/// and associations in any order, after the type name.
+fn type_path_segments(
+    p: &mut Parser,
+    recovery: TokenSet,
+    end: TypePathEnd,
+) -> Option<CompletedMarker> {
     let mut lhs = type_reference(p, recovery)?;
 
     loop {
@@ -14,6 +45,9 @@ pub(crate) fn type_path(p: &mut Parser, recovery: TokenSet) -> Option<CompletedM
         } else if p.at(TokenKind::DotBracketOpen) {
             lhs = type_projection(p, lhs, recovery);
         } else if p.at(TokenKind::Dot) {
+            if end == TypePathEnd::Expression && !p.lookahead_at(1, TokenKind::IdentifierType) {
+                break;
+            }
             lhs = type_association(p, lhs, recovery);
         } else {
             break;
@@ -565,6 +599,24 @@ mod tests {
                   IdentifierType@3..11 "Iterator"
                   Missing@11..11
                 error at 11: missing ‘]’"#]],
+        );
+    }
+
+    #[test]
+    fn type_association_with_a_value_name_is_an_error() {
+        // Unhappy path: in type position a `.` is always an association,
+        // so a value name after it is an error, not a field get as it is
+        // in an expression.
+        check_type_path(
+            "N.default",
+            expect![[r#"
+                TypeAssociation@0..9
+                  TypeReference@0..1
+                    IdentifierType@0..1 "N"
+                  Dot@1..2 "."
+                  Error@2..9
+                    IdentifierValue@2..9 "default"
+                error at 2..9: expected type-id, but found value-id"#]],
         );
     }
 

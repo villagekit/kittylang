@@ -413,12 +413,11 @@ mod tests {
                         Equal@117..118 "="
                         Whitespace@118..119 " "
                         ExpressionApply@119..130
-                          TypeAssociation@119..128
+                          ExpressionGet@119..128
                             TypeReference@119..120
                               IdentifierType@119..120 "N"
                             Dot@120..121 "."
-                            Error@121..128
-                              IdentifierValue@121..128 "default"
+                            IdentifierValue@121..128 "default"
                           FunctionArgList@128..130
                             ParenOpen@128..129 "("
                             ParenClose@129..130 ")"
@@ -437,12 +436,11 @@ mod tests {
                         Equal@144..145 "="
                         Whitespace@145..146 " "
                         ExpressionApply@146..157
-                          TypeAssociation@146..155
+                          ExpressionGet@146..155
                             TypeReference@146..147
                               IdentifierType@146..147 "N"
                             Dot@147..148 "."
-                            Error@148..155
-                              IdentifierValue@148..155 "default"
+                            IdentifierValue@148..155 "default"
                           FunctionArgList@155..157
                             ParenOpen@155..156 "("
                             ParenClose@156..157 ")"
@@ -461,12 +459,11 @@ mod tests {
                         Equal@171..172 "="
                         Whitespace@172..173 " "
                         ExpressionApply@173..184
-                          TypeAssociation@173..182
+                          ExpressionGet@173..182
                             TypeReference@173..174
                               IdentifierType@173..174 "N"
                             Dot@174..175 "."
-                            Error@175..182
-                              IdentifierValue@175..182 "default"
+                            IdentifierValue@175..182 "default"
                           FunctionArgList@182..184
                             ParenOpen@182..183 "("
                             ParenClose@183..184 ")"
@@ -643,9 +640,6 @@ mod tests {
                           Number@385..386 "0"
                       Newline@386..387 "\n"
                       Dedent@387..387 ""
-                error at 121..128: expected type-id, but found value-id
-                error at 148..155: expected type-id, but found value-id
-                error at 175..182: expected type-id, but found value-id
                 error at 275: missing ‘in’
                 error at 275: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
         );

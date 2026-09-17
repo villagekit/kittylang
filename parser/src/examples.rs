@@ -27,9 +27,6 @@ fn three_d_math_lists_its_parse_errors() {
     check_errors(
         include_str!("../../examples/3d-math.kitty"),
         expect![[r#"
-            error at 121..128: expected type-id, but found value-id
-            error at 148..155: expected type-id, but found value-id
-            error at 175..182: expected type-id, but found value-id
             error at 278: missing ‘in’
             error at 278: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’
         "#]],
@@ -47,13 +44,9 @@ fn three_d_object_lists_its_parse_errors() {
             error at 379..380: expected ‘=’, but found ‘.’
             error at 443..445: expected ‘=>’, but found indent
             error at 467..468: expected ‘=’, but found ‘:’
-            error at 485..492: expected type-id, but found value-id
             error at 509..510: expected ‘=’, but found ‘:’
-            error at 522..529: expected type-id, but found value-id
             error at 543..544: expected ‘=’, but found ‘:’
-            error at 553..560: expected type-id, but found value-id
             error at 564..564: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found dedent
-            error at 626..633: expected type-id, but found value-id
             error at 738..739: expected ‘=’, but found ‘:’
         "#]],
     );
@@ -230,7 +223,6 @@ fn chair_lists_its_parse_errors() {
             error at 932..933: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘(’
             error at 933..954: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found string
             error at 954..955: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found ‘)’
-            error at 1017..1024: expected type-id, but found value-id
             error at 1061..1061: expected ‘(’, ‘{’, indent, ‘.’, ‘*’, ‘/’, ‘rem’, ‘+’, ‘-’, ‘<’, ‘<=’, ‘>’, ‘>=’, ‘==’, ‘!=’, ‘and’, ‘xor’, ‘or’, ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found dedent
             error at 1125..1129: expected ‘=’, but found ‘self’
             error at 1153..1163: expected dedent, but found value-id

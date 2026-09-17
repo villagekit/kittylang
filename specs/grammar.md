@@ -22,6 +22,10 @@ and `let with`. This spec adds:
 - **Type path**: a type name with generic arguments, projections and
   associated-type segments: `Vector3[Length]`, `Self.Output`,
   `T.[Iterator]`.
+- **Field get**: a `.` and a name after an expression, the
+  `ExpressionGet` node: `v.x`.
+- **Value segment**: in an expression, the `.` and value name after a
+  type path, `N.default`, parsed as a field get on the path.
 
 ## Notation
 
@@ -323,7 +327,7 @@ UnaryOperator  = "+" | "-" | "not"
 Postfix        = Primary { Call | FieldGet }
 Call       = ArgList                                             (ExpressionApply)
 FieldGet   = "." ( "IdentifierValue" | "from" )                  (ExpressionGet)
-Primary    = Reference | TypePath [ "." "IdentifierValue" ] | Literal | Tuple | Block
+Primary    = Reference | TypePath | Literal | Tuple | Block
            | Lambda | Let | LetWith | If | Match
 Reference  = "IdentifierValue" | "self"                          (ExpressionReference)
 Literal    = "Number" | "String"                                 (ExpressionLiteral)
@@ -356,11 +360,27 @@ left-associative.
   `let` (`top_fn_with_indent`, `parser/src/grammar/declaration.rs`).
 - `True` and `False` must parse as type paths, not literals; there is
   no boolean literal node (`top_struct`, `parser/src/grammar/declaration.rs`).
-- In expression position, a type path may be followed by `.` and a
-  value identifier, which ends the type path and continues as an
-  expression: `N.default()`, `Self.regular()`, `Type.Assoc.value`
+- In expression position, a type path must end before a `.` that no
+  type identifier follows; the `.` and its value name are a value
+  segment, a field get on the type path, and the expression continues
+  as a call, a field or an operand: `N.default()`, `Self.regular()`,
+  `Type.Assoc.value`, `Vector3[Length].default()`. The name may be
+  `from`, so `Length.from(5)` reaches the `From` method
   ([f2708b12](../decisions/f2708b12e004-value-and-type-identifiers-are-separate.md))
-  (review only).
+  (`value_segment_after_a_type_path`, `value_segment_after_self_type`,
+  `type_segment_then_a_value_segment`, `value_segment_after_a_generic_type`,
+  `value_segment_named_from`, `parser/src/grammar/expression.rs`; a type
+  name after the `.` continues the path,
+  `two_type_segments_stay_a_type_path`, same file).
+- In type position a `.` is always an association, so `N.default` in a
+  type annotation or a pattern is an error
+  (`type_association_with_a_value_name_is_an_error`,
+  `parser/src/grammar/type.rs`).
+- A type path with a `.` and nothing after it must end before the `.`,
+  and the field get reports its missing name; the message offers the
+  value names only, though a type identifier is also legal there
+  (`type_path_with_a_dot_and_nothing_after_it_recovers`,
+  `parser/src/grammar/expression.rs`).
 - `<` and `>` are comparison operators only; there is no angle-bracket
   form ([ec7345d9](../decisions/ec7345d92813-brackets-generics-tuples-lists-and-indexing.md))
   (review only).
@@ -368,9 +388,6 @@ left-associative.
   indexing is a call, `list(i)`
   ([ec7345d9](../decisions/ec7345d92813-brackets-generics-tuples-lists-and-indexing.md))
   (review only).
-
-Gap: the parser takes only type segments after a type path in an
-expression.
 
 ## Calls and arguments
 

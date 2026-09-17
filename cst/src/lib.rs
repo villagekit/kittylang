@@ -179,6 +179,9 @@ impl ExpressionBinary {
     }
 }
 define_node!(ExpressionGet);
+// Note(cc): the lhs of an `ExpressionApply` or an `ExpressionGet` may be a
+// type path (`N.default()`, `Parts { ... }`), which this compound does not
+// include; the analysis (M3) decides the view it needs.
 define_compound_node!(
     Expression,
     kinds: [

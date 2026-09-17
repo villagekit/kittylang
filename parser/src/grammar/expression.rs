@@ -3,7 +3,7 @@ use kitty_syntax::{NodeKind, TokenKind};
 use super::{
     function::{function_arg_list, function_declaration, FunctionForm, FUNCTION_ARG_LIST_FIRST},
     pattern::pattern,
-    r#type::{type_annotation, type_path, TYPE_PATH_FIRST},
+    r#type::{type_annotation, type_path_in_expression, TYPE_PATH_FIRST},
     NAME_FIRST,
 };
 use crate::{marker::CompletedMarker, token_set::TokenSet, Parser};
@@ -132,7 +132,7 @@ fn expression_primary(
     let cm = if p.at_set(EXPRESSION_REFERENCE_FIRST) {
         expression_reference(p)
     } else if p.at_set(TYPE_PATH_FIRST) {
-        type_path(p, recovery)?
+        type_path_in_expression(p, recovery)?
     } else if p.at_set(LITERAL_FIRST) {
         expression_literal(p)
     } else if p.at(TokenKind::ParenOpen) {
@@ -800,6 +800,152 @@ mod tests {
                   Dot@3..4 "."
                   Missing@4..4
                 error at 4: missing value-id or ‘from’"#]],
+        );
+    }
+
+    #[test]
+    fn value_segment_after_a_type_path() {
+        // `N.default()`: the type path ends at `N`, and `.default` is a
+        // field get on it, so the call reaches the associated function.
+        check(
+            "N.default()",
+            expect![[r#"
+                ExpressionApply@0..11
+                  ExpressionGet@0..9
+                    TypeReference@0..1
+                      IdentifierType@0..1 "N"
+                    Dot@1..2 "."
+                    IdentifierValue@2..9 "default"
+                  FunctionArgList@9..11
+                    ParenOpen@9..10 "("
+                    ParenClose@10..11 ")""#]],
+        );
+    }
+
+    #[test]
+    fn value_segment_after_self_type() {
+        // `Self` starts a type path as a type name does.
+        check(
+            "Self.regular()",
+            expect![[r#"
+                ExpressionApply@0..14
+                  ExpressionGet@0..12
+                    TypeReference@0..4
+                      SelfUpper@0..4 "Self"
+                    Dot@4..5 "."
+                    IdentifierValue@5..12 "regular"
+                  FunctionArgList@12..14
+                    ParenOpen@12..13 "("
+                    ParenClose@13..14 ")""#]],
+        );
+    }
+
+    #[test]
+    fn value_segment_named_from() {
+        // `from` is a keyword, and a value segment after a type path, as
+        // it is a field name, so `Length.from(5)` reaches the `From`
+        // method.
+        check(
+            "Length.from(5)",
+            expect![[r#"
+                ExpressionApply@0..14
+                  ExpressionGet@0..11
+                    TypeReference@0..6
+                      IdentifierType@0..6 "Length"
+                    Dot@6..7 "."
+                    From@7..11 "from"
+                  FunctionArgList@11..14
+                    ParenOpen@11..12 "("
+                    FunctionArgPositional@12..13
+                      ExpressionLiteral@12..13
+                        Number@12..13 "5"
+                    ParenClose@13..14 ")""#]],
+        );
+    }
+
+    #[test]
+    fn value_segment_after_a_generic_type() {
+        // The path may end in a generic argument list before the value
+        // segment, as `3d-object.kitty` writes it.
+        check(
+            "Vector3[Length].default()",
+            expect![[r#"
+                ExpressionApply@0..25
+                  ExpressionGet@0..23
+                    TypeGeneric@0..15
+                      TypeReference@0..7
+                        IdentifierType@0..7 "Vector3"
+                      GenericArgList@7..15
+                        BracketOpen@7..8 "["
+                        GenericArgPositional@8..14
+                          TypeReference@8..14
+                            IdentifierType@8..14 "Length"
+                        BracketClose@14..15 "]"
+                    Dot@15..16 "."
+                    IdentifierValue@16..23 "default"
+                  FunctionArgList@23..25
+                    ParenOpen@23..24 "("
+                    ParenClose@24..25 ")""#]],
+        );
+    }
+
+    #[test]
+    fn type_segment_then_a_value_segment() {
+        // `Type.Assoc` is the type path; `.value` ends it.
+        check(
+            "Type.Assoc.value",
+            expect![[r#"
+                ExpressionGet@0..16
+                  TypeAssociation@0..10
+                    TypeReference@0..4
+                      IdentifierType@0..4 "Type"
+                    Dot@4..5 "."
+                    IdentifierType@5..10 "Assoc"
+                  Dot@10..11 "."
+                  IdentifierValue@11..16 "value""#]],
+        );
+    }
+
+    #[test]
+    fn two_type_segments_stay_a_type_path() {
+        // `GridBeam.Z` is one type path: a type name after `.` continues
+        // it, so the call applies the path.
+        check(
+            "GridBeam.Z(x = 0)",
+            expect![[r#"
+                ExpressionApply@0..17
+                  TypeAssociation@0..10
+                    TypeReference@0..8
+                      IdentifierType@0..8 "GridBeam"
+                    Dot@8..9 "."
+                    IdentifierType@9..10 "Z"
+                  FunctionArgList@10..17
+                    ParenOpen@10..11 "("
+                    FunctionArgLabelled@11..16
+                      FunctionParamLabel@11..12
+                        IdentifierValue@11..12 "x"
+                      Whitespace@12..13 " "
+                      Equal@13..14 "="
+                      Whitespace@14..15 " "
+                      ExpressionLiteral@15..16
+                        Number@15..16 "0"
+                    ParenClose@16..17 ")""#]],
+        );
+    }
+
+    #[test]
+    fn type_path_with_a_dot_and_nothing_after_it_recovers() {
+        // Unhappy path: the `.` may be a value or a type segment; the
+        // expression rule takes it and reports the value segment.
+        check(
+            "N.",
+            expect![[r#"
+                ExpressionGet@0..2
+                  TypeReference@0..1
+                    IdentifierType@0..1 "N"
+                  Dot@1..2 "."
+                  Missing@2..2
+                error at 2: missing value-id or ‘from’"#]],
         );
     }
 
