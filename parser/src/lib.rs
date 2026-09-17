@@ -1,4 +1,6 @@
 mod error;
+#[cfg(test)]
+mod examples;
 mod grammar;
 mod marker;
 mod parser;
