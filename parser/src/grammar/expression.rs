@@ -4,6 +4,7 @@ use super::{
     function::{function_arg_list, function_declaration, FunctionForm, FUNCTION_ARG_LIST_FIRST},
     pattern::pattern,
     r#type::{type_annotation, type_path, TYPE_PATH_FIRST},
+    NAME_FIRST,
 };
 use crate::{marker::CompletedMarker, token_set::TokenSet, Parser};
 
@@ -112,7 +113,6 @@ pub(crate) const EXPRESSION_FIRST: TokenSet = TokenSet::new([
     TokenKind::SelfLower,
     TokenKind::IdentifierType,
     TokenKind::SelfUpper,
-    TokenKind::Boolean,
     TokenKind::Number,
     TokenKind::String,
     TokenKind::ParenOpen,
@@ -167,7 +167,7 @@ fn expression_reference(p: &mut Parser) -> CompletedMarker {
     p.mark_kind(NodeKind::ExpressionReference)
 }
 
-const LITERAL_FIRST: [TokenKind; 3] = [TokenKind::Boolean, TokenKind::Number, TokenKind::String];
+const LITERAL_FIRST: [TokenKind; 2] = [TokenKind::Number, TokenKind::String];
 
 fn expression_literal(p: &mut Parser) -> CompletedMarker {
     // `expression_primary` dispatches here on a literal.
@@ -191,7 +191,11 @@ fn expression_get(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> C
     debug_assert_eq!(p.peek(), Some(TokenKind::Dot));
     let m = lhs.precede(p);
     p.bump(); // Consume '.'.
-    p.expect(TokenKind::IdentifierValue, recovery);
+    if p.at_set(NAME_FIRST) {
+        p.bump();
+    } else {
+        p.error(recovery);
+    }
     m.complete(p, NodeKind::ExpressionGet)
 }
 
@@ -364,10 +368,10 @@ mod tests {
         check(
             "-",
             expect![[r#"
-            ExpressionUnary@0..1
-              Minus@0..1 "-"
-              Missing@1..1
-            error at 1: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
+                ExpressionUnary@0..1
+                  Minus@0..1 "-"
+                  Missing@1..1
+                error at 1: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
         );
     }
 
@@ -649,7 +653,7 @@ mod tests {
                     Plus@2..3 "+"
                     Missing@3..3
                   Missing@3..3
-                error at 3: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’
+                error at 3: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’
                 error at 3: missing ‘)’"#]],
         );
     }
@@ -764,8 +768,23 @@ mod tests {
                     FunctionArgPositional@4..4
                       Missing@4..4
                     Missing@4..4
-                error at 4: missing ‘)’, value-id, ‘self’, ‘...’, ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’
+                error at 4: missing ‘)’, value-id, ‘self’, ‘...’, ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’
                 error at 4: missing ‘)’"#]],
+        );
+    }
+
+    #[test]
+    fn get_expression_named_from() {
+        // `from` is a keyword, and a field name after `.`, as it is a
+        // function name.
+        check(
+            "converter.from",
+            expect![[r#"
+                ExpressionGet@0..14
+                  ExpressionReference@0..9
+                    IdentifierValue@0..9 "converter"
+                  Dot@9..10 "."
+                  From@10..14 "from""#]],
         );
     }
 
@@ -780,7 +799,7 @@ mod tests {
                     IdentifierValue@0..3 "foo"
                   Dot@3..4 "."
                   Missing@4..4
-                error at 4: missing value-id"#]],
+                error at 4: missing value-id or ‘from’"#]],
         );
     }
 
@@ -803,7 +822,7 @@ mod tests {
                   Whitespace@10..11 " "
                   ExpressionLiteral@11..12
                     Number@11..12 "2"
-                error at 4: missing value-id, _, boolean, number, string, ‘(’, type-id, or ‘Self’"#]],
+                error at 4: missing value-id, _, number, string, ‘(’, type-id, or ‘Self’"#]],
         );
     }
 
@@ -829,9 +848,9 @@ mod tests {
                     Number@11..12 "2"
                   Missing@12..12
                 error at 6..7: expected ‘=’, but found number
-                error at 8..10: expected ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’, but found ‘in’
+                error at 8..10: expected ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’, but found ‘in’
                 error at 11..12: expected ‘in’, but found number
-                error at 12: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
+                error at 12: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
         );
     }
 
@@ -855,9 +874,9 @@ mod tests {
                   Error@12..13
                     Number@12..13 "2"
                   Missing@13..13
-                error at 9..11: expected ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’, but found ‘in’
+                error at 9..11: expected ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’, but found ‘in’
                 error at 12..13: expected ‘in’, but found number
-                error at 13: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
+                error at 13: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
         );
     }
 
@@ -882,7 +901,7 @@ mod tests {
                     Number@10..11 "2"
                   Missing@11..11
                 error at 10..11: expected ‘in’, but found number
-                error at 11: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
+                error at 11: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
         );
     }
 
@@ -905,7 +924,7 @@ mod tests {
                   Whitespace@14..15 " "
                   ExpressionLiteral@15..16
                     Number@15..16 "2"
-                error at 3: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
+                error at 3: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
         );
     }
 
@@ -923,7 +942,7 @@ mod tests {
                   Whitespace@4..5 " "
                   Then@5..9 "then"
                   Missing@9..9
-                error at 9: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
+                error at 9: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
         );
     }
 
@@ -945,7 +964,7 @@ mod tests {
                     FunctionArgPositional@6..6
                       Missing@6..6
                     ParenClose@6..7 ")"
-                error at 6: missing value-id, ‘self’, ‘...’, ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
+                error at 6: missing value-id, ‘self’, ‘...’, ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
         );
     }
 
@@ -984,7 +1003,7 @@ mod tests {
                   Whitespace@12..13 " "
                   ExpressionLiteral@13..14
                     Number@13..14 "2"
-                error at 6: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
+                error at 6: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
         );
     }
 
@@ -1381,7 +1400,7 @@ mod tests {
                       Whitespace@5..6 " "
                       Missing@6..6
                     ParenClose@6..7 ")"
-                error at 6: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
+                error at 6: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
         );
     }
 

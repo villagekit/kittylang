@@ -119,6 +119,7 @@ define_node!(Missing);
 // Module
 define_node!(Module);
 define_node!(ModuleImport);
+define_node!(ImportVersion);
 define_node!(ImportAliasValue);
 define_node!(ImportAliasType);
 define_compound_node!(ImportAlias, kinds: [ImportAliasValue, ImportAliasType]);
@@ -135,7 +136,6 @@ impl Module {
 // Expression
 define_node!(ExpressionReference);
 define_node!(ExpressionLiteral);
-define_node!(LiteralBoolean);
 define_node!(LiteralNumber);
 define_node!(LiteralString);
 define_node!(ExpressionBlock);
@@ -260,10 +260,8 @@ define_token!(IdentifierValue);
 define_token!(IdentifierType);
 
 // Literal
-define_token!(Boolean);
 define_token!(Number);
 define_token!(String);
-define_compound_token!(Literal, kinds: [Boolean, Number, String]);
 
 // Operator
 define_token!(Plus);

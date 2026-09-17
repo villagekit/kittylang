@@ -29,7 +29,15 @@ Token, token kind and indenter are defined in the glossary
   indentation, as the [indenter](#the-indenter) section says, so the parser
   sees blocks, not whitespace (`lex_indent`, `lexer/src/lib.rs`).
 - Every other token must correspond to one match of one spelling in the
-  [tokens](#tokens) table (review only).
+  [tokens](#tokens) table (review only). `@` and `#` are matched by a
+  callback that reads on by hand: `logos` never backtracks, so a package
+  pattern that fails after `@label` could not fall back to `@`; and it
+  takes the longest match, so beside a line pattern `#= x =# y` on one
+  line would be one comment to the end of the line, not one that ends at
+  its `=#` (`at_or_package`, `comment`, `lexer/src/token.rs`;
+  `lex_at_before_attribute_name`, `lex_comment_multi_line`,
+  `lexer/src/lib.rs`; the rules are `logos`'s, see
+  [references](#references)).
 - `kitty_lexer::Tokens` must print the stream one token per line as
   `Kind@start..end`, the form the snapshot tests and the kitty command
   share (`lex_example_basic`, `lexer/src/lib.rs`).
@@ -47,14 +55,14 @@ Token, token kind and indenter are defined in the glossary
 | --- | --- | --- |
 | `Whitespace` | one or more of space, tab, form feed | (`lex_whitespace`, `lexer/src/token.rs`) |
 | `Newline` | `\n` or `\r\n` | (`lex_newline_crlf`, `lexer/src/token.rs`) |
-| `Comment` | `#` to the end of the line; or `#=` to the first following `=#`, newlines included | (`lex_comment`, `lexer/src/token.rs`) for the first; review only for the second |
+| `Comment` | `#` to the end of the line; or `#=` to the first following `=#`, newlines included | (`lex_comment`, `lexer/src/token.rs`; `lex_comment_multi_line`, `lexer/src/lib.rs`) |
 | `Indent`, `Dedent` | emitted by the indenter, never matched | (`lex_indent`, `lexer/src/lib.rs`) |
 | `String` | `"` to `"`, with the escapes `\"`, `\n`, `\t`, `\u` | (`lex_string`, `lexer/src/token.rs`) |
 | `Number` | `0` or an integer with no leading zero, then an optional `.` fraction, then an optional `e` or `E` exponent with an optional sign | (`lex_number`, `lexer/src/token.rs`) |
 | `IdentifierValue` | leading underscores, then lowercase letters, then `_`-separated runs of lowercase letters and digits: `seat_width` | (`lex_identifier_value`, `lexer/src/token.rs`) |
 | `IdentifierType` | leading underscores, then an uppercase letter and lowercase letters or digits, repeated: `GridBeam`, `Vector3` | (`lex_identifier_type`, `lexer/src/token.rs`) |
-| `Package` | `@`, a name, `/`, a name, each name one or more of letters, digits and `-`: `@std/math`, `@villagekit/smart-fasteners` | review only |
-| `At` | `@` not opening a package | review only |
+| `Package` | `@`, a name, `/`, a name, each name one or more of letters, digits and `-`: `@std/math`, `@villagekit/smart-fasteners` | (`lex_package`, `lexer/src/lib.rs`) |
+| `At` | `@` not opening a package | (`lex_at_before_attribute_name`, `lexer/src/lib.rs`) |
 | `ParenOpen`, `ParenClose` | `(`, `)` | (`lex_left_parenthesis`, `lexer/src/token.rs`) |
 | `BraceOpen`, `BraceClose` | `{`, `}` | (`lex_left_brace`, `lexer/src/token.rs`) |
 | `BracketOpen`, `BracketClose` | `[`, `]` | (`lex_left_bracket`, `lexer/src/token.rs`) |
@@ -69,7 +77,7 @@ Token, token kind and indenter are defined in the glossary
 | `Plus`, `Minus`, `Multiply`, `Divide` | `+`, `-`, `*`, `/` | (`lex_plus`, `lexer/src/token.rs`) |
 | `GreaterEqual`, `Greater`, `LessEqual`, `Less` | `>=`, `>`, `<=`, `<` | (`lex_greater_equal`, `lexer/src/token.rs`) |
 | `EqualEqual`, `NotEqual`, `Equal` | `==`, `!=`, `=` | (`lex_equal_equal`, `lexer/src/token.rs`) |
-| `Error` | any byte no other spelling matches | review only |
+| `Error` | any byte no other spelling matches; or `#=` with no `=#` after it, to the end of the input | review only for the first; (`lex_comment_multi_line_unterminated`, `lexer/src/lib.rs`) for the second |
 
 Keywords, one kind each, spelled as written: `fn`, `Fn`, `let`, `in`,
 `with`, `if`, `then`, `else`, `match`, `case`, `self`, `Self`, `type`,
@@ -80,11 +88,7 @@ Keywords, one kind each, spelled as written: `fn`, `Fn`, `let`, `in`,
 The kinds are the `TokenKind` enum in `lexer/src/token.rs`; a kind absent
 from this table is a defect in one of the two.
 
-Gap: the code's `Package` spelling ends after one character of the second
-name, so `@std/math` lexes as `@std/m` then `ath`. The code has no `At`
-kind, no `with` keyword and no multi-line comment. The code has a `Boolean`
-kind matching `True` and `False`, which this spec does not have (see
-[identifiers](#identifiers)).
+Gap: the code has no `with` keyword.
 
 ## Identifiers
 
@@ -93,7 +97,8 @@ kind matching `True` and `False`, which this spec does not have (see
   ([f2708b12](../decisions/f2708b12e004-value-and-type-identifiers-are-separate.md);
   `lex_identifier_value`, `lex_identifier_type`, `lexer/src/token.rs`).
 - `True` and `False` must lex as type identifiers: they are variants of
-  the `Boolean` enum and no keyword (review only).
+  the `Boolean` enum and no keyword (`lex_true_as_type_identifier`,
+  `lex_false_as_type_identifier`, `lexer/src/token.rs`).
 - `Self` and `self` must lex as keywords, not identifiers
   (`lex_example_3d_math`, `lexer/src/lib.rs`).
 - `from` must lex as a keyword; the grammar accepts it where a function
@@ -112,14 +117,14 @@ kind matching `True` and `False`, which this spec does not have (see
 
 ## Packages and versions
 
-- A package name must lex as one `Package` token, `@` included (review
-  only).
+- A package name must lex as one `Package` token, `@` included
+  (`lex_package`, `lexer/src/lib.rs`).
 - A version suffix on an import, `@std/assembly:1`, must lex as `Colon`
   then `Number` after the package; the import rule owns it
-  ([grammar](grammar.md#module)) (review only).
+  ([grammar](grammar.md#module)) (`lex_package`, `lexer/src/lib.rs`).
 - An `@` that does not open a package must lex as `At`, the attribute
   marker ([03212e99](../decisions/03212e993893-attributes-replace-metadata-comments.md))
-  (review only).
+  (`lex_at_before_attribute_name`, `lexer/src/lib.rs`).
 
 ## Comments
 
@@ -127,7 +132,7 @@ kind matching `True` and `False`, which this spec does not have (see
   ([cb55e71a](../decisions/cb55e71a221a-comment-and-metadata-syntax.md),
   comment syntax; `lex_comment`, `lexer/src/token.rs`).
 - `#=` must open a comment that ends at the first following `=#`, lines
-  between included (review only).
+  between included (`lex_comment_multi_line`, `lexer/src/lib.rs`).
 - A comment is trivia: the lexer must yield it as a token
   (`lex_comment`, `lexer/src/token.rs`).
 - The parser must skip a comment
@@ -135,9 +140,10 @@ kind matching `True` and `False`, which this spec does not have (see
   `parser/src/grammar/expression.rs`).
 - The compiler reads no comment: `#{` and `#={` open ordinary comments
   ([03212e99](../decisions/03212e993893-attributes-replace-metadata-comments.md))
-  (review only).
+  (`lex_metadata_shapes_as_plain_comments`, `lexer/src/lib.rs`).
 - A newline inside a multi-line comment belongs to the comment token, so
-  the indenter does not see it (review only).
+  the indenter does not see it (`lex_comment_multi_line`,
+  `lexer/src/lib.rs`).
 
 ## The indenter
 
@@ -202,6 +208,9 @@ the tokens after `fn foo()` are `Newline`, `Indent` (the two spaces),
 - If a match attempt fails, then the lexer must yield one `Error` token
   for the bytes that attempt consumed and resume after them, so a run of
   unmatched bytes yields one `Error` token per attempt (review only).
+- If a `#=` has no `=#` after it, then the lexer must yield one `Error`
+  token from the `#` to the end of the input
+  (`lex_comment_multi_line_unterminated`, `lexer/src/lib.rs`).
 - The lexer reports nothing else. Unbalanced indentation, an unterminated
   string and an unterminated multi-line comment are the parser's to report
   from the tokens it receives (review only).
@@ -224,5 +233,8 @@ the tokens after `fn foo()` are `Newline`, `Indent` (the two spaces),
 - `logos` 0.15.0 matches the spellings. Its disambiguation rule is the
   crate's `book/src/token-disambiguation.md`; the arithmetic that holds
   is `Mir::priority` in `logos-codegen-0.15.0/src/mir.rs`, which counts
-  a class as the book's prose does not. Both are read in the cargo
-  registry.
+  a class as the book's prose does not. That it never backtracks is
+  `book/src/common-regex.md`; a callback may return the token kind
+  itself, `logos-0.15.0/src/internal.rs` (`CallbackResult for T`), and
+  extend the token with `Lexer::bump`, `src/lexer.rs`. All are read in
+  the cargo registry.

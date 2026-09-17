@@ -398,23 +398,23 @@ mod tests {
         check(
             "fn (x) => x",
             expect![[r#"
-            DeclarationFunction@0..11
-              Fn@0..2 "fn"
-              Whitespace@2..3 " "
-              Missing@3..3
-              FunctionParamList@3..6
-                ParenOpen@3..4 "("
-                FunctionParam@4..5
-                  FunctionParamLabel@4..5
-                    IdentifierValue@4..5 "x"
-                ParenClose@5..6 ")"
-              Whitespace@6..7 " "
-              FatArrow@7..9 "=>"
-              Whitespace@9..10 " "
-              FunctionBody@10..11
-                ExpressionReference@10..11
-                  IdentifierValue@10..11 "x"
-            error at 3: missing value-id"#]],
+                DeclarationFunction@0..11
+                  Fn@0..2 "fn"
+                  Whitespace@2..3 " "
+                  Missing@3..3
+                  FunctionParamList@3..6
+                    ParenOpen@3..4 "("
+                    FunctionParam@4..5
+                      FunctionParamLabel@4..5
+                        IdentifierValue@4..5 "x"
+                    ParenClose@5..6 ")"
+                  Whitespace@6..7 " "
+                  FatArrow@7..9 "=>"
+                  Whitespace@9..10 " "
+                  FunctionBody@10..11
+                    ExpressionReference@10..11
+                      IdentifierValue@10..11 "x"
+                error at 3: missing value-id or ‘from’"#]],
         );
     }
 
@@ -551,6 +551,31 @@ mod tests {
                     IdentifierType@41..45 "None"
                   Newline@45..46 "\n"
                   Dedent@46..46 """#]],
+        );
+    }
+
+    #[test]
+    fn fn_named_from() {
+        // `from` is a keyword, and a function name: `impl From` needs it.
+        check(
+            "fn from(value) => value",
+            expect![[r#"
+                DeclarationFunction@0..23
+                  Fn@0..2 "fn"
+                  Whitespace@2..3 " "
+                  From@3..7 "from"
+                  FunctionParamList@7..14
+                    ParenOpen@7..8 "("
+                    FunctionParam@8..13
+                      FunctionParamLabel@8..13
+                        IdentifierValue@8..13 "value"
+                    ParenClose@13..14 ")"
+                  Whitespace@14..15 " "
+                  FatArrow@15..17 "=>"
+                  Whitespace@17..18 " "
+                  FunctionBody@18..23
+                    ExpressionReference@18..23
+                      IdentifierValue@18..23 "value""#]],
         );
     }
 
@@ -841,8 +866,8 @@ mod tests {
                     Whitespace@83..84 " "
                     Equal@84..85 "="
                     Whitespace@85..86 " "
-                    ExpressionLiteral@86..90
-                      Boolean@86..90 "True"
+                    TypeReference@86..90
+                      IdentifierType@86..90 "True"
                   Newline@90..91 "\n"
                   Dedent@91..91 """#]],
         );
@@ -1157,7 +1182,7 @@ mod tests {
                 error at 40: missing ‘)’, value-id, or ‘self’
                 error at 40: missing ‘)’
                 error at 40: missing ‘=>’
-                error at 40: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
+                error at 40: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
         );
     }
 

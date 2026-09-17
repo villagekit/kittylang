@@ -1,4 +1,4 @@
-use logos::{Logos, Span};
+use logos::{Lexer, Logos, Span};
 use std::fmt;
 use text_size::TextRange;
 
@@ -35,8 +35,6 @@ pub enum TokenKind {
     Indent,
     Dedent,
 
-    #[regex("(True|False)")]
-    Boolean,
     #[regex(r#""([^"\\]|\\t|\\u|\\n|\\")*""#)]
     String,
     #[regex(r"(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?")]
@@ -47,7 +45,9 @@ pub enum TokenKind {
     #[regex(r"_*(?:[A-Z][a-z0-9]*)(?:[A-Z]+[a-z0-9]*)*")]
     IdentifierType,
 
-    #[regex(r"@[a-zA-Z0-9-]+\/[a-zA-Z0-9-]")]
+    #[token("@", at_or_package)]
+    At,
+    /// Produced by `at_or_package` when a package path follows the `@`.
     Package,
 
     #[token("(")]
@@ -63,7 +63,7 @@ pub enum TokenKind {
     #[token("]")]
     BracketClose,
 
-    #[regex("#.*")]
+    #[token("#", comment)]
     Comment,
 
     #[token("fn")]
@@ -183,12 +183,12 @@ impl fmt::Display for TokenKind {
             Self::Newline => "newline",
             Self::Indent => "indent",
             Self::Dedent => "dedent",
-            Self::Boolean => "boolean",
             Self::String => "string",
             Self::Number => "number",
             Self::IdentifierValue => "value-id",
             Self::IdentifierType => "type-id",
             Self::Package => "package",
+            Self::At => "‘@’",
             Self::ParenOpen => "‘(’",
             Self::ParenClose => "‘)’",
             Self::BraceOpen => "‘{’",
@@ -248,6 +248,62 @@ impl fmt::Display for TokenKind {
     }
 }
 
+/// `@` opens a package name when a name, `/` and a name follow it, each
+/// name one or more letters, digits or `-`: the whole path is one
+/// `Package` token. Any other `@` is `At`, the attribute marker.
+///
+/// A callback, because `logos` never backtracks: a `Package` pattern that
+/// fails after `@label` cannot fall back to `@` alone.
+fn at_or_package(lex: &mut Lexer<TokenKind>) -> TokenKind {
+    debug_assert_eq!(lex.slice(), "@");
+    let rest = lex.remainder();
+    let first = name_len(rest);
+    if first == 0 || rest.as_bytes().get(first) != Some(&b'/') {
+        return TokenKind::At;
+    }
+    let second = name_len(&rest[first + 1..]);
+    if second == 0 {
+        return TokenKind::At;
+    }
+    lex.bump(first + 1 + second);
+    TokenKind::Package
+}
+
+fn name_len(text: &str) -> usize {
+    text.bytes()
+        .take_while(|byte| byte.is_ascii_alphanumeric() || *byte == b'-')
+        .count()
+}
+
+/// `#=` opens a comment that ends at the first `=#` after it, newlines
+/// included. Any other `#` opens a comment that ends at the end of the
+/// line. A `#=` with no `=#` after it is an `Error` token to the end of
+/// the input, so the parser reports it.
+///
+/// A callback, because `logos` takes the longest match: beside a line
+/// pattern, `#= x =# y` on one line would be one comment to the end of
+/// the line, `y` included, not a comment that ends at its `=#`.
+fn comment(lex: &mut Lexer<TokenKind>) -> TokenKind {
+    debug_assert_eq!(lex.slice(), "#");
+    let rest = lex.remainder();
+    if let Some(body) = rest.strip_prefix('=') {
+        match body.find("=#") {
+            Some(end) => {
+                lex.bump(1 + end + 2);
+                TokenKind::Comment
+            }
+            None => {
+                lex.bump(rest.len());
+                TokenKind::Error
+            }
+        }
+    } else {
+        let end = rest.find('\n').unwrap_or(rest.len());
+        lex.bump(end);
+        TokenKind::Comment
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -281,13 +337,13 @@ mod tests {
     // Indent and Dedent are handled manually by the indenter wrapper.
 
     #[test]
-    fn lex_boolean_true() {
-        check_token("True", TokenKind::Boolean);
+    fn lex_true_as_type_identifier() {
+        check_token("True", TokenKind::IdentifierType);
     }
 
     #[test]
-    fn lex_boolean_false() {
-        check_token("False", TokenKind::Boolean);
+    fn lex_false_as_type_identifier() {
+        check_token("False", TokenKind::IdentifierType);
     }
 
     #[test]

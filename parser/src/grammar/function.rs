@@ -3,6 +3,7 @@ use kitty_syntax::{NodeKind, TokenKind};
 use super::{
     expression::{expression, EXPRESSION_FIRST},
     r#type::{generic_param_list, generic_where_clause, type_annotation},
+    NAME_FIRST,
 };
 use crate::{marker::CompletedMarker, parser::Parser, token_set::TokenSet};
 
@@ -45,13 +46,12 @@ pub(crate) fn function_declaration(
     debug_assert_eq!(p.peek(), Some(TokenKind::Fn));
     let m = p.start();
     p.bump(); // Consume 'fn'
-    if form.requires_name() || p.at(TokenKind::IdentifierValue) {
+    if p.at_set(NAME_FIRST) {
+        p.bump();
+    } else if form.requires_name() {
         // A name left out is missing, not an error that eats the `(`
         // after it.
-        p.expect(
-            TokenKind::IdentifierValue,
-            recovery.union([TokenKind::BracketOpen, TokenKind::ParenOpen]),
-        );
+        p.error(recovery.union([TokenKind::BracketOpen, TokenKind::ParenOpen]));
     }
     if p.at(TokenKind::BracketOpen) {
         generic_param_list(p, recovery);

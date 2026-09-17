@@ -176,6 +176,62 @@ foo()
     }
 
     #[test]
+    fn lex_package() {
+        use TokenKind::*;
+        check_tokens("@std/math", vec![(Package, 0..9)]);
+        check_tokens(
+            "@villagekit/smart-fasteners:1",
+            vec![(Package, 0..27), (Colon, 27..28), (Number, 28..29)],
+        );
+    }
+
+    #[test]
+    fn lex_at_before_attribute_name() {
+        use TokenKind::*;
+        check_tokens(
+            "@label(\"Seat width\")",
+            vec![
+                (At, 0..1),
+                (IdentifierValue, 1..6),
+                (ParenOpen, 6..7),
+                (String, 7..19),
+                (ParenClose, 19..20),
+            ],
+        );
+    }
+
+    #[test]
+    fn lex_comment_multi_line() {
+        use TokenKind::*;
+        check_tokens(
+            "#= a\n b =#\nfoo",
+            vec![
+                (Comment, 0..10),
+                (Newline, 10..11),
+                (IdentifierValue, 11..14),
+            ],
+        );
+        check_tokens("#==#\n", vec![(Comment, 0..4), (Newline, 4..5)]);
+        check_tokens(
+            "#= x =# y",
+            vec![(Comment, 0..7), (Whitespace, 7..8), (IdentifierValue, 8..9)],
+        );
+    }
+
+    #[test]
+    fn lex_metadata_shapes_as_plain_comments() {
+        use TokenKind::*;
+        check_tokens("#{ x }", vec![(Comment, 0..6)]);
+        check_tokens("#={ x }=#", vec![(Comment, 0..9)]);
+    }
+
+    #[test]
+    fn lex_comment_multi_line_unterminated() {
+        use TokenKind::*;
+        check_tokens("#= a\nfoo", vec![(Error, 0..8)]);
+    }
+
+    #[test]
     fn lex_example_basic() {
         check(
             indoc! {"
@@ -315,8 +371,7 @@ foo()
                 Whitespace@11..12
                 From@12..16
                 Whitespace@16..17
-                Package@17..23
-                IdentifierValue@23..26
+                Package@17..26
                 Newline@26..27
                 Newline@27..28
                 Export@28..34

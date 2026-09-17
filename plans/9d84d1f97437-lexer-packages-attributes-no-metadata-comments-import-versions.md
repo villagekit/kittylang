@@ -1,6 +1,6 @@
 ---
 title: "Lexer: packages, attributes, no metadata comments, import versions"
-status: todo
+status: done
 parent: 1cee599ce218
 blocked_by:
   - 0248a546fe20
@@ -66,5 +66,49 @@ examples test.
 - `timeout 600 just check` is green
 
 ## Outcome
+
+Shipped. `@std/math` lexes as one `Package` token; `@label` as `At` then
+a value identifier; `True` and `False` as type identifiers, the
+`Boolean` kind gone from the lexer, `LiteralBoolean` from `kitty-syntax`
+and the `Boolean` and `Literal` views from `kitty-cst`; `#= ... =#` is a
+comment; `import Assembly from @std/assembly:1` keeps an `ImportVersion`
+node in both import forms; `fn from(value)` parses, and so does
+`value.from`. The examples test lost every import-line error, the plan's
+line-1 ones and the rest, and both `from` errors in `units.kitty`; `chair.kitty`'s attributes now fail as
+`‘@’` then `value-id`, ready for [[328c0a9906fb]].
+
+Deviations:
+
+- `Package` and `Comment` are `logos` callbacks on `@` and `#`, not
+  regexes: `logos` never backtracks (0.15.0,
+  `book/src/common-regex.md`), so a `Package` pattern that fails after
+  `@label` cannot fall back to `@`, and `#.*` beside `#= ... =#` cannot
+  share the `#`. The callbacks scan the remainder by hand and return the
+  kind (`at_or_package`, `comment`, `lexer/src/token.rs`).
+- An unterminated `#=` is one `Error` token to the end of the input, so
+  the parser reports it; the plan did not say, and the spec's failure
+  section now does.
+- "The value path segment" is read as `FieldGet` (`ExpressionGet`), the
+  only value segment the grammar has; the value segment after a type
+  path is [[1493e2aa1777]], whose Work now says to take `from` too.
+- `chair.kitty` writes `false` and `true`, which lex as value
+  identifiers; the rewrite of the examples ([[75d0d7eea26c]]) settles
+  the spelling.
+
+No visual gate: nothing here touches a route.
+
+Review, three rounds. Applied: the reason for the `#` callback is
+longest-match disambiguation, not backtracking (the two comment
+patterns do compile side by side; `#= x =# y` on one line is the case
+that breaks); `#{` gained its own test; the citations on `True`/`False`
+moved to the bullets they prove; helpers below the impls; the glossary
+gained "Package name" and "Import version". Deferred: the three-line
+name-or-error shape in `function.rs` and `expression.rs` stays
+duplicated, since the recovery sets differ; `False` is not in a parser
+snapshot, the lexer tests cover it. For the operator: `#= ... =#` does
+not nest, and [[cb55e71a221a]] is silent on it; worth a decision before
+anyone comments out code that holds a comment. `kitty-hir`'s
+`Literal::Boolean` is now unreachable from the parser, since `True` is a
+type path; a `TODO(cc)` marks it for the lowering work.
 
 ## Log

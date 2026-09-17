@@ -147,7 +147,7 @@ ModuleImport  = "import" ImportAlias { "," ImportAlias } "from" "Package" [ Vers
                                                                  (ModuleImport)
 ImportAlias   = "IdentifierValue" [ ":" "IdentifierValue" ]      (ImportAliasValue)
               | "IdentifierType" [ ":" "IdentifierType" ]        (ImportAliasType)
-Version       = ":" "Number"
+Version       = ":" "Number"                                     (ImportVersion)
 ModuleExport  = "export" Declaration                             (ModuleExport)
 ModuleLocal   = Declaration                                      (ModuleLocal)
 ```
@@ -155,15 +155,17 @@ ModuleLocal   = Declaration                                      (ModuleLocal)
 - A module must consist of imports and declarations only; there is no
   top-level expression (review only).
 - The import rule must accept a version suffix after the package and
-  keep it in the tree as a version node (review only).
+  keep it in the tree as a version node, in both import forms
+  (`import_with_version`, `import_block_with_version`,
+  `parser/src/grammar/module.rs`); a `:` with no number after it leaves
+  a `Missing` node in the version node (`import_version_missing_number`,
+  `parser/src/grammar/module.rs`).
 - If a token starts no module item, then the parser must consume it into
   an `Error` node and resume at the next `import`, `export` or
   declaration keyword (review only).
 - What a module is, how an import resolves and what the version and the
   alias mean are undecided
   ([design plan a89ddd38](../plans/a89ddd383a16-design-modules-and-imports.md)).
-
-Gap: the import rule does not take the version suffix.
 
 ## Attributes
 
@@ -261,7 +263,7 @@ Param             = ( "IdentifierValue" | "self" ) [ ":" TypeAnnotation ] [ "=" 
                                                                  (FunctionParam)
 ReturnType        = TypeAnnotation                               (FunctionReturnType)
 Body              = Expression                                   (FunctionBody)
-Lambda            = "fn" [ "IdentifierValue" ] [ GenericParamList ] ParamList [ WhereClause ] "=>" Expression
+Lambda            = "fn" [ FunctionName ] [ GenericParamList ] ParamList [ WhereClause ] "=>" Expression
                                                                  (DeclarationFunction)
 ```
 
@@ -305,12 +307,11 @@ Lambda            = "fn" [ "IdentifierValue" ] [ GenericParamList ] ParamList [ 
 - A parameter may carry a type and a default value (`top_fn_no_indent`,
   `parser/src/grammar/declaration.rs`; the default review only).
 - The parser must accept `from` as a function name, so `fn from(value)`
-  declares the `From` trait's method (review only).
+  declares the `From` trait's method (`fn_named_from`,
+  `parser/src/grammar/declaration.rs`).
 - A lambda is a function expression: its name is optional and it has no
   return type (`function_expr`, `lambda_in_an_argument`,
   `parser/src/grammar/expression.rs`).
-
-Gap: the parser rejects `from` as a name.
 
 ## Expressions
 
@@ -321,7 +322,7 @@ BinaryOperator = "or" | "xor" | "and" | "==" | "!=" | "<" | "<=" | ">" | ">=" | 
 UnaryOperator  = "+" | "-" | "not"
 Postfix        = Primary { Call | FieldGet }
 Call       = ArgList                                             (ExpressionApply)
-FieldGet   = "." "IdentifierValue"                               (ExpressionGet)
+FieldGet   = "." ( "IdentifierValue" | "from" )                  (ExpressionGet)
 Primary    = Reference | TypePath [ "." "IdentifierValue" ] | Literal | Tuple | Block
            | Lambda | Let | LetWith | If | Match
 Reference  = "IdentifierValue" | "self"                          (ExpressionReference)
@@ -348,10 +349,13 @@ left-associative.
 
 - A parenthesised expression must parse as a one-element tuple node
   (`parentheses_affect_precedence`, `parser/src/grammar/expression.rs`).
+- A field is named as a function is, `from` included, so a `from`
+  method is reachable through a value (`get_expression_named_from`,
+  `parser/src/grammar/expression.rs`).
 - A block must hold one expression; a sequence is written as nested
   `let` (`top_fn_with_indent`, `parser/src/grammar/declaration.rs`).
 - `True` and `False` must parse as type paths, not literals; there is
-  no boolean literal node (review only).
+  no boolean literal node (`top_struct`, `parser/src/grammar/declaration.rs`).
 - In expression position, a type path may be followed by `.` and a
   value identifier, which ends the type path and continues as an
   expression: `N.default()`, `Self.regular()`, `Type.Assoc.value`
@@ -366,8 +370,7 @@ left-associative.
   (review only).
 
 Gap: the parser takes only type segments after a type path in an
-expression, and parses `True` and `False` as literals through the
-`Boolean` token kind.
+expression.
 
 ## Calls and arguments
 
@@ -538,8 +541,6 @@ PatternField    = "IdentifierValue" [ "=" "IdentifierValue" ]    (PatternTypeArg
   (`self_type_is_a_type_pattern`, `parser/src/grammar/pattern.rs`).
 - An or-pattern is spelled with the `or` keyword (review only). Note: no
   decision covers the spelling; this is the grammar as built.
-
-Gap: the parser has the `Boolean` token among its literal patterns.
 
 ## Types
 

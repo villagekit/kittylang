@@ -45,6 +45,7 @@ pub enum NodeKind {
     // Module
     Module,
     ModuleImport,
+    ImportVersion,
     ImportAliasValue,
     ImportAliasType,
     ModuleExport,
@@ -53,7 +54,6 @@ pub enum NodeKind {
     // Expression
     ExpressionReference,
     ExpressionLiteral,
-    LiteralBoolean,
     LiteralNumber,
     LiteralString,
     ExpressionBlock,

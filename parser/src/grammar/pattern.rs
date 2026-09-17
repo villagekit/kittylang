@@ -41,8 +41,7 @@ pub(crate) fn pattern_wildcard(p: &mut Parser) -> CompletedMarker {
     p.mark_kind(NodeKind::PatternWildcard)
 }
 
-const PATTERN_LITERAL_FIRST: [TokenKind; 3] =
-    [TokenKind::Boolean, TokenKind::Number, TokenKind::String];
+const PATTERN_LITERAL_FIRST: [TokenKind; 2] = [TokenKind::Number, TokenKind::String];
 
 pub(crate) fn pattern_literal(p: &mut Parser) -> CompletedMarker {
     // `pattern_single` dispatches here on a literal.
@@ -50,7 +49,7 @@ pub(crate) fn pattern_literal(p: &mut Parser) -> CompletedMarker {
         .peek()
         .is_some_and(|kind| PATTERN_LITERAL_FIRST.contains(&kind)));
     let m = p.start();
-    p.bump(); // Consume <boolean>, <number>, or <string>
+    p.bump(); // Consume <number> or <string>
     m.complete(p, NodeKind::PatternLiteral)
 }
 
@@ -204,8 +203,8 @@ mod tests {
         check(
             "",
             expect![[r#"
-            Missing@0..0
-            error at 0: missing value-id, _, boolean, number, string, ‘(’, type-id, or ‘Self’"#]],
+                Missing@0..0
+                error at 0: missing value-id, _, number, string, ‘(’, type-id, or ‘Self’"#]],
         );
     }
 

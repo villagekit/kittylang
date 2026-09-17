@@ -27,9 +27,11 @@ examples fails with it.
 - `parser/src/grammar/expression.rs` and `type.rs`: in expression
   position, a type path may be followed by `.` and a value identifier,
   ending the type path and continuing as an expression (a call, a
-  field, an operator). `kitty-syntax` gets the node the expression
-  needs, if the existing path node cannot carry it; `kitty-cst` the
-  view.
+  field, an operator). The segment takes `from` as a name too, as the
+  function name and the field get do since [[9d84d1f97437]], so
+  `Length.from(5)` reaches the `From` method. `kitty-syntax` gets the
+  node the expression needs, if the existing path node cannot carry it;
+  `kitty-cst` the view.
 - Snapshots: `N.default()`, `Self.regular()`, `GridBeam.Z(x = 0)` once
   [[4423cd0aa2bb]] lands (a soft edge; the snapshot uses positional arguments
   otherwise), `Type.Assoc.value` mixing the two, and a `.` with nothing

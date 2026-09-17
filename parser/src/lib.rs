@@ -339,7 +339,7 @@ mod tests {
             "},
             expect![[r#"
                 Module@0..387
-                  ModuleImport@0..23
+                  ModuleImport@0..26
                     Import@0..6 "import"
                     Whitespace@6..7 " "
                     ImportAliasValue@7..11
@@ -347,9 +347,7 @@ mod tests {
                     Whitespace@11..12 " "
                     From@12..16 "from"
                     Whitespace@16..17 " "
-                    Package@17..23 "@std/m"
-                  Error@23..26
-                    IdentifierValue@23..26 "ath"
+                    Package@17..26 "@std/math"
                   Newline@26..27 "\n"
                   Newline@27..28 "\n"
                   ModuleExport@28..275
@@ -645,12 +643,11 @@ mod tests {
                           Number@385..386 "0"
                       Newline@386..387 "\n"
                       Dedent@387..387 ""
-                error at 23..26: expected ‘import’, ‘export’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’, but found value-id
                 error at 121..128: expected type-id, but found value-id
                 error at 148..155: expected type-id, but found value-id
                 error at 175..182: expected type-id, but found value-id
                 error at 275: missing ‘in’
-                error at 275: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
+                error at 275: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
         );
     }
 }

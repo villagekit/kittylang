@@ -29,6 +29,10 @@ a spec exists it is the owner; until then the crate is.
 - **Indenter**: the pass that turns changes of indentation into block
   open and close tokens, so the parser sees blocks, not whitespace.
   ([specs/lexing.md](../specs/lexing.md#the-indenter))
+- **Package name**: `@`, a name, `/` and a name, as in `@std/math`,
+  lexed as one token. It names where an import comes from; what it
+  resolves to is not yet settled.
+  ([specs/lexing.md](../specs/lexing.md#packages-and-versions))
 
 ## Parsing
 
@@ -53,6 +57,9 @@ a spec exists it is the owner; until then the crate is.
 - **Recovery**: how the parser continues after an error so the rest of
   the source still parses.
   ([specs/grammar.md](../specs/grammar.md#recovery))
+- **Import version**: the `:1` after a package name in an import, kept
+  in the tree as its own node. What it means is not yet settled.
+  ([specs/grammar.md](../specs/grammar.md#module))
 - **Attribute**: `@name(args)` on the line before a declaration: data
   the host reads from the item, its arguments an ordinary call argument
   list. The names are the host's, not the compiler's.

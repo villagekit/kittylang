@@ -115,6 +115,9 @@ pub enum BinaryOperator {
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Literal<'src> {
     /// Literal boolean.
+    // TODO(cc): `True` and `False` parse as type paths, not literals,
+    // so nothing lowers to this variant yet; the lowering decides
+    // whether it stays.
     Boolean(bool),
 
     /// Literal string.
