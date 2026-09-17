@@ -95,6 +95,9 @@ Process terms, defined here because no spec owns them:
   It takes the slice body though it is no PR, and it is the user's to
   move.
 - **Epic**: the record tagged `epic` that parents the milestones.
+- **Site**: a place in an example that an open design plan owns, so its
+  parse errors stand until the plan decides. The examples test names
+  each site by its lines and the plan's prefix.
 - **Design plan**: a plan tagged `design` that holds a language-design
   question too open to settle in one grilling: the question, the evidence
   so far and the options. Its Work is fixed, in this order: Opus

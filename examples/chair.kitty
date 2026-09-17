@@ -1,19 +1,19 @@
 import Assembly from @std/assembly:1
-import GridBeam from @villagekit/gridbeam:1
+import GridBeam, GridPanel from @villagekit/gridbeam:1
 import SmartFasteners from @villagekit/smart-fasteners:1
 
 export struct Chair
   @label("Seat width")
-  @range(min: 5, max: 10, step: 5)
+  @range(min = 5, max = 10, step = 5)
   prop seat_width: Number
 
   @label("Seat depth")
-  @range(min: 5, max: 15)
+  @range(min = 5, max = 15)
   prop seat_depth: Number
 
   @label("Seat height")
   @description("The height from the ground to the top of the seat")
-  @range(min: 5, max: 15)
+  @range(min = 5, max = 15)
   prop seat_height: Number
 
   @label("Include back")
@@ -22,23 +22,23 @@ export struct Chair
   @label("Back height")
   @description("The height from the seat to the top of the backrest")
   @requires(fn (self) => self.should_include_back)
-  @range(min: 5, max: 10)
+  @range(min = 5, max = 10)
   prop back_height: Number
 
   @label("Regular (Without Back)")
-  fn regular(self): Self =>
+  fn regular(): Self =>
     Self
       back_height = 10
       seat_depth = 10
       seat_height = 10
       seat_width = 10
-      should_include_back = false
+      should_include_back = False
 
   @label("Regular (With Back)")
   fn regular_with_back(self): Self =>
     Self
       ...Self.regular()
-      should_include_back = true
+      should_include_back = True
 
 impl Assembly for Chair
   fn parts(self): Parts =>
@@ -48,62 +48,61 @@ impl Assembly for Chair
       seat_height
       back_height
       should_include_back
-    in
     let back_z_beam_end_z = if should_include_back then seat_height + back_height else seat_height in
     let seat_panel_start_y = if should_include_back then -1 else 0 in
     let seat_panel_end_y = if should_include_back then seat_depth - 1 else seat_depth in
 
     Parts
       GridPanel.XY
-        x: [0, seat_width]
-        y: [seat_panel_start_y, seat_panel_end_y]
-        z: seatHeight
+        x = (0, seat_width)
+        y = (seat_panel_start_y, seat_panel_end_y)
+        z = seat_height
 
       if should_include_back
         GridPanel.XZ
-          x: [0, seat_width]
-          y: seat_depth - 2
-          z: [seat_height + 1, seat_height + 1 + back_height]
-          fit: 'top'
+          x = (0, seat_width)
+          y = seat_depth - 2
+          z = (seat_height + 1, seat_height + 1 + back_height)
+          fit = "top"
 
       GridBeam.Z
-        x: 0
-        y: 0
-        z: [0, seat_height]
+        x = 0
+        y = 0
+        z = (0, seat_height)
 
       GridBeam.Z
-        x: seat_width - 1
-        y: 0
-        z: [0, seat_height]
+        x = seat_width - 1
+        y = 0
+        z = (0, seat_height)
 
       GridBeam.Z
-        x: 0
-        y: seat_depth - 1
-        z: [0, back_z_beam_end_z]
+        x = 0
+        y = seat_depth - 1
+        z = (0, back_z_beam_end_z)
 
       GridBeam.Z
-        x: seat_width - 1
-        y: seat_depth - 1
-        z: [0, back_z_beam_end_z]
+        x = seat_width - 1
+        y = seat_depth - 1
+        z = (0, back_z_beam_end_z)
 
       GridBeam.X
-        x: [0, seat_width]
-        y: 1
-        z: seat_height - 2
+        x = (0, seat_width)
+        y = 1
+        z = seat_height - 2
 
       GridBeam.X
-        x: [0, seat_width]
-        y: seat_depth - 2
-        z: seat_height - 2
+        x = (0, seat_width)
+        y = seat_depth - 2
+        z = seat_height - 2
 
       GridBeam.Y
-        x: 1
-        y: [0, seat_depth]
-        z: seat_height - 1
+        x = 1
+        y = (0, seat_depth)
+        z = seat_height - 1
 
       GridBeam.Y
-        x: seat_width - 2
-        y: [0, seat_depth]
-        z: seat_height - 1
+        x = seat_width - 2
+        y = (0, seat_depth)
+        z = seat_height - 1
 
-    fn plugins() => (SmartFasteners())
+  fn plugins() => List(SmartFasteners())

@@ -12,7 +12,7 @@ export struct Length
 
 impl Add for Length
   fn add(self, other) =>
-    Self { x: self.x + other.x }
+    Self { x = self.x + other.x }
 
 impl Default for Length
   fn default() => Self(0)

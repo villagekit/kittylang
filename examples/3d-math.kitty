@@ -12,7 +12,7 @@ export struct Vector3[N = Number]
 
   fn length(self): N =>
     let Self { x, y, z } = self
-    (x * x + y * y + z * z).sqrt()
+    sqrt(x * x + y * y + z * z)
 
 export struct Quaternion
   prop x: Number = 0

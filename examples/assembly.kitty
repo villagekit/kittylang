@@ -13,6 +13,6 @@ export enum PartsItem
 export struct Parts(List[PartsItem])
 
 export trait Assembly
-  fn parts: Parts
+  fn parts(self): Parts
 
 impl Object3d for Assembly
