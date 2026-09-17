@@ -124,7 +124,12 @@ Each rule is given a recovery set: the tokens a caller can continue from.
   with a value identifier or `self` is read as a keyword argument, and
   the error is at the token where its `=` should be
   (`keyword_arg_with_a_colon_recovers`,
-  `parser/src/grammar/expression.rs`); one that starts with any other
+  `parser/src/grammar/expression.rs`); among the positional arguments of
+  `( )`, a label followed by `:` is read the same way, so
+  `(min: 5, max: 10)` is one `expected ‘=’` error per `:`
+  (`keyword_arg_with_a_colon_in_parens_recovers`,
+  `parser/src/grammar/expression.rs`; `chair_lists_its_parse_errors`,
+  `parser/src/examples.rs`); one that starts with any other
   expression token is parsed whole as a positional argument with one
   `Unexpected` error at its first token
   (`labelled_arg_after_a_labelled_arg_recovers`,
@@ -165,7 +170,7 @@ ModuleLocal   = Declaration                                      (ModuleLocal)
   a `Missing` node in the version node (`import_version_missing_number`,
   `parser/src/grammar/module.rs`).
 - If a token starts no module item, then the parser must consume it into
-  an `Error` node and resume at the next `import`, `export` or
+  an `Error` node and resume at the next `import`, `export`, `@` or
   declaration keyword (review only).
 - What a module is, how an import resolves and what the version and the
   alias mean are undecided
@@ -174,20 +179,35 @@ ModuleLocal   = Declaration                                      (ModuleLocal)
 ## Attributes
 
 ```
-Attribute = "@" "IdentifierValue" [ ArgList ]
+Attribute = "@" "IdentifierValue" [ ArgList ]                    (Attribute)
 ```
 
-- A declaration may be preceded by attributes, one per line; each must
-  attach to the declaration below it
-  ([03212e99](../decisions/03212e993893-attributes-replace-metadata-comments.md))
-  (review only).
+- A declaration may be preceded by attributes, by convention one per
+  line, though newlines are trivia and the parser does not hold them to
+  it; each must attach to the declaration below it
+  ([03212e99](../decisions/03212e993893-attributes-replace-metadata-comments.md)):
+  the attribute nodes are the first children of the declaration's node,
+  in source order (`attribute_on_a_function`,
+  `several_attributes_on_a_constant`, `attributes_on_a_prop`,
+  `parser/src/grammar/declaration.rs`).
 - The arguments must be a [call argument list](#calls-and-arguments),
-  so a payload is an ordinary expression (review only).
-- The argument list may be omitted when there are no arguments (review
-  only).
+  so a payload is an ordinary expression
+  (`attribute_with_a_lambda_argument`,
+  `parser/src/grammar/declaration.rs`).
+- The argument list may be omitted when there are no arguments
+  (`several_attributes_on_a_constant`,
+  `parser/src/grammar/declaration.rs`), and takes any of the three call
+  forms, so an indented block after a bare `@name` is its keyword
+  arguments (`attribute_with_a_block_of_arguments`,
+  `parser/src/grammar/declaration.rs`).
 - If an attribute is followed by no declaration, then the parser must
-  record an error and attach the attribute to a `Missing` declaration
-  (review only).
+  record an error and leave the attribute beside a `Missing` declaration
+  (`attribute_with_nothing_after_it`, `parser/src/grammar/module.rs`;
+  `attribute_with_nothing_after_it_in_a_struct`,
+  `parser/src/grammar/declaration.rs`).
+- If the name after `@` is left out, then the name is `Missing` and the
+  argument list after it still parses (`attribute_without_a_name`,
+  `parser/src/grammar/declaration.rs`).
 - The parser must accept any value identifier as an attribute name; the
   set is the host's, not the compiler's (review only).
 
@@ -198,8 +218,6 @@ Example (non-normative):
 @range(min = 5, max = 10, step = 5)
 prop seat_width: Number
 ```
-
-Gap: the parser has no attribute rule.
 
 ## Declarations
 
@@ -421,6 +439,17 @@ Label      = "IdentifierValue" | "self"                          (FunctionParamL
   `parser/src/grammar/expression.rs`).
 - In `( )`, positional arguments must precede keyword arguments
   (`labelled_arg_after_a_labelled_arg_recovers`,
+  `parser/src/grammar/expression.rs`).
+- In `( )` and `{ }`, a token after an argument that is neither `,` nor
+  the closing bracket must be one `Error` node and one error, and the
+  list must go on with the next argument unless the closing bracket
+  follows (`stray_token_between_paren_args_is_one_error_each`,
+  `stray_token_between_brace_args_is_one_error_each`,
+  `parser/src/grammar/expression.rs`). A token the caller recovers at,
+  or the end of the input, ends the list instead, and the closing
+  bracket is then reported missing (`call_expression_missing_closing_paren`,
+  `parser/src/grammar/expression.rs`). A `,` still requires an argument
+  after it (`call_expression_trailing_comma`,
   `parser/src/grammar/expression.rs`).
 - `{ }` and the block form must take keyword arguments and spreads only
   (`positional_arg_in_braces_is_an_error`,

@@ -1,4 +1,4 @@
-use kitty_syntax::{NodeKind, SyntaxNode, SyntaxToken, SyntaxTree, TokenKind};
+use kitty_syntax::{NodeKind, SyntaxElement, SyntaxNode, SyntaxToken, SyntaxTree, TokenKind};
 use text_size::TextRange;
 
 pub trait CstNode: Sized {
@@ -125,6 +125,12 @@ define_node!(ImportAliasType);
 define_compound_node!(ImportAlias, kinds: [ImportAliasValue, ImportAliasType]);
 define_node!(ModuleExport);
 define_node!(ModuleLocal);
+impl ModuleLocal {
+    /// The declaration. `None` when an attribute has none after it.
+    pub fn declaration(self, tree: &SyntaxTree) -> Option<Declaration> {
+        node(self, tree)
+    }
+}
 define_compound_node!(ModuleItem, kinds: [ModuleImport, ModuleExport, ModuleLocal]);
 
 impl Module {
@@ -328,6 +334,37 @@ define_compound_node!(Pattern, kinds: [
     PatternType
 ]);
 
+// Attribute
+define_node!(Attribute);
+impl Attribute {
+    /// The name after the `@`. `None` when the name was left out.
+    pub fn name(self, tree: &SyntaxTree) -> Option<IdentifierValue> {
+        token(self, tree)
+    }
+
+    /// The argument list, if the attribute has one.
+    pub fn arguments(self, tree: &SyntaxTree) -> Option<FunctionArgList> {
+        node(self, tree)
+    }
+}
+
+/// Gives each kind of declaration its `attributes` view: the attributes
+/// written on the lines before it, in source order.
+macro_rules! define_attributes {
+    ($($kind:ident),+ $(,)?) => {
+        $(
+            impl $kind {
+                /// The attributes on the lines before this declaration, in
+                /// source order. A dangling attribute inside a body, one
+                /// with no member after it, is not among them.
+                pub fn attributes(self, tree: &SyntaxTree) -> impl Iterator<Item = Attribute> + '_ {
+                    leading_nodes(self, tree)
+                }
+            }
+        )+
+    };
+}
+
 // Declaration
 define_node!(DeclarationType);
 define_node!(DeclarationConstant);
@@ -423,6 +460,22 @@ define_compound_node!(Declaration, kinds: [
     DeclarationImplTrait
 ]);
 
+define_attributes!(
+    DeclarationType,
+    DeclarationConstant,
+    DeclarationFunction,
+    DeclarationEnum,
+    EnumCase,
+    DeclarationStruct,
+    DeclarationProp,
+    DeclarationTrait,
+    DeclarationImplTrait,
+    Declaration,
+    StructItem,
+    TraitItem,
+    ImplTraitItem,
+);
+
 /* helpers */
 
 fn node<Parent: CstNode, Child: CstNode>(node: Parent, tree: &SyntaxTree) -> Option<Child> {
@@ -435,6 +488,26 @@ fn token<Parent: CstNode, Child: CstToken>(node: Parent, tree: &SyntaxTree) -> O
     node.syntax()
         .child_tokens(tree)
         .find_map(|c| Child::cast(c, tree))
+}
+
+/// The run of `Child` nodes at the start of `node`, before its first
+/// child of another kind. Trivia tokens between them do not end the
+/// run; any other token does, so the run stops at the declaration's
+/// keyword even when no node follows it.
+fn leading_nodes<Parent: CstNode, Child: CstNode>(
+    node: Parent,
+    tree: &SyntaxTree,
+) -> impl Iterator<Item = Child> + '_ {
+    node.syntax()
+        .children(tree)
+        .filter(move |c| match c {
+            SyntaxElement::Token(token) => !token.kind(tree).is_trivia(),
+            SyntaxElement::Node(_) => true,
+        })
+        .map_while(move |c| match c {
+            SyntaxElement::Node(node) => Child::cast(node, tree),
+            SyntaxElement::Token(_) => None,
+        })
 }
 
 fn nodes<Parent: CstNode, Child: CstNode>(

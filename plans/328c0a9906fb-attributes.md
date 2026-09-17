@@ -1,6 +1,6 @@
 ---
 title: Attributes
-status: todo
+status: done
 parent: 1cee599ce218
 blocked_by:
   - 9d84d1f97437
@@ -46,5 +46,50 @@ Not this slice: what the host does with an attribute.
 - `timeout 600 just check` is green
 
 ## Outcome
+
+Shipped. `@name(args)` on the lines before a declaration parses at
+module level and in struct, enum, trait and impl bodies. The tree has a
+new `Attribute` node (name, then an optional `FunctionArgList` in any of
+the three call forms), and attribute nodes are the first children of
+the declaration node, rust-analyzer's shape: the declaration rules now
+take the caller's marker, started before the attributes. A dangling
+attribute abandons that marker and sits beside a `Missing` node
+(`Marker::abandon` gains its first caller). `At` joined
+`DECLARATION_FIRST` and the four item-first sets, so it also serves as
+a recovery token. `kitty-cst` gains `Attribute::name`,
+`Attribute::arguments`, `attributes()` on every declaration view (the
+leading attribute children only, so a dangling attribute in a body is
+not among a struct's) and `ModuleLocal::declaration`.
+
+Two things beyond the Work list, both needed for the Done-when on
+`chair.kitty`, since a stray `:` in `@range(min: 5, ...)` cascaded
+through the whole struct without them: in `( )` the `label :` spelling
+latches into keyword arguments as `label =` does, so the error is
+`expected ‘=’, but found ‘:’` at the colon, as it already was in `{ }`
+and blocks; and in `( )` and `{ }` any other stray token between
+arguments is one `Error` node and the list goes on. Chair's errors on
+`@` lines are exactly the nine at its colons; the other examples change
+only by `‘@’` joining the expected-item lists.
+
+Flags for the operator, not decided here: an attribute before `export`
+does not attach (`@a` then `export fn`), the spec's non-guarantees say
+the position is unsettled and the productions put it after `export`;
+`chair.kitty` puts its attributes inside the exported struct, so it is
+unaffected.
+
+Review findings not applied, with the reason: the two adjacent booleans
+on the `*_optional_type_value` rules and the five parallel item
+dispatchers with the same prologue and epilogue are the file's existing
+shape, one helper over a closure would trade five plain if-chains for
+indirection; the generic stray-token error lists every kind the
+expression loop tested, which is the expected-list contract in the
+grammar spec; a bare dangling `@name` at the end of input lists the
+argument-list openers among the expected kinds, which is honest since
+one could follow; `attributes()` on the compound views (`Declaration`,
+`StructItem`, `TraitItem`, `ImplTraitItem`) has no caller yet, but the
+compounds are what a consumer iterates, so that is where the view
+belongs.
+
+No visual gate: the change touches no route.
 
 ## Log

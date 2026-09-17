@@ -132,6 +132,54 @@ mod tests {
     }
 
     #[test]
+    fn a_declaration_view_lists_only_its_own_attributes() {
+        // A dangling attribute at the end of a body sits inside the struct
+        // node beside a `Missing` node; it is not one of the struct's.
+        use kitty_cst::{CstToken, Declaration, ModuleItem};
+
+        let parsed = parse("@a\n@b(1)\nstruct S\n  @c\n  prop x: Number\n  @d\n");
+        let tree = &parsed.tree;
+        let Some(ModuleItem::ModuleLocal(local)) = parsed.node.items(tree).next() else {
+            panic!("the first item is a local declaration");
+        };
+        let Some(Declaration::DeclarationStruct(s)) = local.declaration(tree) else {
+            panic!("the local declaration is a struct");
+        };
+        let names: Vec<&str> = s
+            .attributes(tree)
+            .map(|attribute| attribute.name(tree).map_or("", |name| name.text(tree)))
+            .collect();
+        assert_eq!(names, ["a", "b"]);
+        let arguments: Vec<Option<&str>> = s
+            .attributes(tree)
+            .map(|attribute| attribute.arguments(tree).map(|list| list.text(tree)))
+            .collect();
+        assert_eq!(arguments, [None, Some("(1)")]);
+        let prop = s.properties(tree).next().expect("the struct has a prop");
+        let names: Vec<&str> = prop
+            .attributes(tree)
+            .map(|attribute| attribute.name(tree).map_or("", |name| name.text(tree)))
+            .collect();
+        assert_eq!(names, ["c"]);
+
+        // With no member at all, the dangling attribute is the only node
+        // after the struct's keyword and name; those tokens end the run.
+        let parsed = parse("@a\nstruct S\n  @d\n");
+        let tree = &parsed.tree;
+        let Some(ModuleItem::ModuleLocal(local)) = parsed.node.items(tree).next() else {
+            panic!("the first item is a local declaration");
+        };
+        let Some(Declaration::DeclarationStruct(s)) = local.declaration(tree) else {
+            panic!("the local declaration is a struct");
+        };
+        let names: Vec<&str> = s
+            .attributes(tree)
+            .map(|attribute| attribute.name(tree).map_or("", |name| name.text(tree)))
+            .collect();
+        assert_eq!(names, ["a"]);
+    }
+
+    #[test]
     fn lex_example_basic() {
         check(
             indoc! {"

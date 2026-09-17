@@ -1,16 +1,23 @@
 use kitty_syntax::{NodeKind, TokenKind};
 
-use crate::{marker::CompletedMarker, parser::Parser, token_set::TokenSet};
+use crate::{
+    marker::{CompletedMarker, Marker},
+    parser::Parser,
+    token_set::TokenSet,
+};
 
 use super::{
     expression::expression,
-    function::{function_declaration, FunctionForm},
+    function::{function_arg_list, function_declaration, FunctionForm, FUNCTION_ARG_LIST_FIRST},
     r#type::{
         generic_bound_list, generic_param_list, generic_where_clause, type_annotation, type_path,
     },
 };
 
-pub(crate) const DECLARATION_FIRST: [TokenKind; 7] = [
+/// The tokens that start a declaration: its keyword, or the `@` of an
+/// attribute on the line before it.
+pub(crate) const DECLARATION_FIRST: [TokenKind; 8] = [
+    TokenKind::At,
     TokenKind::Type,
     TokenKind::Const,
     TokenKind::Fn,
@@ -21,33 +28,63 @@ pub(crate) const DECLARATION_FIRST: [TokenKind; 7] = [
 ];
 
 pub(crate) fn declaration(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
+    let m = p.start();
+    attributes(p, recovery);
     let cm = if p.at(TokenKind::Type) {
-        declaration_type(p, recovery)
+        declaration_type(p, recovery, m)
     } else if p.at(TokenKind::Const) {
-        declaration_constant(p, recovery)
+        declaration_constant(p, recovery, m)
     } else if p.at(TokenKind::Fn) {
-        declaration_function(p, recovery)
+        declaration_function(p, recovery, m)
     } else if p.at(TokenKind::Enum) {
-        declaration_enum(p, recovery)
+        declaration_enum(p, recovery, m)
     } else if p.at(TokenKind::Struct) {
-        declaration_struct(p, recovery)
+        declaration_struct(p, recovery, m)
     } else if p.at(TokenKind::Trait) {
-        declaration_trait(p, recovery)
+        declaration_trait(p, recovery, m)
     } else if p.at(TokenKind::Impl) {
-        declaration_impl_trait(p, recovery)
+        declaration_impl_trait(p, recovery, m)
     } else {
+        m.abandon(p);
         p.error(recovery);
         return None;
     };
     Some(cm)
 }
 
+/// Zero or more attributes before a declaration, each its own node. The
+/// caller has started the declaration's marker, so they become the
+/// declaration's first children; with no declaration after them the
+/// caller abandons the marker and they sit beside the `Missing` node.
+fn attributes(p: &mut Parser, recovery: TokenSet) {
+    while p.at(TokenKind::At) {
+        attribute(p, recovery);
+    }
+}
+
+/// `@name`, with an argument list in any of the call forms when one
+/// follows. A name left out is missing, not an error that eats the `(`
+/// after it.
+fn attribute(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+    // `attributes` dispatches here on `@`.
+    debug_assert_eq!(p.peek(), Some(TokenKind::At));
+    let m = p.start();
+    p.bump(); // Consume '@'
+    p.expect(
+        TokenKind::IdentifierValue,
+        recovery.union(FUNCTION_ARG_LIST_FIRST),
+    );
+    if p.at_set(FUNCTION_ARG_LIST_FIRST) {
+        function_arg_list(p, recovery);
+    }
+    m.complete(p, NodeKind::Attribute)
+}
+
 /// Type alias declaration
-fn declaration_type(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+fn declaration_type(p: &mut Parser, recovery: TokenSet, m: Marker) -> CompletedMarker {
     // `declaration` and `impl_trait_item` dispatch here on `type`.
     debug_assert_eq!(p.peek(), Some(TokenKind::Type));
     let recovery_type = recovery.union([TokenKind::Equal, TokenKind::Colon]);
-    let m = p.start();
     p.bump(); // Consume 'type'
     p.expect(TokenKind::IdentifierType, recovery_type);
     if p.at(TokenKind::BracketOpen) {
@@ -59,19 +96,19 @@ fn declaration_type(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 }
 
 /// Constant declaration
-fn declaration_constant(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    declaration_constant_optional_type_value(p, recovery, false, true)
+fn declaration_constant(p: &mut Parser, recovery: TokenSet, m: Marker) -> CompletedMarker {
+    declaration_constant_optional_type_value(p, recovery, m, false, true)
 }
 
 fn declaration_constant_optional_type_value(
     p: &mut Parser,
     recovery: TokenSet,
+    m: Marker,
     has_type: bool,
     has_value: bool,
 ) -> CompletedMarker {
     // `declaration` and the item rules dispatch here on `const`.
     debug_assert_eq!(p.peek(), Some(TokenKind::Const));
-    let m = p.start();
     p.bump(); // Consume 'const'
     p.expect(TokenKind::IdentifierValue, recovery);
     if has_type || p.at(TokenKind::Colon) {
@@ -85,15 +122,14 @@ fn declaration_constant_optional_type_value(
     m.complete(p, NodeKind::DeclarationConstant)
 }
 
-fn declaration_function(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    function_declaration(p, recovery, FunctionForm::Declaration)
+fn declaration_function(p: &mut Parser, recovery: TokenSet, m: Marker) -> CompletedMarker {
+    function_declaration(p, recovery, FunctionForm::Declaration, m)
 }
 
-fn declaration_struct(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+fn declaration_struct(p: &mut Parser, recovery: TokenSet, m: Marker) -> CompletedMarker {
     // `declaration` dispatches here on `struct`.
     debug_assert_eq!(p.peek(), Some(TokenKind::Struct));
     let recovery_struct = recovery.union(STRUCT_ITEM_FIRST).union([TokenKind::Dedent]);
-    let m = p.start();
     p.bump(); // Consume 'struct'
     p.expect(TokenKind::IdentifierType, recovery);
     if p.at(TokenKind::BracketOpen) {
@@ -110,35 +146,43 @@ fn declaration_struct(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     m.complete(p, NodeKind::DeclarationStruct)
 }
 
-const STRUCT_ITEM_FIRST: [TokenKind; 3] = [TokenKind::Const, TokenKind::Fn, TokenKind::Prop];
+const STRUCT_ITEM_FIRST: [TokenKind; 4] = [
+    TokenKind::At,
+    TokenKind::Const,
+    TokenKind::Fn,
+    TokenKind::Prop,
+];
 
 fn struct_item(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
+    let m = p.start();
+    attributes(p, recovery);
     let cm = if p.at(TokenKind::Const) {
-        declaration_constant(p, recovery)
+        declaration_constant(p, recovery, m)
     } else if p.at(TokenKind::Fn) {
-        declaration_function(p, recovery)
+        declaration_function(p, recovery, m)
     } else if p.at(TokenKind::Prop) {
-        declaration_prop(p, recovery)
+        declaration_prop(p, recovery, m)
     } else {
+        m.abandon(p);
         p.error(recovery);
         return None;
     };
     Some(cm)
 }
 
-fn declaration_prop(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    declaration_prop_optional_type_value(p, recovery, true, false)
+fn declaration_prop(p: &mut Parser, recovery: TokenSet, m: Marker) -> CompletedMarker {
+    declaration_prop_optional_type_value(p, recovery, m, true, false)
 }
 
 fn declaration_prop_optional_type_value(
     p: &mut Parser,
     recovery: TokenSet,
+    m: Marker,
     has_type: bool,
     has_value: bool,
 ) -> CompletedMarker {
     // The item rules dispatch here on `prop`.
     debug_assert_eq!(p.peek(), Some(TokenKind::Prop));
-    let m = p.start();
     p.bump(); // Consume 'prop'
     p.expect(TokenKind::IdentifierValue, recovery);
     if has_type || p.at(TokenKind::Colon) {
@@ -152,11 +196,10 @@ fn declaration_prop_optional_type_value(
     m.complete(p, NodeKind::DeclarationProp)
 }
 
-fn declaration_enum(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+fn declaration_enum(p: &mut Parser, recovery: TokenSet, m: Marker) -> CompletedMarker {
     // `declaration` dispatches here on `enum`.
     debug_assert_eq!(p.peek(), Some(TokenKind::Enum));
     let recovery_enum = recovery.union(ENUM_ITEM_FIRST).union([TokenKind::Dedent]);
-    let m = p.start();
     p.bump(); // Consume 'enum'
     p.expect(TokenKind::IdentifierType, recovery);
     if p.at(TokenKind::BracketOpen) {
@@ -173,26 +216,33 @@ fn declaration_enum(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     m.complete(p, NodeKind::DeclarationEnum)
 }
 
-const ENUM_ITEM_FIRST: [TokenKind; 3] = [TokenKind::Const, TokenKind::Fn, TokenKind::Case];
+const ENUM_ITEM_FIRST: [TokenKind; 4] = [
+    TokenKind::At,
+    TokenKind::Const,
+    TokenKind::Fn,
+    TokenKind::Case,
+];
 
 fn enum_item(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
+    let m = p.start();
+    attributes(p, recovery);
     let cm = if p.at(TokenKind::Const) {
-        declaration_constant(p, recovery)
+        declaration_constant(p, recovery, m)
     } else if p.at(TokenKind::Fn) {
-        declaration_function(p, recovery)
+        declaration_function(p, recovery, m)
     } else if p.at(TokenKind::Case) {
-        enum_case(p, recovery)
+        enum_case(p, recovery, m)
     } else {
+        m.abandon(p);
         p.error(recovery);
         return None;
     };
     Some(cm)
 }
 
-fn enum_case(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+fn enum_case(p: &mut Parser, recovery: TokenSet, m: Marker) -> CompletedMarker {
     // `enum_item` dispatches here on `case`.
     debug_assert_eq!(p.peek(), Some(TokenKind::Case));
-    let m = p.start();
     p.bump(); // Consume 'case'
     p.expect(TokenKind::IdentifierType, recovery);
     if p.at(TokenKind::Colon) {
@@ -202,11 +252,10 @@ fn enum_case(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     m.complete(p, NodeKind::EnumCase)
 }
 
-fn declaration_trait(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+fn declaration_trait(p: &mut Parser, recovery: TokenSet, m: Marker) -> CompletedMarker {
     // `declaration` dispatches here on `trait`.
     debug_assert_eq!(p.peek(), Some(TokenKind::Trait));
     let recovery_trait = recovery.union(TRAIT_ITEM_FIRST).union([TokenKind::Dedent]);
-    let m = p.start();
     p.bump(); // Consume 'trait'
     p.expect(TokenKind::IdentifierType, recovery);
     if p.at(TokenKind::BracketOpen) {
@@ -223,7 +272,8 @@ fn declaration_trait(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     m.complete(p, NodeKind::DeclarationTrait)
 }
 
-const TRAIT_ITEM_FIRST: [TokenKind; 4] = [
+const TRAIT_ITEM_FIRST: [TokenKind; 5] = [
+    TokenKind::At,
     TokenKind::Type,
     TokenKind::Const,
     TokenKind::Fn,
@@ -231,25 +281,27 @@ const TRAIT_ITEM_FIRST: [TokenKind; 4] = [
 ];
 
 fn trait_item(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
+    let m = p.start();
+    attributes(p, recovery);
     let cm = if p.at(TokenKind::Type) {
-        trait_type(p, recovery)
+        trait_type(p, recovery, m)
     } else if p.at(TokenKind::Const) {
-        trait_constant(p, recovery)
+        trait_constant(p, recovery, m)
     } else if p.at(TokenKind::Fn) {
-        trait_function(p, recovery)
+        trait_function(p, recovery, m)
     } else if p.at(TokenKind::Prop) {
-        declaration_prop(p, recovery)
+        declaration_prop(p, recovery, m)
     } else {
+        m.abandon(p);
         p.error(recovery);
         return None;
     };
     Some(cm)
 }
 
-fn trait_type(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+fn trait_type(p: &mut Parser, recovery: TokenSet, m: Marker) -> CompletedMarker {
     // `trait_item` dispatches here on `type`.
     debug_assert_eq!(p.peek(), Some(TokenKind::Type));
-    let m = p.start();
     p.bump(); // Consume 'type'
     p.expect(TokenKind::IdentifierType, recovery);
     if p.at(TokenKind::BracketOpen) {
@@ -266,21 +318,20 @@ fn trait_type(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     m.complete(p, NodeKind::DeclarationType)
 }
 
-fn trait_constant(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    declaration_constant_optional_type_value(p, recovery, false, false)
+fn trait_constant(p: &mut Parser, recovery: TokenSet, m: Marker) -> CompletedMarker {
+    declaration_constant_optional_type_value(p, recovery, m, false, false)
 }
 
-fn trait_function(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    function_declaration(p, recovery, FunctionForm::TraitDeclaration)
+fn trait_function(p: &mut Parser, recovery: TokenSet, m: Marker) -> CompletedMarker {
+    function_declaration(p, recovery, FunctionForm::TraitDeclaration, m)
 }
 
-fn declaration_impl_trait(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+fn declaration_impl_trait(p: &mut Parser, recovery: TokenSet, m: Marker) -> CompletedMarker {
     // `declaration` dispatches here on `impl`.
     debug_assert_eq!(p.peek(), Some(TokenKind::Impl));
     let recovery_trait = recovery
         .union(IMPL_TRAIT_ITEM_FIRST)
         .union([TokenKind::Dedent]);
-    let m = p.start();
     p.bump(); // Consume 'impl'
     if p.at(TokenKind::BracketOpen) {
         generic_param_list(p, recovery);
@@ -299,7 +350,8 @@ fn declaration_impl_trait(p: &mut Parser, recovery: TokenSet) -> CompletedMarker
     m.complete(p, NodeKind::DeclarationImplTrait)
 }
 
-const IMPL_TRAIT_ITEM_FIRST: [TokenKind; 4] = [
+const IMPL_TRAIT_ITEM_FIRST: [TokenKind; 5] = [
+    TokenKind::At,
     TokenKind::Type,
     TokenKind::Const,
     TokenKind::Fn,
@@ -307,31 +359,34 @@ const IMPL_TRAIT_ITEM_FIRST: [TokenKind; 4] = [
 ];
 
 fn impl_trait_item(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
+    let m = p.start();
+    attributes(p, recovery);
     let cm = if p.at(TokenKind::Type) {
-        declaration_type(p, recovery)
+        declaration_type(p, recovery, m)
     } else if p.at(TokenKind::Const) {
-        trait_impl_constant(p, recovery)
+        trait_impl_constant(p, recovery, m)
     } else if p.at(TokenKind::Fn) {
-        trait_impl_function(p, recovery)
+        trait_impl_function(p, recovery, m)
     } else if p.at(TokenKind::Prop) {
-        trait_impl_prop(p, recovery)
+        trait_impl_prop(p, recovery, m)
     } else {
+        m.abandon(p);
         p.error(recovery);
         return None;
     };
     Some(cm)
 }
 
-fn trait_impl_constant(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    declaration_constant_optional_type_value(p, recovery, false, true)
+fn trait_impl_constant(p: &mut Parser, recovery: TokenSet, m: Marker) -> CompletedMarker {
+    declaration_constant_optional_type_value(p, recovery, m, false, true)
 }
 
-fn trait_impl_function(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    function_declaration(p, recovery, FunctionForm::Declaration)
+fn trait_impl_function(p: &mut Parser, recovery: TokenSet, m: Marker) -> CompletedMarker {
+    function_declaration(p, recovery, FunctionForm::Declaration, m)
 }
 
-fn trait_impl_prop(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    declaration_prop_optional_type_value(p, recovery, false, true)
+fn trait_impl_prop(p: &mut Parser, recovery: TokenSet, m: Marker) -> CompletedMarker {
+    declaration_prop_optional_type_value(p, recovery, m, false, true)
 }
 
 #[cfg(test)]
@@ -1278,6 +1333,318 @@ mod tests {
                   FunctionBody@19..20
                     ExpressionReference@19..20
                       IdentifierValue@19..20 "x""#]],
+        );
+    }
+
+    #[test]
+    fn attribute_on_a_function() {
+        check(
+            indoc! {"
+                @label(\"Seat\")
+                fn f() => 1
+            "},
+            expect![[r#"
+                DeclarationFunction@0..27
+                  Attribute@0..14
+                    At@0..1 "@"
+                    IdentifierValue@1..6 "label"
+                    FunctionArgList@6..14
+                      ParenOpen@6..7 "("
+                      FunctionArgPositional@7..13
+                        ExpressionLiteral@7..13
+                          String@7..13 "\"Seat\""
+                      ParenClose@13..14 ")"
+                  Newline@14..15 "\n"
+                  Fn@15..17 "fn"
+                  Whitespace@17..18 " "
+                  IdentifierValue@18..19 "f"
+                  FunctionParamList@19..21
+                    ParenOpen@19..20 "("
+                    ParenClose@20..21 ")"
+                  Whitespace@21..22 " "
+                  FatArrow@22..24 "=>"
+                  Whitespace@24..25 " "
+                  FunctionBody@25..26
+                    ExpressionLiteral@25..26
+                      Number@25..26 "1"
+                  Newline@26..27 "\n""#]],
+        );
+    }
+
+    #[test]
+    fn several_attributes_on_a_constant() {
+        // A bare `@name` has no argument list.
+        check(
+            indoc! {"
+                @hidden
+                @unit(\"mm\")
+                const x = 1
+            "},
+            expect![[r#"
+                DeclarationConstant@0..32
+                  Attribute@0..7
+                    At@0..1 "@"
+                    IdentifierValue@1..7 "hidden"
+                  Newline@7..8 "\n"
+                  Attribute@8..19
+                    At@8..9 "@"
+                    IdentifierValue@9..13 "unit"
+                    FunctionArgList@13..19
+                      ParenOpen@13..14 "("
+                      FunctionArgPositional@14..18
+                        ExpressionLiteral@14..18
+                          String@14..18 "\"mm\""
+                      ParenClose@18..19 ")"
+                  Newline@19..20 "\n"
+                  Const@20..25 "const"
+                  Whitespace@25..26 " "
+                  IdentifierValue@26..27 "x"
+                  Whitespace@27..28 " "
+                  Equal@28..29 "="
+                  Whitespace@29..30 " "
+                  ExpressionLiteral@30..31
+                    Number@30..31 "1"
+                  Newline@31..32 "\n""#]],
+        );
+    }
+
+    #[test]
+    fn attribute_with_a_block_of_arguments() {
+        // The block form of the argument list: an indented block after a
+        // bare `@name` is its keyword arguments.
+        check(
+            indoc! {"
+                @range
+                  min = 5
+                  max = 10
+                fn f() => 1
+            "},
+            expect![[r#"
+                DeclarationFunction@0..40
+                  Attribute@0..28
+                    At@0..1 "@"
+                    IdentifierValue@1..6 "range"
+                    Newline@6..7 "\n"
+                    FunctionArgList@7..28
+                      Indent@7..9 "  "
+                      FunctionArgLabelled@9..16
+                        FunctionParamLabel@9..12
+                          IdentifierValue@9..12 "min"
+                        Whitespace@12..13 " "
+                        Equal@13..14 "="
+                        Whitespace@14..15 " "
+                        ExpressionLiteral@15..16
+                          Number@15..16 "5"
+                      Newline@16..17 "\n"
+                      Whitespace@17..19 "  "
+                      FunctionArgLabelled@19..27
+                        FunctionParamLabel@19..22
+                          IdentifierValue@19..22 "max"
+                        Whitespace@22..23 " "
+                        Equal@23..24 "="
+                        Whitespace@24..25 " "
+                        ExpressionLiteral@25..27
+                          Number@25..27 "10"
+                      Newline@27..28 "\n"
+                      Dedent@28..28 ""
+                  Fn@28..30 "fn"
+                  Whitespace@30..31 " "
+                  IdentifierValue@31..32 "f"
+                  FunctionParamList@32..34
+                    ParenOpen@32..33 "("
+                    ParenClose@33..34 ")"
+                  Whitespace@34..35 " "
+                  FatArrow@35..37 "=>"
+                  Whitespace@37..38 " "
+                  FunctionBody@38..39
+                    ExpressionLiteral@38..39
+                      Number@38..39 "1"
+                  Newline@39..40 "\n""#]],
+        );
+    }
+
+    #[test]
+    fn attribute_with_a_lambda_argument() {
+        check(
+            indoc! {"
+                @requires(fn (self) => self.should_include_back)
+                fn f() => 1
+            "},
+            expect![[r#"
+                DeclarationFunction@0..61
+                  Attribute@0..48
+                    At@0..1 "@"
+                    IdentifierValue@1..9 "requires"
+                    FunctionArgList@9..48
+                      ParenOpen@9..10 "("
+                      FunctionArgPositional@10..47
+                        DeclarationFunction@10..47
+                          Fn@10..12 "fn"
+                          Whitespace@12..13 " "
+                          FunctionParamList@13..19
+                            ParenOpen@13..14 "("
+                            FunctionParam@14..18
+                              FunctionParamLabel@14..18
+                                SelfLower@14..18 "self"
+                            ParenClose@18..19 ")"
+                          Whitespace@19..20 " "
+                          FatArrow@20..22 "=>"
+                          Whitespace@22..23 " "
+                          FunctionBody@23..47
+                            ExpressionGet@23..47
+                              ExpressionReference@23..27
+                                SelfLower@23..27 "self"
+                              Dot@27..28 "."
+                              IdentifierValue@28..47 "should_include_back"
+                      ParenClose@47..48 ")"
+                  Newline@48..49 "\n"
+                  Fn@49..51 "fn"
+                  Whitespace@51..52 " "
+                  IdentifierValue@52..53 "f"
+                  FunctionParamList@53..55
+                    ParenOpen@53..54 "("
+                    ParenClose@54..55 ")"
+                  Whitespace@55..56 " "
+                  FatArrow@56..58 "=>"
+                  Whitespace@58..59 " "
+                  FunctionBody@59..60
+                    ExpressionLiteral@59..60
+                      Number@59..60 "1"
+                  Newline@60..61 "\n""#]],
+        );
+    }
+
+    #[test]
+    fn attributes_on_a_prop() {
+        check(
+            indoc! {"
+                struct S
+                  @label(\"Seat width\")
+                  @range(min = 5, max = 10)
+                  prop seat_width: Number
+            "},
+            expect![[r#"
+                DeclarationStruct@0..86
+                  Struct@0..6 "struct"
+                  Whitespace@6..7 " "
+                  IdentifierType@7..8 "S"
+                  Newline@8..9 "\n"
+                  Indent@9..11 "  "
+                  DeclarationProp@11..85
+                    Attribute@11..31
+                      At@11..12 "@"
+                      IdentifierValue@12..17 "label"
+                      FunctionArgList@17..31
+                        ParenOpen@17..18 "("
+                        FunctionArgPositional@18..30
+                          ExpressionLiteral@18..30
+                            String@18..30 "\"Seat width\""
+                        ParenClose@30..31 ")"
+                    Newline@31..32 "\n"
+                    Whitespace@32..34 "  "
+                    Attribute@34..59
+                      At@34..35 "@"
+                      IdentifierValue@35..40 "range"
+                      FunctionArgList@40..59
+                        ParenOpen@40..41 "("
+                        FunctionArgLabelled@41..48
+                          FunctionParamLabel@41..44
+                            IdentifierValue@41..44 "min"
+                          Whitespace@44..45 " "
+                          Equal@45..46 "="
+                          Whitespace@46..47 " "
+                          ExpressionLiteral@47..48
+                            Number@47..48 "5"
+                        Comma@48..49 ","
+                        Whitespace@49..50 " "
+                        FunctionArgLabelled@50..58
+                          FunctionParamLabel@50..53
+                            IdentifierValue@50..53 "max"
+                          Whitespace@53..54 " "
+                          Equal@54..55 "="
+                          Whitespace@55..56 " "
+                          ExpressionLiteral@56..58
+                            Number@56..58 "10"
+                        ParenClose@58..59 ")"
+                    Newline@59..60 "\n"
+                    Whitespace@60..62 "  "
+                    Prop@62..66 "prop"
+                    Whitespace@66..67 " "
+                    IdentifierValue@67..77 "seat_width"
+                    Colon@77..78 ":"
+                    Whitespace@78..79 " "
+                    TypeReference@79..85
+                      IdentifierType@79..85 "Number"
+                  Newline@85..86 "\n"
+                  Dedent@86..86 """#]],
+        );
+    }
+
+    #[test]
+    fn attribute_with_nothing_after_it_in_a_struct() {
+        // Unhappy path: the attribute sits beside a `Missing` declaration.
+        check(
+            indoc! {"
+                struct S
+                  @label(\"x\")
+            "},
+            expect![[r#"
+                DeclarationStruct@0..23
+                  Struct@0..6 "struct"
+                  Whitespace@6..7 " "
+                  IdentifierType@7..8 "S"
+                  Newline@8..9 "\n"
+                  Indent@9..11 "  "
+                  Attribute@11..22
+                    At@11..12 "@"
+                    IdentifierValue@12..17 "label"
+                    FunctionArgList@17..22
+                      ParenOpen@17..18 "("
+                      FunctionArgPositional@18..21
+                        ExpressionLiteral@18..21
+                          String@18..21 "\"x\""
+                      ParenClose@21..22 ")"
+                  Newline@22..23 "\n"
+                  Missing@23..23
+                  Dedent@23..23 ""
+                error at 23: missing ‘@’, ‘const’, ‘fn’, or ‘prop’"#]],
+        );
+    }
+
+    #[test]
+    fn attribute_without_a_name() {
+        // Unhappy path: the name is missing and the arguments still parse.
+        check(
+            indoc! {"
+                @(\"x\")
+                fn f() => 1
+            "},
+            expect![[r#"
+                DeclarationFunction@0..19
+                  Attribute@0..6
+                    At@0..1 "@"
+                    Missing@1..1
+                    FunctionArgList@1..6
+                      ParenOpen@1..2 "("
+                      FunctionArgPositional@2..5
+                        ExpressionLiteral@2..5
+                          String@2..5 "\"x\""
+                      ParenClose@5..6 ")"
+                  Newline@6..7 "\n"
+                  Fn@7..9 "fn"
+                  Whitespace@9..10 " "
+                  IdentifierValue@10..11 "f"
+                  FunctionParamList@11..13
+                    ParenOpen@11..12 "("
+                    ParenClose@12..13 ")"
+                  Whitespace@13..14 " "
+                  FatArrow@14..16 "=>"
+                  Whitespace@16..17 " "
+                  FunctionBody@17..18
+                    ExpressionLiteral@17..18
+                      Number@17..18 "1"
+                  Newline@18..19 "\n"
+                error at 1: missing value-id"#]],
         );
     }
 }

@@ -227,4 +227,26 @@ mod tests {
                 error at 35: missing number"#]],
         );
     }
+
+    #[test]
+    fn attribute_with_nothing_after_it() {
+        // Unhappy path: the attribute sits beside a `Missing` declaration.
+        check(
+            "@label(\"x\")",
+            expect![[r#"
+                Module@0..11
+                  ModuleLocal@0..11
+                    Attribute@0..11
+                      At@0..1 "@"
+                      IdentifierValue@1..6 "label"
+                      FunctionArgList@6..11
+                        ParenOpen@6..7 "("
+                        FunctionArgPositional@7..10
+                          ExpressionLiteral@7..10
+                            String@7..10 "\"x\""
+                        ParenClose@10..11 ")"
+                    Missing@11..11
+                error at 11: missing ‘@’, ‘type’, ‘const’, ‘fn’, ‘enum’, ‘struct’, ‘trait’, or ‘impl’"#]],
+        );
+    }
 }

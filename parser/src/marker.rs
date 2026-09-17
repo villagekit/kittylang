@@ -38,8 +38,6 @@ impl Marker {
     ///
     /// The marker's `None` event is popped when it is the last one;
     /// otherwise it stays and `Parser::parse` drops it.
-    // TODO(cc): drop the allow once a recovery rule abandons a node.
-    #[allow(dead_code)]
     pub(crate) fn abandon(mut self, p: &mut Parser<'_>) {
         self.bomb.defuse();
         if self.pos + 1 == p.events.len() {

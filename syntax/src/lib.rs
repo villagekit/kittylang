@@ -113,6 +113,9 @@ pub enum NodeKind {
     PatternTypeArgList,
     PatternName,
 
+    // Attributes
+    Attribute,
+
     // Top-Level Declarations
     DeclarationType,
     DeclarationConstant,

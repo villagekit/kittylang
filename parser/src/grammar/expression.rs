@@ -230,7 +230,8 @@ fn expression_block(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 fn expression_function(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     // `expression_primary` dispatches here on `fn`.
     debug_assert_eq!(p.peek(), Some(TokenKind::Fn));
-    function_declaration(p, recovery, FunctionForm::Lambda)
+    let m = p.start();
+    function_declaration(p, recovery, FunctionForm::Lambda, m)
 }
 
 /// Parse a let expression: `let <identifier> = <expr> in <expr>`
@@ -751,6 +752,114 @@ mod tests {
                     IdentifierValue@1..4 "foo"
                   Missing@4..4
                 error at 4: missing ‘)’"#]],
+        );
+    }
+
+    #[test]
+    fn keyword_arg_with_a_colon_in_parens_recovers() {
+        // Unhappy path: `name: value` where `name = value` was meant, among
+        // positional arguments. Each `:` is one error at the `:`.
+        check(
+            "f(a: 1, b: 2)",
+            expect![[r#"
+                ExpressionApply@0..13
+                  ExpressionReference@0..1
+                    IdentifierValue@0..1 "f"
+                  FunctionArgList@1..13
+                    ParenOpen@1..2 "("
+                    FunctionArgLabelled@2..6
+                      FunctionParamLabel@2..3
+                        IdentifierValue@2..3 "a"
+                      Error@3..4
+                        Colon@3..4 ":"
+                      Whitespace@4..5 " "
+                      ExpressionLiteral@5..6
+                        Number@5..6 "1"
+                    Comma@6..7 ","
+                    Whitespace@7..8 " "
+                    FunctionArgLabelled@8..12
+                      FunctionParamLabel@8..9
+                        IdentifierValue@8..9 "b"
+                      Error@9..10
+                        Colon@9..10 ":"
+                      Whitespace@10..11 " "
+                      ExpressionLiteral@11..12
+                        Number@11..12 "2"
+                    ParenClose@12..13 ")"
+                error at 3..4: expected ‘=’, but found ‘:’
+                error at 9..10: expected ‘=’, but found ‘:’"#]],
+        );
+    }
+
+    #[test]
+    fn stray_token_between_paren_args_is_one_error_each() {
+        // Unhappy path: a stray token after an argument in `( )` is one
+        // error and the list goes on.
+        check(
+            "f(1 : 2, 3)",
+            expect![[r#"
+                ExpressionApply@0..11
+                  ExpressionReference@0..1
+                    IdentifierValue@0..1 "f"
+                  FunctionArgList@1..11
+                    ParenOpen@1..2 "("
+                    FunctionArgPositional@2..3
+                      ExpressionLiteral@2..3
+                        Number@2..3 "1"
+                    Whitespace@3..4 " "
+                    Error@4..5
+                      Colon@4..5 ":"
+                    Whitespace@5..6 " "
+                    FunctionArgPositional@6..7
+                      ExpressionLiteral@6..7
+                        Number@6..7 "2"
+                    Comma@7..8 ","
+                    Whitespace@8..9 " "
+                    FunctionArgPositional@9..10
+                      ExpressionLiteral@9..10
+                        Number@9..10 "3"
+                    ParenClose@10..11 ")"
+                error at 4..5: expected ‘(’, ‘{’, indent, ‘.’, ‘*’, ‘/’, ‘rem’, ‘+’, ‘-’, ‘<’, ‘<=’, ‘>’, ‘>=’, ‘==’, ‘!=’, ‘and’, ‘xor’, ‘or’, ‘,’, or ‘)’, but found ‘:’"#]],
+        );
+    }
+
+    #[test]
+    fn stray_token_between_brace_args_is_one_error_each() {
+        // Unhappy path: a stray token after an argument in `{ }` is one
+        // error and the list goes on.
+        check(
+            "f { a = 1 : b = 2 }",
+            expect![[r#"
+                ExpressionApply@0..19
+                  ExpressionReference@0..1
+                    IdentifierValue@0..1 "f"
+                  Whitespace@1..2 " "
+                  FunctionArgList@2..19
+                    BraceOpen@2..3 "{"
+                    Whitespace@3..4 " "
+                    FunctionArgLabelled@4..9
+                      FunctionParamLabel@4..5
+                        IdentifierValue@4..5 "a"
+                      Whitespace@5..6 " "
+                      Equal@6..7 "="
+                      Whitespace@7..8 " "
+                      ExpressionLiteral@8..9
+                        Number@8..9 "1"
+                    Whitespace@9..10 " "
+                    Error@10..11
+                      Colon@10..11 ":"
+                    Whitespace@11..12 " "
+                    FunctionArgLabelled@12..17
+                      FunctionParamLabel@12..13
+                        IdentifierValue@12..13 "b"
+                      Whitespace@13..14 " "
+                      Equal@14..15 "="
+                      Whitespace@15..16 " "
+                      ExpressionLiteral@16..17
+                        Number@16..17 "2"
+                    Whitespace@17..18 " "
+                    BraceClose@18..19 "}"
+                error at 10..11: expected ‘(’, ‘{’, indent, ‘.’, ‘*’, ‘/’, ‘rem’, ‘+’, ‘-’, ‘<’, ‘<=’, ‘>’, ‘>=’, ‘==’, ‘!=’, ‘and’, ‘xor’, ‘or’, ‘,’, or ‘}’, but found ‘:’"#]],
         );
     }
 

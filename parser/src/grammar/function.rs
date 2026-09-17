@@ -5,7 +5,11 @@ use super::{
     r#type::{generic_param_list, generic_where_clause, type_annotation},
     NAME_FIRST,
 };
-use crate::{marker::CompletedMarker, parser::Parser, token_set::TokenSet};
+use crate::{
+    marker::{CompletedMarker, Marker},
+    parser::Parser,
+    token_set::TokenSet,
+};
 
 /// Which parts a function rule requires or allows, by where it stands.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -36,15 +40,17 @@ impl FunctionForm {
     }
 }
 
+/// The marker `m` is the caller's, started before any attributes, so
+/// they are children of the function node.
 pub(crate) fn function_declaration(
     p: &mut Parser,
     recovery: TokenSet,
     form: FunctionForm,
+    m: Marker,
 ) -> CompletedMarker {
     // `declaration` and its item rules, and `expression_primary`,
     // dispatch here on `fn`.
     debug_assert_eq!(p.peek(), Some(TokenKind::Fn));
-    let m = p.start();
     p.bump(); // Consume 'fn'
     if p.at_set(NAME_FIRST) {
         p.bump();
@@ -147,32 +153,31 @@ pub(crate) fn function_arg_list(p: &mut Parser, recovery: TokenSet) -> Completed
     m.complete(p, NodeKind::FunctionArgList)
 }
 
+/// Positional arguments, then keyword arguments once a `label =` is
+/// seen. `label :` counts as well: it is the spelling `=` replaced, so
+/// the argument is read as a keyword argument and the error sits at the
+/// `:`, as it does in `{ }` and in a block.
 fn function_arg_list_parens(p: &mut Parser, recovery: TokenSet) {
     let recovery_arg = recovery.union([TokenKind::Comma, TokenKind::ParenClose]);
     p.bump(); // Consume '('.
-    'all: {
-        if p.at(TokenKind::ParenClose) {
-            break 'all; // End all args
-        }
-        // First process positional args
-        'positional: loop {
-            if p.at_set(FUNCTION_PARAM_LABEL_FIRST) && p.lookahead_at(1, TokenKind::Equal) {
-                break 'positional; // End positional args
+    if !p.at(TokenKind::ParenClose) {
+        let mut keyword = false;
+        loop {
+            if !keyword
+                && p.at_set(FUNCTION_PARAM_LABEL_FIRST)
+                && (p.lookahead_at(1, TokenKind::Equal) || p.lookahead_at(1, TokenKind::Colon))
+            {
+                keyword = true;
             }
-            if p.at(TokenKind::Ellipses) {
+            if keyword {
+                function_keyword_arg(p, recovery_arg);
+            } else if p.at(TokenKind::Ellipses) {
                 function_spread_arg(p, recovery_arg);
             } else {
                 function_positional_arg(p, recovery_arg);
             }
-            if !p.bump_if_at(TokenKind::Comma) {
-                break 'all; // End all args
-            }
-        }
-        // Then process keyword args
-        loop {
-            function_keyword_arg(p, recovery_arg);
-            if !p.bump_if_at(TokenKind::Comma) {
-                break 'all;
+            if !function_arg_separator(p, TokenKind::ParenClose, recovery_arg) {
+                break;
             }
         }
     }
@@ -185,12 +190,28 @@ fn function_arg_list_braces(p: &mut Parser, recovery: TokenSet) {
     if !p.at(TokenKind::BraceClose) {
         loop {
             function_keyword_arg(p, recovery_arg);
-            if !p.bump_if_at(TokenKind::Comma) {
+            if !function_arg_separator(p, TokenKind::BraceClose, recovery_arg) {
                 break;
             }
         }
     }
     p.expect(TokenKind::BraceClose, recovery);
+}
+
+/// After an argument in `( )` or `{ }`: whether another argument
+/// follows. A `,` says one does; the `close`, a token the caller
+/// recovers at, or the end of the input says none does. Any other token
+/// is skipped as one `Error` node so the list can go on, and another
+/// argument follows unless the list then ends.
+fn function_arg_separator(p: &mut Parser, close: TokenKind, recovery_arg: TokenSet) -> bool {
+    if p.bump_if_at(TokenKind::Comma) {
+        return true;
+    }
+    if p.at(close) || p.at_recovery(recovery_arg) {
+        return false;
+    }
+    p.error(recovery_arg);
+    !(p.at(close) || p.at_recovery(recovery_arg))
 }
 
 /// The lines are separated by newlines, which are trivia, so the loop
