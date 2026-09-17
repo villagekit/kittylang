@@ -76,11 +76,13 @@ of a production and are not written.
   (`infix_expression_interspersed_with_newlines`,
   `parser/src/grammar/expression.rs`).
 
-Gap: the `match` arm and `where` bound loops end only at a dedent, and
-an arm or a bound consumes nothing when the next token is in its
-recovery set or the input has ended, so the parser never returns on
-`fn f() => match x` or `fn f() where T: T => 1`; in a release build the
-spin grows the event list until the process aborts.
+Gap: the `where` bound loop ends only at a dedent, and a bound consumes
+nothing when the next token is in its recovery set or the input has
+ended, so the parser never returns on `fn f() where T: T => 1`; in a
+release build the spin grows the event list until the process aborts.
+The `match` arm loop had the same fault and now ends where an arm would
+consume nothing (`match_with_no_arms_ends_at_the_input`,
+`parser/src/grammar/expression.rs`).
 
 ## Recovery
 
@@ -106,15 +108,29 @@ Each rule is given a recovery set: the tokens a caller can continue from.
 - A unary expression whose operand fails must produce the unary node with
   a `Missing` operand (`unary_operator_without_an_operand_is_missing`,
   `parser/src/grammar/expression.rs`).
-- In a list of labelled arguments, only the first is known to start with
-  a label; one after a comma that does not is an error inside its
-  argument node, and the list goes on
-  (`labelled_arg_after_a_labelled_arg_recovers`,
-  `parser/src/grammar/expression.rs`;
-  `generic_labelled_arg_after_a_labelled_arg_recovers`,
+- In a list of labelled generic arguments or pattern fields, only the
+  first is known to start with a label; one after a comma that does not
+  is an error inside its argument node, and the list goes on
+  (`generic_labelled_arg_after_a_labelled_arg_recovers`,
   `parser/src/grammar/type.rs`;
   `type_pattern_labelled_arg_after_a_labelled_arg_recovers`,
   `parser/src/grammar/pattern.rs`).
+- Where only keyword arguments and spreads may stand (in `{ }`, in a
+  block, or after a keyword argument in `( )`), an argument that starts
+  with a value identifier or `self` is read as a keyword argument, and
+  the error is at the token where its `=` should be
+  (`keyword_arg_with_a_colon_recovers`,
+  `parser/src/grammar/expression.rs`); one that starts with any other
+  expression token is parsed whole as a positional argument with one
+  `Unexpected` error at its first token
+  (`labelled_arg_after_a_labelled_arg_recovers`,
+  `positional_arg_in_braces_is_an_error`,
+  `positional_line_in_a_block_is_an_error`,
+  `parser/src/grammar/expression.rs`); any other token is one `Error`
+  node inside an argument node (`stray_token_in_a_block_is_one_error`,
+  `parser/src/grammar/expression.rs`). A positional call that starts
+  with a value identifier, `beam(1)` on its own line, is therefore read
+  as a keyword argument and reports more than one error.
 - An error's `expected` list must name the kinds the rule tested since
   the parser last consumed a token, in the order tested, or the one kind
   an `expect` asked for (`call_expression_trailing_comma`,
@@ -360,27 +376,54 @@ ArgList    = "(" [ Arg { "," Arg } ] ")"                         (FunctionArgLis
            | "{" [ Arg { "," Arg } ] "}"
            | Indent { Arg } Dedent
 Arg        = Expression                                          (FunctionArgPositional)
-           | "IdentifierValue" "=" Expression                    (FunctionArgLabelled)
-           | "..." Expression
+           | Label "=" Expression                                (FunctionArgLabelled)
+           | "..." Expression                                    (FunctionArgSpread)
+Label      = "IdentifierValue" | "self"                          (FunctionParamLabel)
 ```
 
 - A function or a struct is called with `( )` for positional arguments,
   `{ }` for keyword arguments, or a block of keyword arguments one per
   line ([88117830](../decisions/881178303bc8-call-syntax-positional-keyword-and-indented.md))
-  (`function_expr`, `parser/src/grammar/expression.rs`; the `{ }` and
-  block forms review only).
+  (`function_expr`, `keyword_args_in_braces`, `keyword_args_in_a_block`,
+  `parser/src/grammar/expression.rs`).
+- The three forms must produce the same tree shape: a `FunctionArgList`
+  holding one node per argument (`keyword_args_in_parens`,
+  `keyword_args_in_braces`, `keyword_args_in_a_block`,
+  `parser/src/grammar/expression.rs`).
 - `( )` may also carry keyword arguments, `GridBeam.Z(x = 0, y = 0)`
   ([95cd2585](../decisions/95cd2585f916-colon-introduces-a-type-equals-supplies-a-value.md))
-  (review only).
-- A keyword argument must be spelled `name = value`
+  (`keyword_args_in_parens`, `parser/src/grammar/expression.rs`).
+- A keyword argument must be spelled `name = value`, and the value is
+  required
   ([95cd2585](../decisions/95cd2585f916-colon-introduces-a-type-equals-supplies-a-value.md))
-  (review only).
-- In `( )`, positional arguments must precede keyword arguments (review
-  only).
+  (`keyword_arg_with_a_colon_recovers`,
+  `keyword_arg_without_a_value_is_missing`,
+  `parser/src/grammar/expression.rs`).
+- In `( )`, positional arguments must precede keyword arguments
+  (`labelled_arg_after_a_labelled_arg_recovers`,
+  `parser/src/grammar/expression.rs`).
 - `{ }` and the block form must take keyword arguments and spreads only
-  (review only).
+  (`positional_arg_in_braces_is_an_error`,
+  `positional_line_in_a_block_is_an_error`,
+  `parser/src/grammar/expression.rs`).
 - A spread, `...expr`, may stand where an argument stands in any of the
-  three forms (review only).
+  three forms (`spread_among_keyword_args`, `spread_in_a_block`,
+  `parser/src/grammar/expression.rs`; in `( )` review only). The parser
+  accepts one anywhere in `( )`; where it may stand among positional
+  arguments is not settled ([non-guarantees](#non-guarantees)).
+- A label may be `self` (review only). Note: no decision covers it; this
+  is the grammar as built, and it gives a `self.x` line in a block one
+  error.
+- A construction has no shorthand: `Self { x }` is a keyword argument
+  with its `=` and its value missing, two errors (review only).
+- An indented block after an operand is its argument list, except where
+  the rule that follows owns the block: the expression after `match`
+  ends before the block of arms. The restriction holds through operators
+  and the tail of an `if` or a `let`, and lifts inside brackets and
+  blocks (`match_scrutinee_ends_before_the_arms`,
+  `match_scrutinee_tail_ends_before_the_arms`,
+  `parser/src/grammar/expression.rs`; a lambda body as the scrutinee is
+  not restricted, review only).
 - Whether a block under a callee may carry positional lines, one
   argument per line, and whether `if` has a block form without `then`
   among them, is undecided
@@ -397,8 +440,10 @@ Self
   x = 0
 ```
 
-Gap: the parser spells a keyword argument `name: value`, fires a call
-on `(` only, and has no spread node.
+Gap: the parser does not hold a block to one argument per line, since
+newlines are trivia and what a newline means is undecided
+([design plan d0658cb1](../plans/d0658cb19697-design-newlines-inside-brackets.md));
+`x = 1 y = 2` on one line parses as two arguments.
 
 ## Let
 
@@ -476,10 +521,15 @@ PatternField    = "IdentifierValue" [ "=" "IdentifierValue" ]    (PatternTypeArg
   `parser/src/grammar/pattern.rs`).
 - A constructor pattern's named field must use `=`, `let Self { x = a }
   = self` ([95cd2585](../decisions/95cd2585f916-colon-introduces-a-type-equals-supplies-a-value.md))
-  (review only).
+  (`pattern_type_brace_rename`,
+  `pattern_type_brace_field_with_a_colon_recovers`,
+  `parser/src/grammar/pattern.rs`; through `let`, whose recovery set
+  holds `=`, `let_pattern_with_a_renamed_field`,
+  `parser/src/grammar/expression.rs`).
 - In `( )`, a bare name is a positional field; in `{ }`, a bare name is
-  shorthand for `name = name`, `let Self { x, y, z } = self` (review
-  only).
+  shorthand for `name = name`, `let Self { x, y, z } = self`, and parses
+  to a `PatternTypeArgLabelled` node holding one identifier
+  (`pattern_type_brace_shorthand`, `parser/src/grammar/pattern.rs`).
 - In `( )`, positional fields must precede named fields
   (`pattern_type_mixed_arg`, `parser/src/grammar/pattern.rs`).
 - `True` and `False` in a pattern are type patterns, as in an expression
@@ -489,9 +539,7 @@ PatternField    = "IdentifierValue" [ "=" "IdentifierValue" ]    (PatternTypeArg
 - An or-pattern is spelled with the `or` keyword (review only). Note: no
   decision covers the spelling; this is the grammar as built.
 
-Gap: the parser has no `{ }` constructor pattern, spells a named field
-`name: value`, has the `Boolean` token among its literal patterns, and
-aborts on a `Self` pattern.
+Gap: the parser has the `Boolean` token among its literal patterns.
 
 ## Types
 

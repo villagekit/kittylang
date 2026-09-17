@@ -1,7 +1,7 @@
 use kitty_syntax::{NodeKind, TokenKind};
 
 use super::{
-    expression::expression,
+    expression::{expression, EXPRESSION_FIRST},
     r#type::{generic_param_list, generic_where_clause, type_annotation},
 };
 use crate::{marker::CompletedMarker, parser::Parser, token_set::TokenSet};
@@ -121,11 +121,34 @@ fn function_param(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     m.complete(p, NodeKind::FunctionParam)
 }
 
+/// The first tokens of an argument list: the three call forms.
+pub(crate) const FUNCTION_ARG_LIST_FIRST: [TokenKind; 3] = [
+    TokenKind::ParenOpen,
+    TokenKind::BraceOpen,
+    TokenKind::Indent,
+];
+
+/// An argument list in one of its three forms: `( )` for positional
+/// then keyword arguments, `{ }` for keyword arguments, or a block of
+/// keyword arguments one per line. A spread may stand in any of them.
 pub(crate) fn function_arg_list(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
-    // `expression_apply` dispatches here on `(`.
-    debug_assert_eq!(p.peek(), Some(TokenKind::ParenOpen));
-    let recovery_arg_list = recovery.union([TokenKind::Comma, TokenKind::ParenClose]);
+    // `expression_apply` dispatches here on `(`, `{` or an indent.
+    debug_assert!(p
+        .peek()
+        .is_some_and(|kind| FUNCTION_ARG_LIST_FIRST.contains(&kind)));
     let m = p.start();
+    if p.at(TokenKind::ParenOpen) {
+        function_arg_list_parens(p, recovery);
+    } else if p.at(TokenKind::BraceOpen) {
+        function_arg_list_braces(p, recovery);
+    } else {
+        function_arg_list_block(p, recovery);
+    }
+    m.complete(p, NodeKind::FunctionArgList)
+}
+
+fn function_arg_list_parens(p: &mut Parser, recovery: TokenSet) {
+    let recovery_arg = recovery.union([TokenKind::Comma, TokenKind::ParenClose]);
     p.bump(); // Consume '('.
     'all: {
         if p.at(TokenKind::ParenClose) {
@@ -133,29 +156,52 @@ pub(crate) fn function_arg_list(p: &mut Parser, recovery: TokenSet) -> Completed
         }
         // First process positional args
         'positional: loop {
-            if p.at_set(FUNCTION_PARAM_LABEL_FIRST) && p.lookahead_at(1, TokenKind::Colon) {
+            if p.at_set(FUNCTION_PARAM_LABEL_FIRST) && p.lookahead_at(1, TokenKind::Equal) {
                 break 'positional; // End positional args
             }
-
-            function_positional_arg(p, recovery_arg_list);
-
-            if !p.at(TokenKind::Comma) {
+            if p.at(TokenKind::Ellipses) {
+                function_spread_arg(p, recovery_arg);
+            } else {
+                function_positional_arg(p, recovery_arg);
+            }
+            if !p.bump_if_at(TokenKind::Comma) {
                 break 'all; // End all args
             }
-            p.bump(); // Consume ','
         }
-        // Then process labelled args
+        // Then process keyword args
         loop {
-            function_labelled_arg(p, recovery_arg_list);
-
-            if !p.at(TokenKind::Comma) {
+            function_keyword_arg(p, recovery_arg);
+            if !p.bump_if_at(TokenKind::Comma) {
                 break 'all;
             }
-            p.bump(); // Consume ','
         }
     }
     p.expect(TokenKind::ParenClose, recovery);
-    m.complete(p, NodeKind::FunctionArgList)
+}
+
+fn function_arg_list_braces(p: &mut Parser, recovery: TokenSet) {
+    let recovery_arg = recovery.union([TokenKind::Comma, TokenKind::BraceClose]);
+    p.bump(); // Consume '{'.
+    if !p.at(TokenKind::BraceClose) {
+        loop {
+            function_keyword_arg(p, recovery_arg);
+            if !p.bump_if_at(TokenKind::Comma) {
+                break;
+            }
+        }
+    }
+    p.expect(TokenKind::BraceClose, recovery);
+}
+
+/// The lines are separated by newlines, which are trivia, so the loop
+/// runs until the dedent or a token the caller recovers at.
+fn function_arg_list_block(p: &mut Parser, recovery: TokenSet) {
+    let recovery_arg = recovery.union([TokenKind::Dedent]);
+    p.bump(); // Consume the indent.
+    while !p.at_recovery(recovery_arg) {
+        function_keyword_arg(p, recovery_arg);
+    }
+    p.expect(TokenKind::Dedent, recovery);
 }
 
 fn function_positional_arg(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
@@ -164,17 +210,49 @@ fn function_positional_arg(p: &mut Parser, recovery: TokenSet) -> CompletedMarke
     m.complete(p, NodeKind::FunctionArgPositional)
 }
 
-/// Only the first labelled arg is known to start with a label; the ones
-/// after a comma may start with anything, so `function_param_label`
-/// records the error.
+/// An argument where only a keyword argument or a spread may stand: in
+/// `{ }`, in a block, or after the first keyword argument in `( )`.
+///
+/// A positional argument here is still parsed whole, under one error,
+/// so a line in the wrong place is one error rather than one per token.
+/// Whether a block may carry positional lines is design plan
+/// e6a33eab19d4's to decide; until then they are errors.
+fn function_keyword_arg(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+    if p.at_set(FUNCTION_PARAM_LABEL_FIRST) {
+        function_labelled_arg(p, recovery)
+    } else if p.at(TokenKind::Ellipses) {
+        function_spread_arg(p, recovery)
+    } else if p.peek_in(EXPRESSION_FIRST) {
+        p.error_misplaced();
+        function_positional_arg(p, recovery)
+    } else {
+        let m = p.start();
+        p.error(recovery);
+        m.complete(p, NodeKind::FunctionArgLabelled)
+    }
+}
+
+/// `name = value`. The value is required: `name` alone is positional.
 fn function_labelled_arg(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+    // `function_keyword_arg` dispatches here on a label.
+    debug_assert!(p
+        .peek()
+        .is_some_and(|kind| FUNCTION_PARAM_LABEL_FIRST.contains(&kind)));
     let m = p.start();
     function_param_label(p, recovery);
-    p.expect(TokenKind::Colon, recovery);
-    if !(p.at(TokenKind::Comma) || p.at(TokenKind::ParenClose)) {
-        expression(p, recovery);
-    }
+    p.expect(TokenKind::Equal, recovery);
+    expression(p, recovery);
     m.complete(p, NodeKind::FunctionArgLabelled)
+}
+
+/// `...value`: the fields of `value` supplied as keyword arguments.
+fn function_spread_arg(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+    // The argument rules dispatch here on `...`.
+    debug_assert_eq!(p.peek(), Some(TokenKind::Ellipses));
+    let m = p.start();
+    p.bump(); // Consume '...'.
+    expression(p, recovery);
+    m.complete(p, NodeKind::FunctionArgSpread)
 }
 
 const FUNCTION_PARAM_LABEL_FIRST: [TokenKind; 2] =

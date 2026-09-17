@@ -359,6 +359,7 @@ impl FunctionReturnType {
 }
 define_node!(FunctionArgPositional);
 define_node!(FunctionArgLabelled);
+define_node!(FunctionArgSpread);
 define_node!(FunctionArgList);
 
 define_node!(DeclarationEnum);

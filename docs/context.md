@@ -57,6 +57,13 @@ a spec exists it is the owner; until then the crate is.
   the host reads from the item, its arguments an ordinary call argument
   list. The names are the host's, not the compiler's.
   ([specs/grammar.md](../specs/grammar.md#attributes))
+- **Keyword argument**: `name = value` among a call's arguments: a value
+  supplied by name, in `( )`, `{ }` or an indented block. The tree calls
+  the node labelled (`FunctionArgLabelled`).
+  ([specs/grammar.md](../specs/grammar.md#calls-and-arguments))
+- **Positional argument**: a value among a call's arguments supplied by
+  its place, in `( )`.
+  ([specs/grammar.md](../specs/grammar.md#calls-and-arguments))
 - **Spread**: `...value` among a call's arguments: the fields of `value`
   supplied as keyword arguments.
   ([specs/grammar.md](../specs/grammar.md#calls-and-arguments))

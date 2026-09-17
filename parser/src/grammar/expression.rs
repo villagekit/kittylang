@@ -1,27 +1,55 @@
 use kitty_syntax::{NodeKind, TokenKind};
 
 use super::{
-    function::{function_arg_list, function_declaration, FunctionForm},
+    function::{function_arg_list, function_declaration, FunctionForm, FUNCTION_ARG_LIST_FIRST},
     pattern::pattern,
     r#type::{type_annotation, type_path, TYPE_PATH_FIRST},
 };
 use crate::{marker::CompletedMarker, token_set::TokenSet, Parser};
 
 /// Parse an expression.
-#[allow(dead_code)]
 pub(crate) fn expression(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
-    expression_pratt(p, recovery, 0)
+    expression_pratt(p, recovery, 0, BlockArgs::Allowed)
+}
+
+/// Parse an expression that stops short of an indented block, for a rule
+/// that owns the block after its expression, such as `match`. Elsewhere
+/// an indented block after an operand is its argument list.
+fn expression_before_block(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
+    expression_pratt(p, recovery, 0, BlockArgs::Forbidden)
+}
+
+/// Whether an indented block after an operand is its argument list.
+///
+/// The restriction holds through operators, unary operands and the tail
+/// of an `if` or a `let`, and lifts inside brackets and blocks, where a
+/// nested expression starts afresh. A lambda body is not restricted: it
+/// is parsed by the function rule, and a lambda has no use as a
+/// scrutinee.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum BlockArgs {
+    Allowed,
+    Forbidden,
 }
 
 /// Parse an expression with a given minimum binding power.
 /// (Also known as a Pratt parser.)
-fn expression_pratt(p: &mut Parser, recovery: TokenSet, min_bp: u8) -> Option<CompletedMarker> {
+fn expression_pratt(
+    p: &mut Parser,
+    recovery: TokenSet,
+    min_bp: u8,
+    block_args: BlockArgs,
+) -> Option<CompletedMarker> {
     // First, parse a left-hand side (unary operator or primary) expression.
-    let mut lhs = expression_lhs(p, recovery)?;
+    let mut lhs = expression_lhs(p, recovery, block_args)?;
 
     loop {
         // Check for postfix operators inline.
-        if p.at(TokenKind::ParenOpen) {
+        let at_arg_list = match block_args {
+            BlockArgs::Allowed => p.at_set(FUNCTION_ARG_LIST_FIRST),
+            BlockArgs::Forbidden => p.at_set([TokenKind::ParenOpen, TokenKind::BraceOpen]),
+        };
+        if at_arg_list {
             lhs = expression_apply(p, lhs, recovery);
             continue;
         }
@@ -44,7 +72,7 @@ fn expression_pratt(p: &mut Parser, recovery: TokenSet, min_bp: u8) -> Option<Co
         p.bump(); // Consume the operator.
 
         let m = lhs.precede(p);
-        let rhs = expression_pratt(p, recovery, right_bp);
+        let rhs = expression_pratt(p, recovery, right_bp, block_args);
         lhs = m.complete(p, NodeKind::ExpressionBinary);
 
         if rhs.is_none() {
@@ -56,21 +84,51 @@ fn expression_pratt(p: &mut Parser, recovery: TokenSet, min_bp: u8) -> Option<Co
 }
 
 /// Parse a left-hand side expression, which may be a unary operator or a primary.
-fn expression_lhs(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
+fn expression_lhs(
+    p: &mut Parser,
+    recovery: TokenSet,
+    block_args: BlockArgs,
+) -> Option<CompletedMarker> {
     if let Some(bp) = unary_binding_power(p) {
         // A unary operator is present.
         // The node is made whether or not the operand parses, as the
         // binary rule does, so the marker is always completed.
         let m = p.start();
         p.bump(); // Consume the unary operator token.
-        expression_pratt(p, recovery, bp);
+        expression_pratt(p, recovery, bp, block_args);
         return Some(m.complete(p, NodeKind::ExpressionUnary));
     }
-    expression_primary(p, recovery)
+    expression_primary(p, recovery, block_args)
 }
 
+/// The tokens an expression can start with: what `expression_lhs` and
+/// `expression_primary` dispatch on, for a rule that must know whether
+/// an expression follows before it commits to one.
+pub(crate) const EXPRESSION_FIRST: TokenSet = TokenSet::new([
+    TokenKind::Plus,
+    TokenKind::Minus,
+    TokenKind::Not,
+    TokenKind::IdentifierValue,
+    TokenKind::SelfLower,
+    TokenKind::IdentifierType,
+    TokenKind::SelfUpper,
+    TokenKind::Boolean,
+    TokenKind::Number,
+    TokenKind::String,
+    TokenKind::ParenOpen,
+    TokenKind::Indent,
+    TokenKind::Fn,
+    TokenKind::Let,
+    TokenKind::If,
+    TokenKind::Match,
+]);
+
 /// Parse a primary expression.
-fn expression_primary(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
+fn expression_primary(
+    p: &mut Parser,
+    recovery: TokenSet,
+    block_args: BlockArgs,
+) -> Option<CompletedMarker> {
     let cm = if p.at_set(EXPRESSION_REFERENCE_FIRST) {
         expression_reference(p)
     } else if p.at_set(TYPE_PATH_FIRST) {
@@ -84,12 +142,14 @@ fn expression_primary(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMar
     } else if p.at(TokenKind::Fn) {
         expression_function(p, recovery)
     } else if p.at(TokenKind::Let) {
-        expression_let(p, recovery)
+        expression_let(p, recovery, block_args)
     } else if p.at(TokenKind::If) {
-        expression_if(p, recovery)
+        expression_if(p, recovery, block_args)
     } else if p.at(TokenKind::Match) {
         expression_match(p, recovery)
     } else {
+        // The branches above are `EXPRESSION_FIRST`; keep the two in step.
+        debug_assert!(!p.peek_in(EXPRESSION_FIRST));
         p.error(recovery);
         return None;
     };
@@ -115,10 +175,11 @@ fn expression_literal(p: &mut Parser) -> CompletedMarker {
     p.mark_kind(NodeKind::ExpressionLiteral)
 }
 
-/// Parse an apply expression given an existing `lhs`.
+/// Parse an apply expression given an existing `lhs`: the callee and
+/// its argument list in any of the three forms.
 fn expression_apply(p: &mut Parser, lhs: CompletedMarker, recovery: TokenSet) -> CompletedMarker {
-    // `expression_pratt` dispatches here on `(`.
-    debug_assert_eq!(p.peek(), Some(TokenKind::ParenOpen));
+    // `expression_pratt` dispatches here on `(`, `{` or an indent, which
+    // `function_arg_list` asserts.
     let m = lhs.precede(p);
     function_arg_list(p, recovery);
     m.complete(p, NodeKind::ExpressionApply)
@@ -169,7 +230,9 @@ fn expression_function(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 }
 
 /// Parse a let expression: `let <identifier> = <expr> in <expr>`
-fn expression_let(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+///
+/// The body is the tail, so it keeps the caller's block restriction.
+fn expression_let(p: &mut Parser, recovery: TokenSet, block_args: BlockArgs) -> CompletedMarker {
     let m = p.start();
     p.expect(TokenKind::Let, recovery);
     pattern(p, recovery.union([TokenKind::Equal, TokenKind::In]));
@@ -182,20 +245,23 @@ fn expression_let(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     expression(p, recovery);
     p.expect(TokenKind::In, recovery);
     // The body of the let scope
-    expression(p, recovery);
+    expression_pratt(p, recovery, 0, block_args);
     m.complete(p, NodeKind::ExpressionLet)
 }
 
-/// Parse an if–expression: `if <cond> { ... } [else { ... }]`
-fn expression_if(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
+/// Parse an if expression: `if <cond> then <expr> [else <expr>]`
+///
+/// Either branch may be the tail, so both keep the caller's block
+/// restriction.
+fn expression_if(p: &mut Parser, recovery: TokenSet, block_args: BlockArgs) -> CompletedMarker {
     let m = p.start();
     p.expect(TokenKind::If, recovery);
     expression(p, recovery.union([TokenKind::Then])); // condition
     p.expect(TokenKind::Then, recovery);
-    expression(p, recovery.union([TokenKind::Else])); // then body
+    expression_pratt(p, recovery.union([TokenKind::Else]), 0, block_args); // then body
     if p.at(TokenKind::Else) {
         p.bump(); // Consume 'else'.
-        expression(p, recovery); // else body
+        expression_pratt(p, recovery, 0, block_args); // else body
     }
     m.complete(p, NodeKind::ExpressionIf)
 }
@@ -204,12 +270,13 @@ fn expression_if(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
 fn expression_match(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
     p.expect(TokenKind::Match, recovery);
-    expression(p, recovery); // condition
+    // The block after the scrutinee is the arms, never its arguments.
+    expression_before_block(p, recovery);
     p.expect(TokenKind::Indent, recovery);
-    // TODO will the lack of delimiters be an issue?
-    while !p.at(TokenKind::Dedent) {
-        let recovery = recovery.union([TokenKind::Dedent]);
-        match_arm(p, recovery);
+    // The arms end at the dedent, or where an arm would consume nothing.
+    let recovery_arms = recovery.union([TokenKind::Dedent]);
+    while !p.at_recovery(recovery_arms) {
+        match_arm(p, recovery_arms);
     }
     p.expect(TokenKind::Dedent, recovery);
     m.complete(p, NodeKind::ExpressionMatch)
@@ -337,29 +404,28 @@ mod tests {
     #[test]
     fn labelled_arg_after_a_labelled_arg_recovers() {
         check(
-            "f(a: 1, 2)",
+            "f(a = 1, 2)",
             expect![[r#"
-            ExpressionApply@0..10
-              ExpressionReference@0..1
-                IdentifierValue@0..1 "f"
-              FunctionArgList@1..10
-                ParenOpen@1..2 "("
-                FunctionArgLabelled@2..6
-                  FunctionParamLabel@2..3
-                    IdentifierValue@2..3 "a"
-                  Colon@3..4 ":"
-                  Whitespace@4..5 " "
-                  ExpressionLiteral@5..6
-                    Number@5..6 "1"
-                Comma@6..7 ","
-                Whitespace@7..8 " "
-                FunctionArgLabelled@8..9
-                  Error@8..9
-                    Number@8..9 "2"
-                  Missing@9..9
-                ParenClose@9..10 ")"
-            error at 8..9: expected value-id or ‘self’, but found number
-            error at 9: missing ‘:’"#]],
+                ExpressionApply@0..11
+                  ExpressionReference@0..1
+                    IdentifierValue@0..1 "f"
+                  FunctionArgList@1..11
+                    ParenOpen@1..2 "("
+                    FunctionArgLabelled@2..7
+                      FunctionParamLabel@2..3
+                        IdentifierValue@2..3 "a"
+                      Whitespace@3..4 " "
+                      Equal@4..5 "="
+                      Whitespace@5..6 " "
+                      ExpressionLiteral@6..7
+                        Number@6..7 "1"
+                    Comma@7..8 ","
+                    Whitespace@8..9 " "
+                    FunctionArgPositional@9..10
+                      ExpressionLiteral@9..10
+                        Number@9..10 "2"
+                    ParenClose@10..11 ")"
+                error at 9..10: expected value-id, ‘self’, or ‘...’, but found number"#]],
         );
     }
 
@@ -698,7 +764,7 @@ mod tests {
                     FunctionArgPositional@4..4
                       Missing@4..4
                     Missing@4..4
-                error at 4: missing ‘)’, value-id, ‘self’, ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’
+                error at 4: missing ‘)’, value-id, ‘self’, ‘...’, ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’
                 error at 4: missing ‘)’"#]],
         );
     }
@@ -879,7 +945,7 @@ mod tests {
                     FunctionArgPositional@6..6
                       Missing@6..6
                     ParenClose@6..7 ")"
-                error at 6: missing value-id, ‘self’, ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
+                error at 6: missing value-id, ‘self’, ‘...’, ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
         );
     }
 
@@ -1074,6 +1140,441 @@ mod tests {
                       ParenClose@53..54 ")"
                   Newline@54..55 "\n"
                   Dedent@55..55 """#]],
+        );
+    }
+
+    #[test]
+    fn keyword_args_in_parens() {
+        check(
+            "f(x = 1)",
+            expect![[r#"
+                ExpressionApply@0..8
+                  ExpressionReference@0..1
+                    IdentifierValue@0..1 "f"
+                  FunctionArgList@1..8
+                    ParenOpen@1..2 "("
+                    FunctionArgLabelled@2..7
+                      FunctionParamLabel@2..3
+                        IdentifierValue@2..3 "x"
+                      Whitespace@3..4 " "
+                      Equal@4..5 "="
+                      Whitespace@5..6 " "
+                      ExpressionLiteral@6..7
+                        Number@6..7 "1"
+                    ParenClose@7..8 ")""#]],
+        );
+    }
+
+    #[test]
+    fn keyword_args_in_braces() {
+        check(
+            "Self { x = 1 }",
+            expect![[r#"
+                ExpressionApply@0..14
+                  TypeReference@0..4
+                    SelfUpper@0..4 "Self"
+                  Whitespace@4..5 " "
+                  FunctionArgList@5..14
+                    BraceOpen@5..6 "{"
+                    Whitespace@6..7 " "
+                    FunctionArgLabelled@7..12
+                      FunctionParamLabel@7..8
+                        IdentifierValue@7..8 "x"
+                      Whitespace@8..9 " "
+                      Equal@9..10 "="
+                      Whitespace@10..11 " "
+                      ExpressionLiteral@11..12
+                        Number@11..12 "1"
+                    Whitespace@12..13 " "
+                    BraceClose@13..14 "}""#]],
+        );
+    }
+
+    #[test]
+    fn keyword_args_in_a_block() {
+        check(
+            indoc! {"
+                Self
+                  x = 1
+                  y = 2
+            "},
+            expect![[r#"
+                ExpressionApply@0..21
+                  TypeReference@0..4
+                    SelfUpper@0..4 "Self"
+                  Newline@4..5 "\n"
+                  FunctionArgList@5..21
+                    Indent@5..7 "  "
+                    FunctionArgLabelled@7..12
+                      FunctionParamLabel@7..8
+                        IdentifierValue@7..8 "x"
+                      Whitespace@8..9 " "
+                      Equal@9..10 "="
+                      Whitespace@10..11 " "
+                      ExpressionLiteral@11..12
+                        Number@11..12 "1"
+                    Newline@12..13 "\n"
+                    Whitespace@13..15 "  "
+                    FunctionArgLabelled@15..20
+                      FunctionParamLabel@15..16
+                        IdentifierValue@15..16 "y"
+                      Whitespace@16..17 " "
+                      Equal@17..18 "="
+                      Whitespace@18..19 " "
+                      ExpressionLiteral@19..20
+                        Number@19..20 "2"
+                    Newline@20..21 "\n"
+                    Dedent@21..21 """#]],
+        );
+    }
+
+    #[test]
+    fn spread_among_keyword_args() {
+        check(
+            "Self { ...self, x = 1 }",
+            expect![[r#"
+                ExpressionApply@0..23
+                  TypeReference@0..4
+                    SelfUpper@0..4 "Self"
+                  Whitespace@4..5 " "
+                  FunctionArgList@5..23
+                    BraceOpen@5..6 "{"
+                    Whitespace@6..7 " "
+                    FunctionArgSpread@7..14
+                      Ellipses@7..10 "..."
+                      ExpressionReference@10..14
+                        SelfLower@10..14 "self"
+                    Comma@14..15 ","
+                    Whitespace@15..16 " "
+                    FunctionArgLabelled@16..21
+                      FunctionParamLabel@16..17
+                        IdentifierValue@16..17 "x"
+                      Whitespace@17..18 " "
+                      Equal@18..19 "="
+                      Whitespace@19..20 " "
+                      ExpressionLiteral@20..21
+                        Number@20..21 "1"
+                    Whitespace@21..22 " "
+                    BraceClose@22..23 "}""#]],
+        );
+    }
+
+    #[test]
+    fn spread_in_a_block() {
+        check(
+            indoc! {"
+                Self
+                  ...self
+                  x = 1
+            "},
+            expect![[r#"
+                ExpressionApply@0..23
+                  TypeReference@0..4
+                    SelfUpper@0..4 "Self"
+                  Newline@4..5 "\n"
+                  FunctionArgList@5..23
+                    Indent@5..7 "  "
+                    FunctionArgSpread@7..14
+                      Ellipses@7..10 "..."
+                      ExpressionReference@10..14
+                        SelfLower@10..14 "self"
+                    Newline@14..15 "\n"
+                    Whitespace@15..17 "  "
+                    FunctionArgLabelled@17..22
+                      FunctionParamLabel@17..18
+                        IdentifierValue@17..18 "x"
+                      Whitespace@18..19 " "
+                      Equal@19..20 "="
+                      Whitespace@20..21 " "
+                      ExpressionLiteral@21..22
+                        Number@21..22 "1"
+                    Newline@22..23 "\n"
+                    Dedent@23..23 """#]],
+        );
+    }
+
+    #[test]
+    fn keyword_arg_with_a_colon_recovers() {
+        check(
+            "Self { x: 1 }",
+            expect![[r#"
+                ExpressionApply@0..13
+                  TypeReference@0..4
+                    SelfUpper@0..4 "Self"
+                  Whitespace@4..5 " "
+                  FunctionArgList@5..13
+                    BraceOpen@5..6 "{"
+                    Whitespace@6..7 " "
+                    FunctionArgLabelled@7..11
+                      FunctionParamLabel@7..8
+                        IdentifierValue@7..8 "x"
+                      Error@8..9
+                        Colon@8..9 ":"
+                      Whitespace@9..10 " "
+                      ExpressionLiteral@10..11
+                        Number@10..11 "1"
+                    Whitespace@11..12 " "
+                    BraceClose@12..13 "}"
+                error at 8..9: expected ‘=’, but found ‘:’"#]],
+        );
+    }
+
+    #[test]
+    fn positional_line_in_a_block_is_an_error() {
+        check(
+            indoc! {"
+                Parts
+                  Beam.Z(1)
+                  x = 1
+            "},
+            expect![[r#"
+                ExpressionApply@0..26
+                  TypeReference@0..5
+                    IdentifierType@0..5 "Parts"
+                  Newline@5..6 "\n"
+                  FunctionArgList@6..26
+                    Indent@6..8 "  "
+                    FunctionArgPositional@8..17
+                      ExpressionApply@8..17
+                        TypeAssociation@8..14
+                          TypeReference@8..12
+                            IdentifierType@8..12 "Beam"
+                          Dot@12..13 "."
+                          IdentifierType@13..14 "Z"
+                        FunctionArgList@14..17
+                          ParenOpen@14..15 "("
+                          FunctionArgPositional@15..16
+                            ExpressionLiteral@15..16
+                              Number@15..16 "1"
+                          ParenClose@16..17 ")"
+                    Newline@17..18 "\n"
+                    Whitespace@18..20 "  "
+                    FunctionArgLabelled@20..25
+                      FunctionParamLabel@20..21
+                        IdentifierValue@20..21 "x"
+                      Whitespace@21..22 " "
+                      Equal@22..23 "="
+                      Whitespace@23..24 " "
+                      ExpressionLiteral@24..25
+                        Number@24..25 "1"
+                    Newline@25..26 "\n"
+                    Dedent@26..26 ""
+                error at 8..12: expected value-id, ‘self’, or ‘...’, but found type-id"#]],
+        );
+    }
+
+    #[test]
+    fn keyword_arg_without_a_value_is_missing() {
+        check(
+            "f(x = )",
+            expect![[r#"
+                ExpressionApply@0..7
+                  ExpressionReference@0..1
+                    IdentifierValue@0..1 "f"
+                  FunctionArgList@1..7
+                    ParenOpen@1..2 "("
+                    FunctionArgLabelled@2..6
+                      FunctionParamLabel@2..3
+                        IdentifierValue@2..3 "x"
+                      Whitespace@3..4 " "
+                      Equal@4..5 "="
+                      Whitespace@5..6 " "
+                      Missing@6..6
+                    ParenClose@6..7 ")"
+                error at 6: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, boolean, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
+        );
+    }
+
+    #[test]
+    fn positional_arg_in_braces_is_an_error() {
+        check(
+            "Self { 1, x = 2 }",
+            expect![[r#"
+                ExpressionApply@0..17
+                  TypeReference@0..4
+                    SelfUpper@0..4 "Self"
+                  Whitespace@4..5 " "
+                  FunctionArgList@5..17
+                    BraceOpen@5..6 "{"
+                    Whitespace@6..7 " "
+                    FunctionArgPositional@7..8
+                      ExpressionLiteral@7..8
+                        Number@7..8 "1"
+                    Comma@8..9 ","
+                    Whitespace@9..10 " "
+                    FunctionArgLabelled@10..15
+                      FunctionParamLabel@10..11
+                        IdentifierValue@10..11 "x"
+                      Whitespace@11..12 " "
+                      Equal@12..13 "="
+                      Whitespace@13..14 " "
+                      ExpressionLiteral@14..15
+                        Number@14..15 "2"
+                    Whitespace@15..16 " "
+                    BraceClose@16..17 "}"
+                error at 7..8: expected ‘}’, value-id, ‘self’, or ‘...’, but found number"#]],
+        );
+    }
+
+    #[test]
+    fn stray_token_in_a_block_is_one_error() {
+        check(
+            indoc! {"
+                Self
+                  , x = 1
+            "},
+            expect![[r#"
+                ExpressionApply@0..15
+                  TypeReference@0..4
+                    SelfUpper@0..4 "Self"
+                  Newline@4..5 "\n"
+                  FunctionArgList@5..15
+                    Indent@5..7 "  "
+                    FunctionArgLabelled@7..8
+                      Error@7..8
+                        Comma@7..8 ","
+                    Whitespace@8..9 " "
+                    FunctionArgLabelled@9..14
+                      FunctionParamLabel@9..10
+                        IdentifierValue@9..10 "x"
+                      Whitespace@10..11 " "
+                      Equal@11..12 "="
+                      Whitespace@12..13 " "
+                      ExpressionLiteral@13..14
+                        Number@13..14 "1"
+                    Newline@14..15 "\n"
+                    Dedent@15..15 ""
+                error at 7..8: expected value-id, ‘self’, or ‘...’, but found ‘,’"#]],
+        );
+    }
+
+    #[test]
+    fn let_pattern_with_a_renamed_field() {
+        // `let` recovers at `=`, which must not read the rename as a
+        // shorthand field.
+        check(
+            "let Self { x = a } = self in a",
+            expect![[r#"
+                ExpressionLet@0..30
+                  Let@0..3 "let"
+                  Whitespace@3..4 " "
+                  PatternType@4..18
+                    TypeReference@4..8
+                      SelfUpper@4..8 "Self"
+                    Whitespace@8..9 " "
+                    PatternTypeArgList@9..18
+                      BraceOpen@9..10 "{"
+                      Whitespace@10..11 " "
+                      PatternTypeArgLabelled@11..16
+                        IdentifierValue@11..12 "x"
+                        Whitespace@12..13 " "
+                        Equal@13..14 "="
+                        Whitespace@14..15 " "
+                        IdentifierValue@15..16 "a"
+                      Whitespace@16..17 " "
+                      BraceClose@17..18 "}"
+                  Whitespace@18..19 " "
+                  Equal@19..20 "="
+                  Whitespace@20..21 " "
+                  ExpressionReference@21..25
+                    SelfLower@21..25 "self"
+                  Whitespace@25..26 " "
+                  In@26..28 "in"
+                  Whitespace@28..29 " "
+                  ExpressionReference@29..30
+                    IdentifierValue@29..30 "a""#]],
+        );
+    }
+
+    #[test]
+    fn match_scrutinee_ends_before_the_arms() {
+        check(
+            indoc! {"
+                match a + b
+                  _ => 1
+            "},
+            expect![[r#"
+                ExpressionMatch@0..21
+                  Match@0..5 "match"
+                  Whitespace@5..6 " "
+                  ExpressionBinary@6..11
+                    ExpressionReference@6..7
+                      IdentifierValue@6..7 "a"
+                    Whitespace@7..8 " "
+                    Plus@8..9 "+"
+                    Whitespace@9..10 " "
+                    ExpressionReference@10..11
+                      IdentifierValue@10..11 "b"
+                  Newline@11..12 "\n"
+                  Indent@12..14 "  "
+                  MatchArm@14..20
+                    PatternWildcard@14..15
+                      Underscore@14..15 "_"
+                    Whitespace@15..16 " "
+                    FatArrow@16..18 "=>"
+                    Whitespace@18..19 " "
+                    ExpressionLiteral@19..20
+                      Number@19..20 "1"
+                  Newline@20..21 "\n"
+                  Dedent@21..21 """#]],
+        );
+    }
+
+    #[test]
+    fn match_scrutinee_tail_ends_before_the_arms() {
+        check(
+            indoc! {"
+                match if a then b else c
+                  _ => 1
+            "},
+            expect![[r#"
+                ExpressionMatch@0..34
+                  Match@0..5 "match"
+                  Whitespace@5..6 " "
+                  ExpressionIf@6..24
+                    If@6..8 "if"
+                    Whitespace@8..9 " "
+                    ExpressionReference@9..10
+                      IdentifierValue@9..10 "a"
+                    Whitespace@10..11 " "
+                    Then@11..15 "then"
+                    Whitespace@15..16 " "
+                    ExpressionReference@16..17
+                      IdentifierValue@16..17 "b"
+                    Whitespace@17..18 " "
+                    Else@18..22 "else"
+                    Whitespace@22..23 " "
+                    ExpressionReference@23..24
+                      IdentifierValue@23..24 "c"
+                  Newline@24..25 "\n"
+                  Indent@25..27 "  "
+                  MatchArm@27..33
+                    PatternWildcard@27..28
+                      Underscore@27..28 "_"
+                    Whitespace@28..29 " "
+                    FatArrow@29..31 "=>"
+                    Whitespace@31..32 " "
+                    ExpressionLiteral@32..33
+                      Number@32..33 "1"
+                  Newline@33..34 "\n"
+                  Dedent@34..34 """#]],
+        );
+    }
+
+    #[test]
+    fn match_with_no_arms_ends_at_the_input() {
+        check(
+            "match x",
+            expect![[r#"
+                ExpressionMatch@0..7
+                  Match@0..5 "match"
+                  Whitespace@5..6 " "
+                  ExpressionReference@6..7
+                    IdentifierValue@6..7 "x"
+                  Missing@7..7
+                  Missing@7..7
+                error at 7: missing indent
+                error at 7: missing dedent"#]],
         );
     }
 }

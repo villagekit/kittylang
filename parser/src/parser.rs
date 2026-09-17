@@ -86,6 +86,29 @@ impl<'t> Parser<'t> {
         }
     }
 
+    /// Records an `Unexpected` error at the current token and leaves the
+    /// token in place. The caller then parses the construct it begins, so
+    /// a construct in the wrong place is one error, not one per token.
+    ///
+    /// At the end of the input this records a `Missing` error instead, as
+    /// `error` does; a caller checks `at_recovery` first.
+    pub(crate) fn error_misplaced(&mut self) {
+        let expected = std::mem::take(&mut self.expected_kinds);
+        match self.source.peek_token() {
+            Some(&Token { kind, range, .. }) => {
+                self.errors.push(ParseError::Unexpected {
+                    expected,
+                    found: Some(kind),
+                    range,
+                });
+            }
+            None => {
+                let offset = self.source.end_offset();
+                self.errors.push(ParseError::Missing { expected, offset });
+            }
+        }
+    }
+
     pub(crate) fn mark_kind(&mut self, kind: NodeKind) -> CompletedMarker {
         let m = self.start();
         self.bump();
@@ -130,6 +153,20 @@ impl<'t> Parser<'t> {
 
     pub(crate) fn lookahead_at(&mut self, nth: usize, kind: TokenKind) -> bool {
         self.source.lookahead_kind(nth) == Some(kind)
+    }
+
+    /// Whether the next token is one the caller continues from, or the
+    /// input has ended: the place `error` consumes nothing. A loop over
+    /// items with no separator ends here, so it always makes progress.
+    /// The recovery kinds are not expected kinds, so none is recorded.
+    pub(crate) fn at_recovery(&mut self, recovery: TokenSet) -> bool {
+        self.peek().is_none_or(|kind| recovery.contains(kind))
+    }
+
+    /// Whether the next token is in `set`, without recording the set as
+    /// expected: for a rule choosing a path, not a rule expecting a token.
+    pub(crate) fn peek_in(&mut self, set: TokenSet) -> bool {
+        self.peek().is_some_and(|kind| set.contains(kind))
     }
 
     fn at_set_raw(&mut self, set: &TokenSet) -> bool {
