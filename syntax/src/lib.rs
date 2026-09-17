@@ -59,6 +59,7 @@ pub enum NodeKind {
     ExpressionBlock,
     ExpressionFunction,
     ExpressionLet,
+    ExpressionLetWith,
     ExpressionIf,
     ExpressionMatch,
     MatchArm,

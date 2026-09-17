@@ -467,7 +467,8 @@ Label      = "IdentifierValue" | "self"                          (FunctionParamL
   with its `=` and its value missing, two errors (review only).
 - An indented block after an operand is its argument list, except where
   the rule that follows owns the block: the expression after `match`
-  ends before the block of arms. The restriction holds through operators
+  ends before the block of arms, and the value of a `let with` before
+  the block of names. The restriction holds through operators
   and the tail of an `if` or a `let`, and lifts inside brackets and
   blocks (`match_scrutinee_ends_before_the_arms`,
   `match_scrutinee_tail_ends_before_the_arms`,
@@ -497,9 +498,10 @@ newlines are trivia and what a newline means is undecided
 ## Let
 
 ```
-Let     = "let" Pattern [ ":" TypeAnnotation ] "=" Expression ( "in" Expression | Expression )
+Let     = "let" Pattern [ ":" TypeAnnotation ] "=" Expression [ "in" ] Expression
                                                                  (ExpressionLet)
 LetWith = "let" "with" Expression Indent { "IdentifierValue" } Dedent Expression
+                                                                 (ExpressionLetWith)
 ```
 
 - A `let` must bind a pattern to a value and then continue with a body
@@ -507,12 +509,24 @@ LetWith = "let" "with" Expression Indent { "IdentifierValue" } Dedent Expression
 - `in` may separate the value from the body on one line; when the next
   token after the value is not `in`, the value ends there and the body is
   the expression that follows, the newline being the implicit `in`
-  (`let_expression_type`, `parser/src/grammar/expression.rs`; without `in`
-  review only).
+  (`let_expression_type`, `let_expression_without_in`,
+  `parser/src/grammar/expression.rs`).
 - `let with <expr>` followed by a block of value identifiers, one per
   line, must bind each name to the field of that name on the value; no
   `in` follows the block, and the body is the expression that follows
-  (review only).
+  (`let_with_three_names`, `parser/src/grammar/expression.rs`). The
+  block after the value is the names, never the value's argument list.
+- Recovery: a missing block is its own error, and the body is read
+  where the block should be (`let_with_empty_block`,
+  `parser/src/grammar/expression.rs`); a token among the names that is
+  not a value identifier is one error each
+  (`let_with_a_type_name_among_the_names`,
+  `parser/src/grammar/expression.rs`); an `in` after the block is the
+  body's error, consumed as one, and the body is read after it
+  (`let_with_stray_in`, `parser/src/grammar/expression.rs`), unless the
+  `in` belongs to an enclosing `let`, where the body is missing and the
+  `in` is left to it (`let_with_as_a_let_value`,
+  `parser/src/grammar/expression.rs`).
 
 Example (non-normative):
 
@@ -524,7 +538,13 @@ let x = seat_width + seat_depth
 x * 2
 ```
 
-Gap: the parser requires `in` and has no `let with` rule.
+Gap: the parser does not end a `let` value at the newline, nor hold the
+names to one per line, since newlines are trivia and what a newline
+means is undecided
+([design plan d0658cb1](../plans/d0658cb19697-design-newlines-inside-brackets.md));
+`let x = 1 2` on one line parses `2` as the body, `a b` on one line as
+two names, and a value continued on the next line with `(` reads as a
+call.
 
 ## If
 

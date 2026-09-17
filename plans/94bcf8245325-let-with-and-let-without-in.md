@@ -1,6 +1,6 @@
 ---
 title: let with, and let without in
-status: todo
+status: done
 parent: 1cee599ce218
 blocked_by:
   - 0248a546fe20
@@ -54,4 +54,51 @@ Not this slice: newlines inside brackets ([[d0658cb19697]]).
 
 ## Outcome
 
+Shipped. `in` is optional after a `let` value: the value ends where the
+next token is not `in`, and the body is what follows. `let with <expr>`
+then an indented block of value identifiers then the body parses into a
+new `ExpressionLetWith` node; the block after the value is the names,
+never the value's argument list. The lexer gains the `with` keyword.
+`kitty-cst` gains `ExpressionLetWith` (`value`, `names`, `body`) and
+`ExpressionLet::body`. The four snapshots the plan asks for are in
+`parser/src/grammar/expression.rs` (`let_expression_type`,
+`let_expression_without_in`, `let_with_three_names`,
+`let_with_empty_block`), with three recovery cases beside them. The
+examples test: `sample.kitty` now lists no error; `chair.kitty` lists
+none at its `let` lines or in the `let with` block, and the errors in
+the let region fell from 41 to one, the bare `in` line after the block
+([[75d0d7eea26c]] removes that line).
+
+Deviations and flags for the operator:
+
+- The plan's claim that "the examples do not" continue a value on the
+  next line with `(` is false: `3d-math.kitty` lines 14-15 (`= self`
+  then `(x * x + ...).sqrt()`) read as a call, so the file still lists
+  one error, at its end (the missing body). Newlines are trivia as the
+  plan says, and where a newline ends a value is [[d0658cb19697]]'s
+  question; [[75d0d7eea26c]]'s exit demo wants this file empty, so one
+  of the two must resolve that line. Not fixed here: no other slice
+  edits `examples/`.
+- Recovery: an `in` after the `let with` block, the single-line form's
+  habit, is the body's error, consumed as one, and the body is read
+  after it (`let_with_stray_in`); without this the enclosing block
+  cascaded errors onto the `let` lines below, the plan's exit
+  criterion. The Spec reviewer flagged it as scope creep; kept, since
+  the grammar is unchanged and the mistake is the likely one.
+
+Review findings deferred, each marked in the code: the CST accessors
+are positional, so on a recovery tree with the value missing `value`
+is the body (`Note(cc)` in `cst/src/lib.rs`, M3's concern); a `let`
+body missing at the end of input lists the operator kinds the value's
+Pratt loop recorded, since nothing clears them between the value and
+the body (`TODO(cc)` in `expression.rs`; the old `expect(In)` masked
+this); a nested block among the names is skipped token by token and
+its dedent ends the names, as the argument block's loop does
+(`Note(cc)`). Rejected: an indented block after a `let` value being
+its argument list is the designed call form, not a defect.
+
+No visual gate: the change touches no route.
+
 ## Log
+
+- 2026-09-18: shipped on branch `slop`.

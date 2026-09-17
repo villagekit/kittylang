@@ -83,12 +83,10 @@ Keywords, one kind each, spelled as written: `fn`, `Fn`, `let`, `in`,
 `with`, `if`, `then`, `else`, `match`, `case`, `self`, `Self`, `type`,
 `const`, `enum`, `struct`, `prop`, `impl`, `trait`, `where`, `for`,
 `import`, `export`, `from`, `and`, `or`, `xor`, `not`, `rem`
-(`lex_let_keyword`, `lexer/src/token.rs`; `with` review only).
+(`lex_let_keyword`, `lex_with_keyword`, `lexer/src/token.rs`).
 
 The kinds are the `TokenKind` enum in `lexer/src/token.rs`; a kind absent
 from this table is a defect in one of the two.
-
-Gap: the code has no `with` keyword.
 
 ## Identifiers
 

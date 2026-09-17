@@ -154,6 +154,31 @@ impl ExpressionLet {
     pub fn value(self, tree: &SyntaxTree) -> Option<Expression> {
         node(self, tree)
     }
+
+    /// The expression after the value, where the pattern's names are in scope.
+    // Note(cc): the accessors are positional, so on a recovery tree with
+    // the value missing, `value` is the body and `body` is `None`; the
+    // analysis (M3) decides whether the views need to tell them apart.
+    pub fn body(self, tree: &SyntaxTree) -> Option<Expression> {
+        nodes(self, tree).nth(1)
+    }
+}
+define_node!(ExpressionLetWith);
+impl ExpressionLetWith {
+    /// The value whose fields the names are bound to.
+    pub fn value(self, tree: &SyntaxTree) -> Option<Expression> {
+        node(self, tree)
+    }
+
+    /// The names in the indented block, in source order.
+    pub fn names(self, tree: &SyntaxTree) -> impl Iterator<Item = IdentifierValue> + '_ {
+        tokens(self, tree)
+    }
+
+    /// The expression after the block, where the names are in scope.
+    pub fn body(self, tree: &SyntaxTree) -> Option<Expression> {
+        nodes(self, tree).nth(1)
+    }
 }
 define_node!(ExpressionIf);
 define_node!(ExpressionMatch);
@@ -195,6 +220,7 @@ define_compound_node!(
         ExpressionLiteral,
         ExpressionBlock,
         ExpressionLet,
+        ExpressionLetWith,
         ExpressionIf,
         ExpressionMatch,
         ExpressionApply,
@@ -516,5 +542,14 @@ fn nodes<Parent: CstNode, Child: CstNode>(
 ) -> impl Iterator<Item = Child> + '_ {
     node.syntax()
         .child_nodes(tree)
+        .filter_map(move |c| Child::cast(c, tree))
+}
+
+fn tokens<Parent: CstNode, Child: CstToken>(
+    node: Parent,
+    tree: &SyntaxTree,
+) -> impl Iterator<Item = Child> + '_ {
+    node.syntax()
+        .child_tokens(tree)
         .filter_map(move |c| Child::cast(c, tree))
 }

@@ -39,6 +39,10 @@ impl TokenSet {
     pub(crate) const fn union<const LEN: usize>(self, other: [TokenKind; LEN]) -> Self {
         Self(self.0 | TokenSet::new(other).0)
     }
+
+    pub(crate) const fn union_set(self, other: TokenSet) -> Self {
+        Self(self.0 | other.0)
+    }
 }
 
 const fn mask(kind: TokenKind) -> u128 {

@@ -74,6 +74,8 @@ pub enum TokenKind {
     Let,
     #[token("in")]
     In,
+    #[token("with")]
+    With,
     #[token("if")]
     If,
     #[token("then")]
@@ -200,6 +202,7 @@ impl fmt::Display for TokenKind {
             Self::FnUpper => "‘Fn’",
             Self::Let => "‘let’",
             Self::In => "‘in’",
+            Self::With => "‘with’",
             Self::If => "‘if’",
             Self::Then => "‘then’",
             Self::Else => "‘else’",
@@ -409,6 +412,11 @@ mod tests {
     #[test]
     fn lex_let_keyword() {
         check_token("let", TokenKind::Let);
+    }
+
+    #[test]
+    fn lex_with_keyword() {
+        check_token("with", TokenKind::With);
     }
 
     #[test]

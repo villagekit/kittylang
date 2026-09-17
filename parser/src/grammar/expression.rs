@@ -6,7 +6,11 @@ use super::{
     r#type::{type_annotation, type_path_in_expression, TYPE_PATH_FIRST},
     NAME_FIRST,
 };
-use crate::{marker::CompletedMarker, token_set::TokenSet, Parser};
+use crate::{
+    marker::{CompletedMarker, Marker},
+    token_set::TokenSet,
+    Parser,
+};
 
 /// Parse an expression.
 pub(crate) fn expression(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMarker> {
@@ -234,24 +238,77 @@ fn expression_function(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     function_declaration(p, recovery, FunctionForm::Lambda, m)
 }
 
-/// Parse a let expression: `let <identifier> = <expr> in <expr>`
+/// Parse a let expression: `let <pattern> = <expr> in <expr>`, or
+/// `let with <expr>` and a block of names.
 ///
-/// The body is the tail, so it keeps the caller's block restriction.
+/// The `in` is optional: when the token after the value is not `in`,
+/// the value ends there and the body is what follows, the newline being
+/// the implicit `in`. The body is the tail, so it keeps the caller's
+/// block restriction.
 fn expression_let(p: &mut Parser, recovery: TokenSet, block_args: BlockArgs) -> CompletedMarker {
     let m = p.start();
     p.expect(TokenKind::Let, recovery);
+    if p.at(TokenKind::With) {
+        return expression_let_with(p, recovery, block_args, m);
+    }
     pattern(p, recovery.union([TokenKind::Equal, TokenKind::In]));
     if p.at(TokenKind::Colon) {
         p.bump(); // Consume ':'.
         type_annotation(p, recovery);
     }
     p.expect(TokenKind::Equal, recovery.union([TokenKind::In]));
-    // The value of the variable
-    expression(p, recovery);
-    p.expect(TokenKind::In, recovery);
-    // The body of the let scope
+    // The value of the variable.
+    expression(p, recovery.union([TokenKind::In]));
+    // TODO(cc): the kinds the value's operator checks recorded, and `in`,
+    // carry into the body's error message when the body is missing.
+    p.bump_if_at(TokenKind::In);
+    // The body of the let scope.
     expression_pratt(p, recovery, 0, block_args);
     m.complete(p, NodeKind::ExpressionLet)
+}
+
+/// Parse the rest of a `let with` after its `let`: the value, then an
+/// indented block of names, one per line, then the body.
+///
+/// No `in` follows the block: the dedent ends the names and the body is
+/// what comes next. An `in` written there anyway, the single-line form's
+/// habit, is the body's error and is consumed as one, so the body after
+/// it is still read.
+fn expression_let_with(
+    p: &mut Parser,
+    recovery: TokenSet,
+    block_args: BlockArgs,
+    m: Marker,
+) -> CompletedMarker {
+    // `expression_let` dispatches here on `with`.
+    debug_assert_eq!(p.peek(), Some(TokenKind::With));
+    p.bump(); // Consume 'with'.
+
+    // The block after the value is the names, never its arguments, and
+    // an error in the value stops at the indent so the names are kept.
+    expression_before_block(p, recovery.union([TokenKind::Indent]));
+    if p.at(TokenKind::Indent) {
+        p.bump(); // Consume the indent.
+        let recovery_names = recovery.union([TokenKind::Dedent]);
+        // Note(cc): a nested block among the names is skipped token by
+        // token, and its dedent ends the names, as in the argument block's
+        // loop (`function_arg_list_block`).
+        while !p.at_recovery(recovery_names) {
+            if !p.bump_if_at(TokenKind::IdentifierValue) {
+                p.error(recovery_names);
+            }
+        }
+        p.expect(TokenKind::Dedent, recovery);
+    } else {
+        // The body starts where the block should; leave its first token to it.
+        p.error(recovery.union_set(EXPRESSION_FIRST));
+    }
+    if p.peek() == Some(TokenKind::In) && !recovery.contains(TokenKind::In) {
+        let stray_in = expression_pratt(p, recovery, 0, block_args);
+        debug_assert!(stray_in.is_none());
+    }
+    expression_pratt(p, recovery, 0, block_args);
+    m.complete(p, NodeKind::ExpressionLetWith)
 }
 
 /// Parse an if expression: `if <cond> then <expr> [else <expr>]`
@@ -1077,7 +1134,7 @@ mod tests {
                   Whitespace@10..11 " "
                   ExpressionLiteral@11..12
                     Number@11..12 "2"
-                error at 4: missing value-id, _, number, string, ‘(’, type-id, or ‘Self’"#]],
+                error at 4: missing ‘with’, value-id, _, number, string, ‘(’, type-id, or ‘Self’"#]],
         );
     }
 
@@ -1096,16 +1153,13 @@ mod tests {
                   Error@6..7
                     Number@6..7 "1"
                   Whitespace@7..8 " "
-                  Error@8..10
-                    In@8..10 "in"
+                  Missing@8..8
+                  In@8..10 "in"
                   Whitespace@10..11 " "
-                  Error@11..12
+                  ExpressionLiteral@11..12
                     Number@11..12 "2"
-                  Missing@12..12
                 error at 6..7: expected ‘=’, but found number
-                error at 8..10: expected ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’, but found ‘in’
-                error at 11..12: expected ‘in’, but found number
-                error at 12: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
+                error at 8: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
         );
     }
 
@@ -1123,40 +1177,12 @@ mod tests {
                   Whitespace@5..6 " "
                   Equal@6..7 "="
                   Whitespace@7..9 "  "
-                  Error@9..11
-                    In@9..11 "in"
+                  Missing@9..9
+                  In@9..11 "in"
                   Whitespace@11..12 " "
-                  Error@12..13
+                  ExpressionLiteral@12..13
                     Number@12..13 "2"
-                  Missing@13..13
-                error at 9..11: expected ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’, but found ‘in’
-                error at 12..13: expected ‘in’, but found number
-                error at 13: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
-        );
-    }
-
-    #[test]
-    fn let_expression_missing_in() {
-        // Unhappy path: let expression missing the 'in' keyword.
-        check(
-            "let x = 1 2",
-            expect![[r#"
-                ExpressionLet@0..11
-                  Let@0..3 "let"
-                  Whitespace@3..4 " "
-                  PatternName@4..5
-                    IdentifierValue@4..5 "x"
-                  Whitespace@5..6 " "
-                  Equal@6..7 "="
-                  Whitespace@7..8 " "
-                  ExpressionLiteral@8..9
-                    Number@8..9 "1"
-                  Whitespace@9..10 " "
-                  Error@10..11
-                    Number@10..11 "2"
-                  Missing@11..11
-                error at 10..11: expected ‘in’, but found number
-                error at 11: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
+                error at 9: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
         );
     }
 
@@ -1293,6 +1319,222 @@ mod tests {
                     Whitespace@25..26 " "
                     ExpressionLiteral@26..28
                       Number@26..28 "20""#]],
+        );
+    }
+
+    #[test]
+    fn let_expression_without_in() {
+        // Happy path: the value ends at the newline, the body follows.
+        check(
+            indoc! {"
+                let x = 1
+                x + 2
+            "},
+            expect![[r#"
+                ExpressionLet@0..16
+                  Let@0..3 "let"
+                  Whitespace@3..4 " "
+                  PatternName@4..5
+                    IdentifierValue@4..5 "x"
+                  Whitespace@5..6 " "
+                  Equal@6..7 "="
+                  Whitespace@7..8 " "
+                  ExpressionLiteral@8..9
+                    Number@8..9 "1"
+                  Newline@9..10 "\n"
+                  ExpressionBinary@10..15
+                    ExpressionReference@10..11
+                      IdentifierValue@10..11 "x"
+                    Whitespace@11..12 " "
+                    Plus@12..13 "+"
+                    Whitespace@13..14 " "
+                    ExpressionLiteral@14..15
+                      Number@14..15 "2"
+                  Newline@15..16 "\n""#]],
+        );
+    }
+
+    #[test]
+    fn let_with_three_names() {
+        // Happy path: the names are the indented block, no `in` follows.
+        check(
+            indoc! {"
+                let with self
+                  a
+                  b
+                  c
+                a + b + c
+            "},
+            expect![[r#"
+                ExpressionLetWith@0..36
+                  Let@0..3 "let"
+                  Whitespace@3..4 " "
+                  With@4..8 "with"
+                  Whitespace@8..9 " "
+                  ExpressionReference@9..13
+                    SelfLower@9..13 "self"
+                  Newline@13..14 "\n"
+                  Indent@14..16 "  "
+                  IdentifierValue@16..17 "a"
+                  Newline@17..18 "\n"
+                  Whitespace@18..20 "  "
+                  IdentifierValue@20..21 "b"
+                  Newline@21..22 "\n"
+                  Whitespace@22..24 "  "
+                  IdentifierValue@24..25 "c"
+                  Newline@25..26 "\n"
+                  Dedent@26..26 ""
+                  ExpressionBinary@26..35
+                    ExpressionBinary@26..31
+                      ExpressionReference@26..27
+                        IdentifierValue@26..27 "a"
+                      Whitespace@27..28 " "
+                      Plus@28..29 "+"
+                      Whitespace@29..30 " "
+                      ExpressionReference@30..31
+                        IdentifierValue@30..31 "b"
+                    Whitespace@31..32 " "
+                    Plus@32..33 "+"
+                    Whitespace@33..34 " "
+                    ExpressionReference@34..35
+                      IdentifierValue@34..35 "c"
+                  Newline@35..36 "\n""#]],
+        );
+    }
+
+    #[test]
+    fn let_with_empty_block() {
+        // Unhappy path: no names follow the value.
+        check(
+            indoc! {"
+                let with self
+                1
+            "},
+            expect![[r#"
+                ExpressionLetWith@0..16
+                  Let@0..3 "let"
+                  Whitespace@3..4 " "
+                  With@4..8 "with"
+                  Whitespace@8..9 " "
+                  ExpressionReference@9..13
+                    SelfLower@9..13 "self"
+                  Newline@13..14 "\n"
+                  Missing@14..14
+                  ExpressionLiteral@14..15
+                    Number@14..15 "1"
+                  Newline@15..16 "\n"
+                error at 14: missing ‘(’, ‘{’, ‘.’, ‘*’, ‘/’, ‘rem’, ‘+’, ‘-’, ‘<’, ‘<=’, ‘>’, ‘>=’, ‘==’, ‘!=’, ‘and’, ‘xor’, ‘or’, or indent"#]],
+        );
+    }
+
+    #[test]
+    fn let_with_a_type_name_among_the_names() {
+        // Unhappy path: a token among the names that is not a value identifier.
+        check(
+            indoc! {"
+                let with self
+                  a
+                  Foo
+                  b
+                a
+            "},
+            expect![[r#"
+                ExpressionLetWith@0..30
+                  Let@0..3 "let"
+                  Whitespace@3..4 " "
+                  With@4..8 "with"
+                  Whitespace@8..9 " "
+                  ExpressionReference@9..13
+                    SelfLower@9..13 "self"
+                  Newline@13..14 "\n"
+                  Indent@14..16 "  "
+                  IdentifierValue@16..17 "a"
+                  Newline@17..18 "\n"
+                  Whitespace@18..20 "  "
+                  Error@20..23
+                    IdentifierType@20..23 "Foo"
+                  Newline@23..24 "\n"
+                  Whitespace@24..26 "  "
+                  IdentifierValue@26..27 "b"
+                  Newline@27..28 "\n"
+                  Dedent@28..28 ""
+                  ExpressionReference@28..29
+                    IdentifierValue@28..29 "a"
+                  Newline@29..30 "\n"
+                error at 20..23: expected value-id, but found type-id"#]],
+        );
+    }
+
+    #[test]
+    fn let_with_as_a_let_value() {
+        // Unhappy path: the `in` after the block belongs to the enclosing `let`.
+        check(
+            indoc! {"
+                let x = let with self
+                  a
+                in x
+            "},
+            expect![[r#"
+                ExpressionLet@0..31
+                  Let@0..3 "let"
+                  Whitespace@3..4 " "
+                  PatternName@4..5
+                    IdentifierValue@4..5 "x"
+                  Whitespace@5..6 " "
+                  Equal@6..7 "="
+                  Whitespace@7..8 " "
+                  ExpressionLetWith@8..26
+                    Let@8..11 "let"
+                    Whitespace@11..12 " "
+                    With@12..16 "with"
+                    Whitespace@16..17 " "
+                    ExpressionReference@17..21
+                      SelfLower@17..21 "self"
+                    Newline@21..22 "\n"
+                    Indent@22..24 "  "
+                    IdentifierValue@24..25 "a"
+                    Newline@25..26 "\n"
+                    Dedent@26..26 ""
+                    Missing@26..26
+                  In@26..28 "in"
+                  Whitespace@28..29 " "
+                  ExpressionReference@29..30
+                    IdentifierValue@29..30 "x"
+                  Newline@30..31 "\n"
+                error at 26: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
+        );
+    }
+
+    #[test]
+    fn let_with_stray_in() {
+        // Unhappy path: an `in` after the names, the single-line form's habit.
+        check(
+            indoc! {"
+                let with self
+                  a
+                in
+                a
+            "},
+            expect![[r#"
+                ExpressionLetWith@0..23
+                  Let@0..3 "let"
+                  Whitespace@3..4 " "
+                  With@4..8 "with"
+                  Whitespace@8..9 " "
+                  ExpressionReference@9..13
+                    SelfLower@9..13 "self"
+                  Newline@13..14 "\n"
+                  Indent@14..16 "  "
+                  IdentifierValue@16..17 "a"
+                  Newline@17..18 "\n"
+                  Dedent@18..18 ""
+                  Error@18..20
+                    In@18..20 "in"
+                  Newline@20..21 "\n"
+                  ExpressionReference@21..22
+                    IdentifierValue@21..22 "a"
+                  Newline@22..23 "\n"
+                error at 18..20: expected ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’, but found ‘in’"#]],
         );
     }
 

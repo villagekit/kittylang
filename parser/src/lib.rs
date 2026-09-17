@@ -613,7 +613,6 @@ mod tests {
                               Newline@273..274 "\n"
                               Newline@274..275 "\n"
                               Missing@275..275
-                              Missing@275..275
                             Dedent@275..275 ""
                       Dedent@275..275 ""
                   ModuleExport@275..387
@@ -688,8 +687,7 @@ mod tests {
                           Number@385..386 "0"
                       Newline@386..387 "\n"
                       Dedent@387..387 ""
-                error at 275: missing ‘in’
-                error at 275: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
+                error at 275: missing ‘(’, ‘{’, indent, ‘.’, ‘*’, ‘/’, ‘rem’, ‘+’, ‘-’, ‘<’, ‘<=’, ‘>’, ‘>=’, ‘==’, ‘!=’, ‘and’, ‘xor’, ‘or’, ‘in’, ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
         );
     }
 }
