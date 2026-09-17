@@ -156,6 +156,7 @@ prompt carries the context they need. No tool restrictions.
 | `just build` | Build the full workspace |
 | `just clippy` | Clippy with warnings as errors |
 | `just fmt` | Format all crates |
+| `just playground` | Build the playground's wasm into `playground/web/pkg/` (adds the wasm target and `wasm-bindgen-cli` on first run) and say how to serve the page |
 | `just fuzz` | Fuzz `kitty_parser::parse` for 60 seconds, seeded from `examples/`; needs nightly, installs `cargo-fuzz` on first run; not part of `just check`; bound it once installed: `timeout 120 just fuzz` |
 
 No CI host yet: the gate is run locally.
@@ -210,9 +211,10 @@ Flix, Julia), read its reference, not a summary of it.
 The discipline is `/tdd`; the repo's bindings:
 
 - TDD applies in full: the whole pipeline is pure, deterministic code
-  (source text in, tokens, tree, HIR, value out). No I/O boundary exists
-  yet; when one does (a CLI, a REPL, an embedding), it is exempt but kept
-  thin.
+  (source text in, tokens, tree, HIR, value out). The I/O boundaries, the
+  `kitty` command and the playground page, are exempt but kept thin: they
+  move text between the outside and the library crates and decide
+  nothing themselves.
 - Snapshot tests through `expect-test` are the house style: a source
   string in, the rendered tokens or tree out, the expectation updated with
   `UPDATE_EXPECT=1` only when the change is intended and reviewed.
@@ -245,6 +247,9 @@ One cargo workspace, the crates named `kitty-<dir>`:
   produce. Types only so far.
 - `meta/`: source ids, spans, diagnostic rendering.
 - `number/`: the `Number` type over `fastnum` decimals.
+- `playground/`: the compiler as a library for a web page: `inspect_json`
+  behind a `wasm-bindgen` export, and `web/index.html`, the page, built
+  by `just playground`.
 - `examples/`: `.kitty` programs, the end-to-end fixtures.
 - `fuzz/`: the `cargo-fuzz` target over `kitty_parser::parse`, its own
   cargo root outside the workspace, run by `just fuzz`.

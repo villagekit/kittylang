@@ -18,6 +18,10 @@ a spec exists it is the owner; until then the crate is.
 - **Kitty command**: the `kitty` binary that prints what the compiler
   sees: `kitty lex` the tokens, `kitty parse` the tree and the parse
   errors. ([cli/README.md](../cli/README.md))
+- **Playground**: the web page where the source is typed, the tokens and
+  the tree update beside it and the parse errors beneath it on every
+  keystroke, the source coloured by the lexer's token kinds.
+  ([playground/README.md](../playground/README.md))
 
 ## Lexing
 

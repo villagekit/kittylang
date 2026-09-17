@@ -8,6 +8,7 @@ members = [
   "meta",
   "number",
   "parser",
+  "playground",
   "syntax"
 ]
 # `fuzz/` is its own cargo root, built by `cargo fuzz` on nightly (`just

@@ -7,3 +7,4 @@
 /.claude/*
 !/.claude/skills
 /.claude/skills/transcripts/scripts/target/
+/playground/web/pkg

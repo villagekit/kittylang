@@ -55,6 +55,9 @@ order:
 - `number/`: `Number`, a `fastnum` decimal.
 - `cli/`: the `kitty` command, which prints what the compiler sees: the
   tokens, the tree, the errors.
+- `playground/`: the compiler as a library, through `wasm-bindgen`, and
+  the web page that shows the tokens, the tree and the errors as the
+  source is typed.
 
 Around the code: `specs/`, the normative design; `docs/`, narrative for an
 outside reader, opened by the glossary; `decisions/`, the decision

@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kitty Lang playground</title>
+<style>
+  :root {
+    --bg: #fbfaf7;
+    --fg: #2b2b2b;
+    --muted: #7a776f;
+    --border: #d9d5cb;
+    --pane: #ffffff;
+    --error: #c62828;
+    --keyword: #8a3ffc;
+    --type: #0f62fe;
+    --value: #2b2b2b;
+    --literal: #198038;
+    --comment: #8d8d8d;
+    --punct: #6f6f6f;
+    --block: #ffe9a8;
+    --package: #ba4e00;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    font: 14px/1.5 system-ui, sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+  }
+  header {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { margin: 0; font-size: 1rem; font-weight: 600; }
+  header .status { color: var(--muted); }
+  header .status.failed { color: var(--error); }
+  main {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: minmax(0, 2fr) minmax(0, 1fr);
+    gap: 1px;
+    min-height: 0;
+    background: var(--border);
+  }
+  main > section {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+    background: var(--pane);
+  }
+  main > section > h2 {
+    margin: 0;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  #editor { grid-row: 1; grid-column: 1; }
+  #errors { grid-row: 2; grid-column: 1; }
+  #tokens { grid-row: 1; grid-column: 2; }
+  #tree { grid-row: 2; grid-column: 2; }
+
+  .code, pre, textarea {
+    font: 13px/1.45 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    tab-size: 4;
+  }
+  pre { margin: 0; }
+  .out {
+    flex: 1;
+    overflow: auto;
+    padding: 0.5rem 0.75rem;
+    white-space: pre;
+  }
+
+  /* The textarea sits over the coloured copy of its text. Both have the
+     same font, padding and wrapping, so the glyphs line up; the textarea
+     paints only the caret and the selection. */
+  .stack {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+  }
+  .stack > #highlight, .stack > #source {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    padding: 0.5rem 0.75rem;
+    border: 0;
+    overflow: auto;
+    white-space: pre;
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+  #highlight {
+    pointer-events: none;
+    color: var(--value);
+  }
+  #source {
+    background: transparent;
+    color: transparent;
+    caret-color: var(--fg);
+    resize: none;
+    outline: none;
+  }
+  #source::selection { background: rgba(15, 98, 254, 0.25); }
+
+  /* One class per token kind, the lexer's own names. */
+  .tok-Fn, .tok-FnUpper, .tok-Let, .tok-In, .tok-With, .tok-If, .tok-Then,
+  .tok-Else, .tok-Match, .tok-Case, .tok-Type, .tok-Const, .tok-Enum,
+  .tok-Struct, .tok-Prop, .tok-Impl, .tok-Trait, .tok-Where, .tok-For,
+  .tok-Import, .tok-Export, .tok-From, .tok-And, .tok-Or, .tok-Xor,
+  .tok-Not, .tok-Rem { color: var(--keyword); }
+  .tok-SelfLower, .tok-SelfUpper, .tok-Underscore { color: var(--keyword); font-style: italic; }
+  .tok-IdentifierType { color: var(--type); }
+  .tok-IdentifierValue { color: var(--value); }
+  .tok-String, .tok-Number { color: var(--literal); }
+  .tok-Comment { color: var(--comment); font-style: italic; }
+  .tok-At, .tok-Package { color: var(--package); }
+  .tok-ParenOpen, .tok-ParenClose, .tok-BraceOpen, .tok-BraceClose,
+  .tok-BracketOpen, .tok-BracketClose, .tok-Comma, .tok-Colon, .tok-Dot,
+  .tok-DotBracketOpen, .tok-Ellipses, .tok-Arrow, .tok-FatArrow, .tok-Plus,
+  .tok-Minus, .tok-Multiply, .tok-Divide, .tok-Greater, .tok-GreaterEqual,
+  .tok-Less, .tok-LessEqual, .tok-Equal, .tok-EqualEqual, .tok-NotEqual { color: var(--punct); }
+  .tok-Indent { background: var(--block); }
+  .tok-Error { background: rgba(198, 40, 40, 0.15); }
+
+  .err {
+    text-decoration: underline wavy var(--error);
+    text-decoration-skip-ink: none;
+  }
+  /* A zero-width bar at the offset: the margins cancel the border's
+     width, so the text after it stays aligned with the textarea. */
+  .missing {
+    border-left: 2px solid var(--error);
+    margin-left: -1px;
+    margin-right: -1px;
+  }
+
+  #error-list { margin: 0; padding: 0.5rem 0.75rem; list-style: none; overflow: auto; flex: 1; }
+  #error-list li { padding: 0.125rem 0; }
+  #error-list .where { color: var(--muted); }
+  #error-list:empty::before { content: "no errors"; color: var(--muted); }
+
+  #token-count, #error-count { font-weight: normal; text-transform: none; letter-spacing: 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Kitty Lang playground</h1>
+  <span class="status" id="status">loading the compiler</span>
+</header>
+<main>
+  <section id="editor">
+    <h2>Source</h2>
+    <div class="stack">
+      <pre id="highlight" aria-hidden="true"></pre>
+      <textarea id="source" spellcheck="false" autocomplete="off" autocapitalize="off" wrap="off" aria-label="Kitty source"></textarea>
+    </div>
+  </section>
+  <section id="errors">
+    <h2>Errors <span id="error-count"></span></h2>
+    <ol id="error-list"></ol>
+  </section>
+  <section id="tokens">
+    <h2>Tokens <span id="token-count"></span></h2>
+    <pre class="out" id="token-list"></pre>
+  </section>
+  <section id="tree">
+    <h2>Tree</h2>
+    <pre class="out" id="tree-text"></pre>
+  </section>
+</main>
+<script type="module">
+  import init, { inspect } from "./pkg/kitty_playground.js";
+
+  const source = document.getElementById("source");
+  const highlight = document.getElementById("highlight");
+  const tokenList = document.getElementById("token-list");
+  const tokenCount = document.getElementById("token-count");
+  const treeText = document.getElementById("tree-text");
+  const errorList = document.getElementById("error-list");
+  const errorCount = document.getElementById("error-count");
+  const status = document.getElementById("status");
+
+  const sample = [
+    "export struct Length",
+    "  prop x: Number",
+    "",
+    "impl Add for Length",
+    "  fn add(self, other) =>",
+    "    Self { x = self.x + other.x }",
+    "",
+    "fn broken(a, b) => a +",
+    "",
+  ].join("\n");
+
+  // The compiler's ranges are byte offsets into UTF-8 text; the page
+  // works in UTF-16 code units. One table, rebuilt per keystroke, maps
+  // each byte offset to its string index.
+  function byteToIndex(text) {
+    const table = new Uint32Array(utf8Length(text) + 1);
+    let byte = 0;
+    let index = 0;
+    for (const char of text) {
+      const bytes = utf8Length(char);
+      for (let i = 0; i < bytes; i++) table[byte + i] = index;
+      byte += bytes;
+      index += char.length;
+    }
+    table[byte] = index;
+    return table;
+  }
+
+  function utf8Length(text) {
+    let length = 0;
+    for (let i = 0; i < text.length; i++) {
+      const code = text.charCodeAt(i);
+      if (code < 0x80) length += 1;
+      else if (code < 0x800) length += 2;
+      else if (code >= 0xd800 && code < 0xdc00 && i + 1 < text.length
+        && (text.charCodeAt(i + 1) & 0xfc00) === 0xdc00) { length += 4; i++; }
+      // A lone surrogate reaches the compiler as U+FFFD, three bytes: the
+      // bindings encode the text with TextEncoder, which replaces it.
+      else length += 3;
+    }
+    return length;
+  }
+
+  // Line and column as `kitty parse` reports them: one-based, the column
+  // counted in code points from the start of the line, a line ended by
+  // any of ariadne's separators, CRLF counted once. An offset at the end
+  // of the text lands on the last line, past its separator, as ariadne
+  // has no empty line after a final separator.
+  const lineSeparators = new Set([0x0a, 0x0d, 0x0b, 0x0c, 0x85, 0x2028, 0x2029]);
+  function lineAndColumn(text, index) {
+    let line = 1;
+    let lineStart = 0;
+    let previousStart = 0;
+    for (let i = 0; i < index; i++) {
+      const code = text.charCodeAt(i);
+      if (!lineSeparators.has(code)) continue;
+      if (code === 0x0d && i + 1 < text.length && text.charCodeAt(i + 1) === 0x0a) {
+        // An offset inside the pair stays on the line the pair ends.
+        if (i + 1 >= index) break;
+        i++;
+      }
+      previousStart = lineStart;
+      line++;
+      lineStart = i + 1;
+    }
+    if (index === text.length && lineStart === index && index > 0) {
+      line--;
+      lineStart = previousStart;
+    }
+    const column = [...text.slice(lineStart, index)].length + 1;
+    return `${line}:${column}`;
+  }
+
+  function span(className, text) {
+    const element = document.createElement("span");
+    element.className = className;
+    element.textContent = text;
+    return element;
+  }
+
+  // Colours the source by its tokens and underlines the errors. The text
+  // is cut at every token and error boundary, so each piece carries one
+  // token class and, inside an error, the error class too.
+  function renderHighlight(text, tokens, errors, table) {
+    const cuts = new Set([0, text.length]);
+    for (const token of tokens) { cuts.add(table[token.start]); cuts.add(table[token.end]); }
+    for (const error of errors) { cuts.add(table[error.start]); cuts.add(table[error.end]); }
+    const bounds = [...cuts].sort((a, b) => a - b);
+
+    // Missing tokens at one offset share one marker; its title lists them.
+    const missing = new Map();
+    for (const error of errors) {
+      if (error.start !== error.end) continue;
+      const at = table[error.start];
+      missing.set(at, missing.has(at) ? `${missing.get(at)}\n${error.message}` : error.message);
+    }
+
+    const fragment = document.createDocumentFragment();
+    let tokenIndex = 0;
+    for (let i = 0; i + 1 < bounds.length; i++) {
+      const from = bounds[i];
+      const to = bounds[i + 1];
+      if (missing.has(from)) fragment.append(markMissing(missing.get(from)));
+      while (tokenIndex < tokens.length && table[tokens[tokenIndex].end] <= from) tokenIndex++;
+      const token = tokens[tokenIndex];
+      let className = token && table[token.start] <= from ? `tok tok-${token.kind}` : "tok";
+      // Note(cc): a scan per piece, so pieces times errors per keystroke;
+      // a sorted sweep would do if a source ever has thousands of errors.
+      const inError = errors.some((error) => table[error.start] <= from && to <= table[error.end] && error.start !== error.end);
+      if (inError) className += " err";
+      fragment.append(span(className, text.slice(from, to)));
+    }
+    if (missing.has(text.length)) fragment.append(markMissing(missing.get(text.length)));
+    // A trailing newline needs a line after it, or the pre is one line short.
+    fragment.append("\n");
+    highlight.replaceChildren(fragment);
+  }
+
+  function markMissing(message) {
+    const element = span("missing", "");
+    element.title = message;
+    return element;
+  }
+
+  function renderTokens(result) {
+    tokenList.textContent = result.tokens_text;
+    tokenCount.textContent = `(${result.tokens.length})`;
+  }
+
+  function renderErrors(text, errors, table) {
+    const fragment = document.createDocumentFragment();
+    for (const error of errors) {
+      const item = document.createElement("li");
+      item.append(span("where", `${lineAndColumn(text, table[error.start])} `), error.message);
+      fragment.append(item);
+    }
+    errorList.replaceChildren(fragment);
+    errorCount.textContent = errors.length ? `(${errors.length})` : "";
+  }
+
+  function update() {
+    const text = source.value;
+    const result = JSON.parse(inspect(text));
+    const table = byteToIndex(text);
+    renderHighlight(text, result.tokens, result.errors, table);
+    renderTokens(result);
+    treeText.textContent = result.tree;
+    renderErrors(text, result.errors, table);
+  }
+
+  function syncScroll() {
+    highlight.scrollTop = source.scrollTop;
+    highlight.scrollLeft = source.scrollLeft;
+  }
+
+  try {
+    await init();
+    source.value = sample;
+    source.addEventListener("input", update);
+    source.addEventListener("scroll", syncScroll);
+    update();
+    status.textContent = "ready: edit the source, the panes follow";
+  } catch (error) {
+    status.textContent = `the compiler did not load: ${error}. Run just playground and serve this directory over HTTP.`;
+    status.classList.add("failed");
+  }
+</script>
+</body>
+</html>

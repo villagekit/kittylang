@@ -1,0 +1,27 @@
+[package]
+name = "kitty-playground"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "The playground: the compiler as a library, for a web page"
+readme = "README.md"
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+kitty-lexer = { path = "../lexer" }
+kitty-parser = { path = "../parser" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+# The crate and the `wasm-bindgen` CLI must be the same version; `just
+# playground` installs the CLI at the version `Cargo.lock` holds.
+wasm-bindgen = "0.2.126"
+
+[dev-dependencies]
+expect-test = { workspace = true }
