@@ -259,9 +259,11 @@ fn expression_let(p: &mut Parser, recovery: TokenSet, block_args: BlockArgs) -> 
     p.expect(TokenKind::Equal, recovery.union([TokenKind::In]));
     // The value of the variable.
     expression(p, recovery.union([TokenKind::In]));
-    // TODO(cc): the kinds the value's operator checks recorded, and `in`,
-    // carry into the body's error message when the body is missing.
-    p.bump_if_at(TokenKind::In);
+    if !p.bump_if_at(TokenKind::In) {
+        // The value has ended: the operators its loop tested, and `in`,
+        // are not what a missing body's error should list.
+        p.clear_expected();
+    }
     // The body of the let scope.
     expression_pratt(p, recovery, 0, block_args);
     m.complete(p, NodeKind::ExpressionLet)
@@ -1351,6 +1353,28 @@ mod tests {
                     ExpressionLiteral@14..15
                       Number@14..15 "2"
                   Newline@15..16 "\n""#]],
+        );
+    }
+
+    #[test]
+    fn let_expression_missing_body_expects_what_starts_a_body() {
+        // Unhappy path: the value has ended, so the error names what may
+        // start the body, not the operators the value's loop tested.
+        check(
+            "let a = 1",
+            expect![[r#"
+            ExpressionLet@0..9
+              Let@0..3 "let"
+              Whitespace@3..4 " "
+              PatternName@4..5
+                IdentifierValue@4..5 "a"
+              Whitespace@5..6 " "
+              Equal@6..7 "="
+              Whitespace@7..8 " "
+              ExpressionLiteral@8..9
+                Number@8..9 "1"
+              Missing@9..9
+            error at 9: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
         );
     }
 

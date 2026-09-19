@@ -144,7 +144,12 @@ Each rule is given a recovery set: the tokens a caller can continue from.
   the parser last consumed a token, in the order tested, or the one kind
   an `expect` asked for (`call_expression_trailing_comma`,
   `parser/src/grammar/expression.rs`; `trait_unknown_item`,
-  `parser/src/grammar/declaration.rs`).
+  `parser/src/grammar/declaration.rs`). A rule that ends one construct
+  without consuming a token and goes on to the next may forget the kinds
+  tested so far, so the list names what may start the next construct;
+  `let` does, between its value and its body
+  (`let_expression_missing_body_expects_what_starts_a_body`,
+  `parser/src/grammar/expression.rs`).
 
 ## Module
 
@@ -510,7 +515,12 @@ LetWith = "let" "with" Expression Indent { "IdentifierValue" } Dedent Expression
   token after the value is not `in`, the value ends there and the body is
   the expression that follows, the newline being the implicit `in`
   (`let_expression_type`, `let_expression_without_in`,
-  `parser/src/grammar/expression.rs`).
+  `parser/src/grammar/expression.rs`). When the body is missing, the
+  error lists what may start a body, not the operators that could have
+  continued the value nor the `in` it could have taken
+  (`let_expression_missing_body_expects_what_starts_a_body`,
+  `parser/src/grammar/expression.rs`); a `let with` whose block is
+  missing still lists the operators (`let_with_empty_block`).
 - `let with <expr>` followed by a block of value identifiers, one per
   line, must bind each name to the field of that name on the value; no
   `in` follows the block, and the body is the expression that follows
@@ -572,7 +582,7 @@ MatchArm = Pattern "=>" Expression                               (MatchArm)
 ## Patterns
 
 ```
-Pattern         = Single { "or" Single }                         (PatternOr, when "or" occurs)
+Pattern         = Single { "or" Single }                         (PatternOr, per "or", nesting right)
 Single          = Name | Wildcard | LiteralPattern | TuplePattern | TypePattern
 Name            = "IdentifierValue"                               (PatternName)
 Wildcard        = "_"                                            (PatternWildcard)
@@ -605,8 +615,12 @@ PatternField    = "IdentifierValue" [ "=" "IdentifierValue" ]    (PatternTypeArg
   (review only).
 - `Self` must be accepted where a type path starts a pattern
   (`self_type_is_a_type_pattern`, `parser/src/grammar/pattern.rs`).
-- An or-pattern is spelled with the `or` keyword (review only). Note: no
-  decision covers the spelling; this is the grammar as built.
+- An or-pattern is spelled with the `or` keyword
+  (`pattern_literal_number_or`, `pattern_type_or`,
+  `parser/src/grammar/pattern.rs`). Note: no decision covers the
+  spelling, and none covers the tree's shape; as built, a chain nests to
+  the right, `2 or 3 or 4` being a `PatternOr` of `2` and the `PatternOr`
+  of `3` and `4`, which the same tests pin without deciding it.
 
 ## Types
 
@@ -661,6 +675,15 @@ WhereBound       = TypePath ":" BoundList                         (GenericWhereB
   `parser/src/grammar/type.rs`).
 - A `where` clause must be a block of `Type: Bound + Bound` lines
   (`lex_example_3d_math`, `parser/src/lib.rs`).
+- A `where` clause whose block never opens expects no dedent, so the
+  dedent that follows stays the enclosing body's
+  (`struct_where_clause_with_no_block_keeps_the_body_dedent`,
+  `parser/src/grammar/declaration.rs`). A function's clause ends at
+  `=>`, so the body after a malformed clause is still the function's
+  body, and `fn f() where => 1` is the one error of the missing indent
+  (`function_body_after_a_where_clause_with_no_bounds`,
+  `where_clause_on_one_line_ends_at_the_body`,
+  `parser/src/grammar/declaration.rs`).
 - A bound is a trait name; a bound with generic arguments has no
   spelling (`generic_param_single_bound`, `parser/src/grammar/type.rs`).
 

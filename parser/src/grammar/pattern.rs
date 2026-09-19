@@ -11,6 +11,9 @@ pub(crate) fn pattern(p: &mut Parser, recovery: TokenSet) -> Option<CompletedMar
     }
 
     let m = lhs.precede(p);
+    // Note(cc): the recursion takes every later `or`, so a chain nests to
+    // the right and the loop runs once; the spec records that shape as
+    // built, not as decided.
     while p.bump_if_at(TokenKind::Or) {
         pattern(p, recovery);
     }
@@ -302,11 +305,22 @@ mod tests {
     fn pattern_literal_number_or() {
         // Happy path
         check(
-            "2 | 3 | 4",
+            "2 or 3 or 4",
             expect![[r#"
-                PatternLiteral@0..2
-                  Number@0..1 "2"
-                  Whitespace@1..2 " ""#]],
+            PatternOr@0..11
+              PatternLiteral@0..1
+                Number@0..1 "2"
+              Whitespace@1..2 " "
+              Or@2..4 "or"
+              Whitespace@4..5 " "
+              PatternOr@5..11
+                PatternLiteral@5..6
+                  Number@5..6 "3"
+                Whitespace@6..7 " "
+                Or@7..9 "or"
+                Whitespace@9..10 " "
+                PatternLiteral@10..11
+                  Number@10..11 "4""#]],
         );
     }
 
@@ -427,12 +441,18 @@ mod tests {
     fn pattern_type_or() {
         // Happy path
         check(
-            "This | That",
+            "This or That",
             expect![[r#"
-                PatternType@0..5
-                  TypeReference@0..4
-                    IdentifierType@0..4 "This"
-                  Whitespace@4..5 " ""#]],
+            PatternOr@0..12
+              PatternType@0..4
+                TypeReference@0..4
+                  IdentifierType@0..4 "This"
+              Whitespace@4..5 " "
+              Or@5..7 "or"
+              Whitespace@7..8 " "
+              PatternType@8..12
+                TypeReference@8..12
+                  IdentifierType@8..12 "That""#]],
         );
     }
 

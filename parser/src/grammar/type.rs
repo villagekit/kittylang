@@ -302,12 +302,17 @@ pub(crate) fn generic_where_clause(p: &mut Parser, recovery: TokenSet) -> Comple
     let recovery_where = recovery.union([TokenKind::Dedent]);
     let m = p.start();
     p.bump(); // Consume 'where'
+    let has_block = p.peek() == Some(TokenKind::Indent);
     p.expect(TokenKind::Indent, recovery);
     // The bounds end at the dedent, or where a bound would consume nothing.
     while !p.at_recovery(recovery_where) {
         generic_where_bound(p, recovery_where);
     }
-    p.expect(TokenKind::Dedent, recovery);
+    // A block that never opened has no dedent to close it, so the missing
+    // indent is the clause's one error.
+    if has_block {
+        p.expect(TokenKind::Dedent, recovery);
+    }
     m.complete(p, NodeKind::GenericWhereClause)
 }
 

@@ -1651,6 +1651,45 @@ mod tests {
     #[test]
     fn where_clause_with_no_bounds_ends_at_the_input() {
         check(
+            "fn f() where T: T",
+            expect![[r#"
+            DeclarationFunction@0..17
+              Fn@0..2 "fn"
+              Whitespace@2..3 " "
+              IdentifierValue@3..4 "f"
+              FunctionParamList@4..6
+                ParenOpen@4..5 "("
+                ParenClose@5..6 ")"
+              Whitespace@6..7 " "
+              GenericWhereClause@7..17
+                Where@7..12 "where"
+                Whitespace@12..13 " "
+                Error@13..14
+                  IdentifierType@13..14 "T"
+                GenericWhereBound@14..17
+                  Error@14..15
+                    Colon@14..15 ":"
+                  Whitespace@15..16 " "
+                  Error@16..17
+                    IdentifierType@16..17 "T"
+                  GenericBoundList@17..17
+                    GenericBound@17..17
+                      Missing@17..17
+              Missing@17..17
+              FunctionBody@17..17
+                Missing@17..17
+            error at 13..14: expected indent, but found type-id
+            error at 14..15: expected type-id or ‘Self’, but found ‘:’
+            error at 16..17: expected ‘:’, but found type-id
+            error at 17: missing type-id
+            error at 17: missing ‘=>’
+            error at 17: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
+        );
+    }
+
+    #[test]
+    fn where_clause_on_one_line_ends_at_the_body() {
+        check(
             "fn f() where T: T => 1",
             expect![[r#"
                 DeclarationFunction@0..22
@@ -1661,44 +1700,107 @@ mod tests {
                     ParenOpen@4..5 "("
                     ParenClose@5..6 ")"
                   Whitespace@6..7 " "
-                  GenericWhereClause@7..22
+                  GenericWhereClause@7..18
                     Where@7..12 "where"
                     Whitespace@12..13 " "
                     Error@13..14
                       IdentifierType@13..14 "T"
-                    GenericWhereBound@14..20
+                    GenericWhereBound@14..18
                       Error@14..15
                         Colon@14..15 ":"
                       Whitespace@15..16 " "
                       Error@16..17
                         IdentifierType@16..17 "T"
                       Whitespace@17..18 " "
-                      GenericBoundList@18..20
-                        GenericBound@18..20
-                          Error@18..20
-                            FatArrow@18..20 "=>"
-                    Whitespace@20..21 " "
-                    GenericWhereBound@21..22
-                      Error@21..22
-                        Number@21..22 "1"
-                      Missing@22..22
-                      GenericBoundList@22..22
-                        GenericBound@22..22
-                          Missing@22..22
-                    Missing@22..22
-                  Missing@22..22
-                  FunctionBody@22..22
-                    Missing@22..22
+                      GenericBoundList@18..18
+                        GenericBound@18..18
+                          Missing@18..18
+                  FatArrow@18..20 "=>"
+                  Whitespace@20..21 " "
+                  FunctionBody@21..22
+                    ExpressionLiteral@21..22
+                      Number@21..22 "1"
                 error at 13..14: expected indent, but found type-id
                 error at 14..15: expected type-id or ‘Self’, but found ‘:’
                 error at 16..17: expected ‘:’, but found type-id
-                error at 18..20: expected type-id, but found ‘=>’
-                error at 21..22: expected ‘+’, type-id, or ‘Self’, but found number
-                error at 22: missing ‘:’
-                error at 22: missing type-id
-                error at 22: missing dedent
-                error at 22: missing ‘=>’
-                error at 22: missing ‘+’, ‘-’, ‘not’, value-id, ‘self’, type-id, ‘Self’, number, string, ‘(’, indent, ‘fn’, ‘let’, ‘if’, or ‘match’"#]],
+                error at 18: missing type-id"#]],
+        );
+    }
+
+    #[test]
+    fn struct_where_clause_with_no_block_keeps_the_body_dedent() {
+        // Unhappy path: the clause opened no block, so the struct's dedent
+        // is the struct's, and the member after the clause is read as a
+        // bound only because the clause has no separator to end at.
+        check(
+            "struct S\n  where T: T\n  x: N",
+            expect![[r#"
+            DeclarationStruct@0..28
+              Struct@0..6 "struct"
+              Whitespace@6..7 " "
+              IdentifierType@7..8 "S"
+              Newline@8..9 "\n"
+              Indent@9..11 "  "
+              GenericWhereClause@11..28
+                Where@11..16 "where"
+                Whitespace@16..17 " "
+                Error@17..18
+                  IdentifierType@17..18 "T"
+                GenericWhereBound@18..25
+                  Error@18..19
+                    Colon@18..19 ":"
+                  Whitespace@19..20 " "
+                  Error@20..21
+                    IdentifierType@20..21 "T"
+                  Newline@21..22 "\n"
+                  Whitespace@22..24 "  "
+                  GenericBoundList@24..25
+                    GenericBound@24..25
+                      Error@24..25
+                        IdentifierValue@24..25 "x"
+                GenericWhereBound@25..28
+                  Error@25..26
+                    Colon@25..26 ":"
+                  Whitespace@26..27 " "
+                  Error@27..28
+                    IdentifierType@27..28 "N"
+                  GenericBoundList@28..28
+                    GenericBound@28..28
+                      Missing@28..28
+              Dedent@28..28 ""
+            error at 17..18: expected indent, but found type-id
+            error at 18..19: expected type-id or ‘Self’, but found ‘:’
+            error at 20..21: expected ‘:’, but found type-id
+            error at 24..25: expected type-id, but found value-id
+            error at 25..26: expected ‘+’, type-id, or ‘Self’, but found ‘:’
+            error at 27..28: expected ‘:’, but found type-id
+            error at 28: missing type-id"#]],
+        );
+    }
+
+    #[test]
+    fn function_body_after_a_where_clause_with_no_bounds() {
+        check(
+            "fn f() where => 1",
+            expect![[r#"
+            DeclarationFunction@0..17
+              Fn@0..2 "fn"
+              Whitespace@2..3 " "
+              IdentifierValue@3..4 "f"
+              FunctionParamList@4..6
+                ParenOpen@4..5 "("
+                ParenClose@5..6 ")"
+              Whitespace@6..7 " "
+              GenericWhereClause@7..13
+                Where@7..12 "where"
+                Whitespace@12..13 " "
+                Missing@13..13
+              FatArrow@13..15 "=>"
+              Whitespace@15..16 " "
+              FunctionBody@16..17
+                ExpressionLiteral@16..17
+                  Number@16..17 "1"
+            error at 13: missing indent"#]],
         );
     }
 }

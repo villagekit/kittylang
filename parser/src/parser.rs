@@ -151,6 +151,14 @@ impl<'t> Parser<'t> {
         self.at_set_raw(&TokenSet::new(set))
     }
 
+    /// Forgets the kinds tested since the last token was consumed. A
+    /// rule that ends one construct without consuming a token and goes
+    /// on to another calls this, so the next error lists only what may
+    /// start the second.
+    pub(crate) fn clear_expected(&mut self) {
+        self.expected_kinds.clear();
+    }
+
     pub(crate) fn lookahead_at(&mut self, nth: usize, kind: TokenKind) -> bool {
         self.source.lookahead_kind(nth) == Some(kind)
     }
