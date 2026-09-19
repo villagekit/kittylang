@@ -25,7 +25,10 @@ tooling makes them visible.
    types (`466ffceb`), keyword arguments with `=` and spread
    (`4423cd0a`), value segments after a type path (`1493e2aa`); then attributes (`328c0a99`), `let with` (`94bcf824`)
    and the fuzz target (`378fe0c3`); last, the examples rewritten
-   (`75d0d7ee`), the record's exit demo.
+   (`75d0d7ee`), the record's exit demo. Three follow-ups cut from the
+   slices' Outcomes before the gate: labelled generic arguments with `=`
+   (`6419ca56`), dedents before an error token (`a03d713e`) and the
+   parser recovery tidy-ups (`353161c4`).
 3. The design plans, tagged `design`, blocked by the tooling record:
    [newlines inside brackets](d0658cb19697-design-newlines-inside-brackets.md),
    [supertraits and blanket impls](3738718cde03-design-supertraits-and-blanket-impls.md),
