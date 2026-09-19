@@ -1,6 +1,6 @@
 ---
 title: Dedents after a newline before an error token
-status: todo
+status: done
 priority: medium
 parent: 1cee599ce218
 derived_from: 1cee599ce218
@@ -47,5 +47,42 @@ spec lists as such and no example needs.
 - `timeout 600 just check` is green
 
 ## Outcome
+
+Shipped in `kitty-lexer` and `specs/lexing.md`; the Gap line is gone.
+
+- `indenter.rs`: the branch taken after a `Newline` that the next line
+  starts at column zero now fires on any following token, `Ok` or
+  `Err`, so the level of the new line decides the dedents, not the kind
+  of its first token. The end-of-source path (`None`) is unchanged. The
+  `Error` token stays in place; only the `Dedent` tokens around it move,
+  from the end of the source to the newline before it.
+- Two lexer tests, in the `check_tokens` form the other indent tests
+  use: `lex_indent_error_at_column_zero_dedents` was red before the fix
+  (the dedents arrived at the end of the source);
+  `lex_indent_error_after_a_dedent` was green before it, since the
+  whitespace branch never looked at the token after the run. It is kept
+  as the plan asked, pinning that half of the rule.
+- The spec's two rules say "an `Error` token included" and cite the new
+  tests.
+- Verified first, with `kitty lex` over a two-level block followed by a
+  `$` at column zero: `Error@28..30` arrived with the two `Dedent`s at
+  the end of the source, as the Gap line said. After the fix they sit
+  at `28..28`, before it.
+- `timeout 120 just fuzz`: 216k runs in 60 seconds, no artifact.
+- The plan's `## Done when` says the dedent before the `Error` sits "at
+  the newline"; in the one-level case it sits at the end of the
+  whitespace run (`14..14`), where the spec's rule for a lesser level
+  has always put it. The tests follow the spec.
+- From review: the spec's `Error` token row cites the column-zero test
+  instead of "review only"; `lex_indent_error_after_a_dedent` is cited
+  on the "less" sub-rule it exercises, not the parent rule; a
+  Non-guarantees bullet says the indenter sees no newline inside an
+  `Error` token that runs across a line end (an unterminated `#=`); the
+  indenter's comment names the end-of-source case.
+- Dropped from review: folding `else if ahead.is_some()` into a bare
+  `else`, since the `None` arm is the one place the end-of-source
+  dedents are popped and the reviewer wanted no change either.
+- Last open slice of [[1cee599ce218]]'s three follow-ups; the record's
+  finishing is the next iteration's, not this one's.
 
 ## Log

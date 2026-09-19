@@ -219,6 +219,59 @@ foo()
     }
 
     #[test]
+    fn lex_indent_error_at_column_zero_dedents() {
+        // A line that starts at column zero closes the open blocks at
+        // its newline whatever its first token is, an `Error` included.
+        use TokenKind::*;
+        let input = "a\n  b\n    c\n$ d\n";
+        let expected = vec![
+            (IdentifierValue, 0..1),
+            (Newline, 1..2),
+            (Indent, 2..4),
+            (IdentifierValue, 4..5),
+            (Newline, 5..6),
+            (Whitespace, 6..8),
+            (Indent, 8..10),
+            (IdentifierValue, 10..11),
+            (Newline, 11..12),
+            (Dedent, 12..12),
+            (Dedent, 12..12),
+            (Error, 12..13),
+            (Whitespace, 13..14),
+            (IdentifierValue, 14..15),
+            (Newline, 15..16),
+        ];
+        check_tokens(input, expected);
+    }
+
+    #[test]
+    fn lex_indent_error_after_a_dedent() {
+        // The level of the new line decides the dedents: one level out,
+        // then the `Error` token in place.
+        use TokenKind::*;
+        let input = "a\n  b\n    c\n  $ d\n";
+        let expected = vec![
+            (IdentifierValue, 0..1),
+            (Newline, 1..2),
+            (Indent, 2..4),
+            (IdentifierValue, 4..5),
+            (Newline, 5..6),
+            (Whitespace, 6..8),
+            (Indent, 8..10),
+            (IdentifierValue, 10..11),
+            (Newline, 11..12),
+            (Whitespace, 12..14),
+            (Dedent, 14..14),
+            (Error, 14..15),
+            (Whitespace, 15..16),
+            (IdentifierValue, 16..17),
+            (Newline, 17..18),
+            (Dedent, 18..18),
+        ];
+        check_tokens(input, expected);
+    }
+
+    #[test]
     fn lex_package() {
         use TokenKind::*;
         check_tokens("@std/math", vec![(Package, 0..9)]);

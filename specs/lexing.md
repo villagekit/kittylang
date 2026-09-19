@@ -79,7 +79,7 @@ Token, token kind and indenter are defined in the glossary
 | `Plus`, `Minus`, `Multiply`, `Divide` | `+`, `-`, `*`, `/` | (`lex_plus`, `lexer/src/token.rs`) |
 | `GreaterEqual`, `Greater`, `LessEqual`, `Less` | `>=`, `>`, `<=`, `<` | (`lex_greater_equal`, `lexer/src/token.rs`) |
 | `EqualEqual`, `NotEqual`, `Equal` | `==`, `!=`, `=` | (`lex_equal_equal`, `lexer/src/token.rs`) |
-| `Error` | any byte no other spelling matches; or `#=` with no `=#` after it, to the end of the input | review only for the first; (`lex_comment_multi_line_unterminated`, `lexer/src/lib.rs`) for the second |
+| `Error` | any byte no other spelling matches; or `#=` with no `=#` after it, to the end of the input | (`lex_indent_error_at_column_zero_dedents`, `lexer/src/lib.rs`) for the first; (`lex_comment_multi_line_unterminated`, `lexer/src/lib.rs`) for the second |
 
 Keywords, one kind each, spelled as written: `fn`, `Fn`, `let`, `in`,
 `with`, `if`, `then`, `else`, `match`, `case`, `self`, `Self`, `type`,
@@ -155,9 +155,10 @@ at what follows it.
   `Newline`, the line is blank: the indenter must change no level, and
   yields the whitespace as `Whitespace` (`lex_indent_empty_lines`,
   `lexer/src/lib.rs`).
-- When a `Newline` is followed by `Whitespace` then any other token, the
-  indenter must measure the indentation level of that whitespace and
-  compare it with the top of the stack (`lex_indent`, `lexer/src/lib.rs`):
+- When a `Newline` is followed by `Whitespace` then any other token, an
+  `Error` token included, the indenter must measure the indentation level
+  of that whitespace and compare it with the top of the stack
+  (`lex_indent`, `lexer/src/lib.rs`):
   - If it is greater, the indenter must push it, yield `Whitespace` for
     the longest prefix of the run whose indentation level is at most the
     previous level (when that prefix is not empty), then yield one
@@ -167,13 +168,15 @@ at what follows it.
   - If it is less, the indenter must yield the whole run as `Whitespace`,
     then pop each level greater than it and yield one `Dedent` per level
     popped, each with an empty range at the end of the run
-    (`lex_indent_2`, `lexer/src/lib.rs`).
+    (`lex_indent_2`, `lex_indent_error_after_a_dedent`,
+    `lexer/src/lib.rs`).
   - If it is equal, the indenter must yield the run as `Whitespace` and
     nothing else.
 - When a `Newline` is followed by a token that is not `Whitespace` and
-  not `Newline`, the indenter must pop every level above `0` and yield one
-  `Dedent` per level, each with an empty range at the end of the newline
-  (`lex_indent_2`, `lexer/src/lib.rs`).
+  not `Newline`, an `Error` token included, the indenter must pop every
+  level above `0` and yield one `Dedent` per level, each with an empty
+  range at the end of the newline (`lex_indent_2`,
+  `lex_indent_error_at_column_zero_dedents`, `lexer/src/lib.rs`).
 - At the end of the source, the indenter must pop every level above `0`
   and yield one `Dedent` per level, each with an empty range at the end of
   the source (`lex_indent`, `lexer/src/lib.rs`).
@@ -186,10 +189,6 @@ at what follows it.
   rules is undecided
   ([design plan d0658cb1](../plans/d0658cb19697-design-newlines-inside-brackets.md)).
   Today the indenter applies them to every newline, brackets included.
-
-Gap: a `Newline` followed by an `Error` token queues no `Dedent`; the
-dedents arrive at the next newline that dedents, or at the end of the
-source.
 
 Example (non-normative). For
 
@@ -222,6 +221,10 @@ the tokens after `fn foo()` are `Newline`, `Indent` (the two spaces),
   pops the top and pushes nothing.
 - The indenter does not exempt a line holding only a comment: its
   indentation counts like a line of code.
+- The indenter does not see a newline inside an `Error` token: one that
+  runs across a line end (a `#=` with no `=#` after it) holds the newline
+  and the indentation after it, and the dedents arrive at the next
+  newline that dedents, or at the end of the source.
 - A tab's width of four is the current measure, not a promise.
 
 ## References

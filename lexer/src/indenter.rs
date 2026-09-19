@@ -147,8 +147,12 @@ impl<'src, I: TokenKindIterator<'src>> Iterator for Indenter<'src, I> {
                         Ordering::Equal => {}
                     }
                 }
-                // If newline followed by not whitespace.
-                else if let Some((Ok(_), _)) = ahead {
+                // If newline followed by a line at column zero: the level of
+                // the new line decides the dedents, not the kind of its first
+                // token, so an `Error` token closes the open blocks as any
+                // other token does. A newline that ends the source (`None`
+                // ahead) leaves the dedents to the `None` arm below.
+                else if ahead.is_some() {
                     let dedent_span = span.end..span.end;
                     self.pop_and_queue_dedents(0, dedent_span);
                 }
