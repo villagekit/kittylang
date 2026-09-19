@@ -22,7 +22,12 @@ whose section 9 lists twenty open questions; the outcome of
 answer the grilling of 2026-09-12 gave without a decision item: trait
 objects, `impl Trait` as a type with dynamic dispatch, are wanted, and
 the user is open to an interpreted design with runtime reflection if
-that is the best language.
+that is the best language. One syntax question waits here too, since
+the analysis is what gives it weight: the class of a labelled generic
+argument's label. [[95cd2585f916]] writes the argument with a value
+identifier, `Map[key = String]`, and the parameter with a type
+identifier, `Vector3[N = Number]`; the parser takes a type identifier
+for both (`specs/grammar.md`, Types), carried from [[6419ca56e149]].
 
 ## Work
 

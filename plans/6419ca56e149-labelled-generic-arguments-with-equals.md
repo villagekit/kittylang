@@ -1,6 +1,6 @@
 ---
 title: Labelled generic arguments with equals
-status: todo
+status: done
 priority: medium
 parent: 1cee599ce218
 derived_from: 1cee599ce218
@@ -52,5 +52,36 @@ labelled, and the recovery on `:`.
 - `timeout 600 just check` is green
 
 ## Outcome
+
+Shipped in `kitty-parser` and `specs/grammar.md`; nothing that parsed
+without error changed its tree except the labelled generic argument
+itself.
+
+- `generic_labelled_arg` expects `=` where it expected `:`, and the
+  positional loop in `generic_arg_list` ends at a type identifier
+  followed by `=` or `:`, so `Foo[Bar: Number]` is one labelled
+  argument with one `expected ‘=’` error at the colon, the colon in an
+  `Error` node inside `GenericArgLabelled`
+  (`generic_arg_labelled_with_a_colon_recovers`). `generic_arg_labelled`
+  and `generic_arg_mixed` pin the `=` spelling;
+  `generic_arg_labelled_missing_colon` is renamed
+  `generic_arg_labelled_missing_equals`, its input and tree unchanged.
+- `pattern.rs` already spelled a type pattern's named field `=`
+  (`pattern_type_brace_rename`), so it did not change.
+- No `.kitty` example writes a labelled generic argument; the examples
+  test's expectations did not change. The `kitty-cst` view over
+  `GenericArgLabelled` has no accessors, so nothing there changed.
+- The spec's Types bullet cites the two tests instead of "review only",
+  and the Gap line is gone; the Recovery bullet on `label :` now cites
+  the generic case beside the keyword one.
+- The label's class stays open. Review found the plan's claim that
+  [[95cd2585f916]] "shows both" imprecise: its one labelled argument is
+  `Map[key = String]`, a value identifier, and `Vector3[N = Number]` is
+  a parameter default. The spec now says that, links the question to
+  [[5890c35571be]] as `specs/README.md` asks, and that plan's inputs
+  carry it. Nothing decided.
+- Dropped from review: a citation for the Types bullet's phrase "as a
+  keyword argument's `:` is", since the Recovery bullet now holds the
+  cross-citation.
 
 ## Log

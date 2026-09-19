@@ -223,6 +223,10 @@ fn generic_param(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     m.complete(p, NodeKind::GenericParam)
 }
 
+/// Positional arguments, then labelled arguments once a `Label =` is
+/// seen. `Label :` counts as well: it is the spelling `=` replaced, so
+/// the argument is read as labelled and the error sits at the `:`, as
+/// it does for a keyword argument.
 pub(crate) fn generic_arg_list(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     // `type_generic` dispatches here on `[`.
     debug_assert_eq!(p.peek(), Some(TokenKind::BracketOpen));
@@ -237,7 +241,9 @@ pub(crate) fn generic_arg_list(p: &mut Parser, recovery: TokenSet) -> CompletedM
         }
         // First process positional args
         'positional: loop {
-            if p.at(TokenKind::IdentifierType) && p.lookahead_at(1, TokenKind::Colon) {
+            if p.at(TokenKind::IdentifierType)
+                && (p.lookahead_at(1, TokenKind::Equal) || p.lookahead_at(1, TokenKind::Colon))
+            {
                 break 'positional; // End positional args
             }
 
@@ -274,7 +280,7 @@ fn generic_positional_arg(p: &mut Parser, recovery: TokenSet) -> CompletedMarker
 fn generic_labelled_arg(p: &mut Parser, recovery: TokenSet) -> CompletedMarker {
     let m = p.start();
     p.expect(TokenKind::IdentifierType, recovery);
-    p.expect(TokenKind::Colon, recovery);
+    p.expect(TokenKind::Equal, recovery);
     type_annotation(p, recovery);
     m.complete(p, NodeKind::GenericArgLabelled)
 }
@@ -355,32 +361,33 @@ mod tests {
     #[test]
     fn generic_labelled_arg_after_a_labelled_arg_recovers() {
         check_type_annotation(
-            "List[A: B, (X)]",
+            "List[A = B, (X)]",
             expect![[r#"
-            TypeGeneric@0..14
-              TypeReference@0..4
-                IdentifierType@0..4 "List"
-              GenericArgList@4..14
-                BracketOpen@4..5 "["
-                GenericArgLabelled@5..9
-                  IdentifierType@5..6 "A"
-                  Colon@6..7 ":"
-                  Whitespace@7..8 " "
-                  TypeReference@8..9
-                    IdentifierType@8..9 "B"
-                Comma@9..10 ","
-                Whitespace@10..11 " "
-                GenericArgLabelled@11..13
-                  Error@11..12
-                    ParenOpen@11..12 "("
-                  Missing@12..12
-                  TypeReference@12..13
-                    IdentifierType@12..13 "X"
-                Error@13..14
-                  ParenClose@13..14 ")"
-            error at 11..12: expected type-id, but found ‘(’
-            error at 12: missing ‘:’
-            error at 13..14: expected ‘]’, but found ‘)’"#]],
+                TypeGeneric@0..15
+                  TypeReference@0..4
+                    IdentifierType@0..4 "List"
+                  GenericArgList@4..15
+                    BracketOpen@4..5 "["
+                    GenericArgLabelled@5..10
+                      IdentifierType@5..6 "A"
+                      Whitespace@6..7 " "
+                      Equal@7..8 "="
+                      Whitespace@8..9 " "
+                      TypeReference@9..10
+                        IdentifierType@9..10 "B"
+                    Comma@10..11 ","
+                    Whitespace@11..12 " "
+                    GenericArgLabelled@12..14
+                      Error@12..13
+                        ParenOpen@12..13 "("
+                      Missing@13..13
+                      TypeReference@13..14
+                        IdentifierType@13..14 "X"
+                    Error@14..15
+                      ParenClose@14..15 ")"
+                error at 12..13: expected type-id, but found ‘(’
+                error at 13: missing ‘=’
+                error at 14..15: expected ‘]’, but found ‘)’"#]],
         );
     }
 
@@ -936,20 +943,21 @@ mod tests {
     fn generic_arg_labelled() {
         // Happy path: A generic type with a single labelled generic argument.
         check_type_path(
-            "Foo[Bar: Number]",
+            "Foo[Bar = Number]",
             expect![[r#"
-                TypeGeneric@0..16
+                TypeGeneric@0..17
                   TypeReference@0..3
                     IdentifierType@0..3 "Foo"
-                  GenericArgList@3..16
+                  GenericArgList@3..17
                     BracketOpen@3..4 "["
-                    GenericArgLabelled@4..15
+                    GenericArgLabelled@4..16
                       IdentifierType@4..7 "Bar"
-                      Colon@7..8 ":"
-                      Whitespace@8..9 " "
-                      TypeReference@9..15
-                        IdentifierType@9..15 "Number"
-                    BracketClose@15..16 "]""#]],
+                      Whitespace@7..8 " "
+                      Equal@8..9 "="
+                      Whitespace@9..10 " "
+                      TypeReference@10..16
+                        IdentifierType@10..16 "Number"
+                    BracketClose@16..17 "]""#]],
         );
     }
 
@@ -957,31 +965,33 @@ mod tests {
     fn generic_arg_mixed() {
         // Happy path: A generic type with a positional generic argument followed by a labelled one.
         check_type_path(
-            "Foo[Number, Bar: String]",
+            "Foo[Number, Bar = String]",
             expect![[r#"
-                TypeGeneric@0..24
+                TypeGeneric@0..25
                   TypeReference@0..3
                     IdentifierType@0..3 "Foo"
-                  GenericArgList@3..24
+                  GenericArgList@3..25
                     BracketOpen@3..4 "["
                     GenericArgPositional@4..10
                       TypeReference@4..10
                         IdentifierType@4..10 "Number"
                     Comma@10..11 ","
                     Whitespace@11..12 " "
-                    GenericArgLabelled@12..23
+                    GenericArgLabelled@12..24
                       IdentifierType@12..15 "Bar"
-                      Colon@15..16 ":"
-                      Whitespace@16..17 " "
-                      TypeReference@17..23
-                        IdentifierType@17..23 "String"
-                    BracketClose@23..24 "]""#]],
+                      Whitespace@15..16 " "
+                      Equal@16..17 "="
+                      Whitespace@17..18 " "
+                      TypeReference@18..24
+                        IdentifierType@18..24 "String"
+                    BracketClose@24..25 "]""#]],
         );
     }
 
     #[test]
-    fn generic_arg_labelled_missing_colon() {
-        // Unhappy path: labelled generic argument missing the colon.
+    fn generic_arg_labelled_missing_equals() {
+        // Unhappy path: a labelled generic argument missing its `=` reads
+        // as a positional one followed by a stray type.
         check_type_path(
             "Foo[Bar Number]",
             expect![[r#"
@@ -997,6 +1007,30 @@ mod tests {
                     Error@8..14
                       IdentifierType@8..14 "Number"
                 error at 8..14: expected ‘]’, but found type-id"#]],
+        );
+    }
+
+    #[test]
+    fn generic_arg_labelled_with_a_colon_recovers() {
+        // Unhappy path: `Name: Type` is a labelled argument whose `=` is
+        // the colon, one error at the colon.
+        check_type_path(
+            "Foo[Bar: Number]",
+            expect![[r#"
+                TypeGeneric@0..16
+                  TypeReference@0..3
+                    IdentifierType@0..3 "Foo"
+                  GenericArgList@3..16
+                    BracketOpen@3..4 "["
+                    GenericArgLabelled@4..15
+                      IdentifierType@4..7 "Bar"
+                      Error@7..8
+                        Colon@7..8 ":"
+                      Whitespace@8..9 " "
+                      TypeReference@9..15
+                        IdentifierType@9..15 "Number"
+                    BracketClose@15..16 "]"
+                error at 7..8: expected ‘=’, but found ‘:’"#]],
         );
     }
 }

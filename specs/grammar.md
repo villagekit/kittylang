@@ -129,7 +129,9 @@ Each rule is given a recovery set: the tokens a caller can continue from.
   `(min: 5, max: 10)` is one `expected ‘=’` error per `:`
   (`keyword_arg_with_a_colon_in_parens_recovers`,
   `parser/src/grammar/expression.rs`; `chair_lists_its_parse_errors`,
-  `parser/src/examples.rs`); one that starts with any other
+  `parser/src/examples.rs`), and so is a labelled generic argument's
+  (`generic_arg_labelled_with_a_colon_recovers`,
+  `parser/src/grammar/type.rs`); one that starts with any other
   expression token is parsed whole as a positional argument with one
   `Unexpected` error at its first token
   (`labelled_arg_after_a_labelled_arg_recovers`,
@@ -647,17 +649,21 @@ ImplTraitType    = "impl" "IdentifierType"                         (TypeTrait)
   ones (`generic_arg_mixed`, `parser/src/grammar/type.rs`).
 - A labelled generic argument must be spelled `label = Type`
   ([95cd2585](../decisions/95cd2585f916-colon-introduces-a-type-equals-supplies-a-value.md))
-  (review only). Whether the label is the parameter's type identifier
-  (`Vector3[N = Number]`) or a value identifier (`Map[key = String]`) is
-  not settled: the decision's examples spell it both ways. Today the
-  parser takes a type identifier.
+  (`generic_arg_labelled`, `parser/src/grammar/type.rs`). A label
+  followed by `:` is read as a labelled argument whose `=` is the colon,
+  one `expected ‘=’` error at the colon, as a keyword argument's `:` is
+  (`generic_arg_labelled_with_a_colon_recovers`,
+  `parser/src/grammar/type.rs`). The label's class is not settled
+  ([design plan 5890c355](../plans/5890c35571be-m3-grilling.md)): the
+  decision's one labelled example writes a value identifier,
+  `Map[key = String]`, while the parameter it names is a type
+  identifier, `Vector3[N = Number]`. Today the parser takes a type
+  identifier.
 - A type path may chain generic arguments, projections and associated
   types in any order: `Result[Ok, Err].Error`
   (`type_chain_generic_association`, `parser/src/grammar/type.rs`).
 - `()` is the unit type (`type_tuple_happy`, `parser/src/grammar/type.rs`;
   the empty form review only).
-
-Gap: the parser spells a labelled generic argument `Name: Type`.
 
 ## Generics and where clauses
 
