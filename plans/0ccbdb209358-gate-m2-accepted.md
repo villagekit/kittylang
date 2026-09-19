@@ -1,6 +1,6 @@
 ---
 title: "Gate: M2 accepted"
-status: todo
+status: done
 tags:
   - gate
 parent: 436aea0e22af
@@ -28,4 +28,7 @@ None.
 
 ## Outcome
 
+Accepted on the user's instruction of 2026-09-19 ("Finally, accept M2"), after the three follow-up slices shipped and the exit demo was re-run. Nothing was sent back. Sent forward: the seven open syntax questions and the CST and HIR notes, both in [[5890c35571be]]; the design plans [[e6a33eab19d4]], [[dd325e81ad2c]], [[3738718cde03]], [[d0658cb19697]] and [[a89ddd383a16]] stay open and still block that grilling.
+
 ## Log
+- 2026-09-19: Moved to done by the orchestrator on the user's explicit instruction.

@@ -1,6 +1,6 @@
 ---
 title: Tooling for language design
-status: doing
+status: done
 parent: 436aea0e22af
 ---
 
@@ -66,6 +66,9 @@ diagnostics, which do not exist yet.
 
 ## Outcome
 
+The `kitty` command (`lex`, `parse`), the resilient parser's error rendering through `ariadne`, the examples test and the playground page all shipped. The exit demo was run on 2026-09-19 and holds: `cargo run -p kitty-cli -- parse examples/units.kitty` prints the tree; `just test` runs the examples test with its expectations; the playground page, served locally and loaded in headless Chrome, shows the tree for the example it starts with. The interactive part (pasting an example and watching it update while editing) was not exercised by hand, only the initial render. `just playground` builds the wasm; the `pkg/` output is not committed.
+
 ## Log
 
 - 2026-09-12: Minted by the grilling of 2026-09-12; its transcripts are in the shared transcripts repo under kittylang/2026-09-12-surface-syntax-grilling (grill.md, the parser-coverage probe, three slice review rounds).
+- 2026-09-19: Exit demo run and the record closed during the orchestration that followed the M2 gate's opening; see the M2 record's Outcome.

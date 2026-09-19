@@ -1,6 +1,6 @@
 ---
 title: "M2: the parser"
-status: doing
+status: done
 parent: 436aea0e22af
 ---
 
@@ -93,8 +93,13 @@ command, in [[5c5f4b9256b3]].
 
 ## Outcome
 
+M2 shipped: the lexer, the indenter, the resilient parser over the whole settled surface syntax, the CST views, the specs `lexing.md` and `grammar.md`, the fuzz target, the playground and the rewritten examples. The exit demo holds as of 2026-09-19: `timeout 600 just check` is green, the examples test's expectation is empty for `units.kitty`, `3d-math.kitty` and `sample.kitty`, and every remaining error in the other three carries its design plan's prefix.
+
+Three follow-ups cut from the slices' Outcomes also shipped: a57facc (where, let and or-pattern recovery), 4e34994 (labelled generic arguments spelled with `=`) and 0ddae7a (dedents before an error token). Seven language questions that no decision covers are carried to the M3 grilling ([[5890c35571be]], "Questions carried from M2"), with research and a lean for each. Not verified: the 1.83 `rust-version`, since no 1.83 toolchain is installed; the committed lockfile declares nothing above it.
+
 ## Log
 
 - 2026-09-12: Minted by the grilling of 2026-09-12; its transcripts are in the shared transcripts repo under kittylang/2026-09-12-surface-syntax-grilling (grill.md, the parser-coverage probe, three slice review rounds).
 - 2026-09-17: `specs/lexing.md` and `specs/grammar.md` written ([[0248a546fe20]]). Where the code disagrees with them, the code is the defect; each spec section carries a Gap line until its slice ships. The gaps no slice holds (among them `Name = Type` for labelled generic arguments, a lexer abort on tab indentation and a parser hang at end of input) are listed in that slice's Outcome for the operator.
 - 2026-09-18: Exit demo run by [[75d0d7eea26c]], and it holds: `timeout 600 just check` is green; the examples test's expectation is empty for `units.kitty`, `3d-math.kitty` and `sample.kitty`; every remaining error carries its design plan's prefix beside it, `3d-object.kitty` three under [[e6a33eab19d4]], `assembly.kitty` twenty-six under [[dd325e81ad2c]] and two under [[3738718cde03]], `chair.kitty` thirteen under [[e6a33eab19d4]]; no example holds a [[d0658cb19697]] site any more. Left `doing` for the user to finish with an Outcome, as `plans/README.md` says.
+- 2026-09-19: Closed with the follow-ups shipped and the exit demo re-run.

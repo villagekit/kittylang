@@ -16,10 +16,10 @@ and the questions it could not settle held as design plans until the
 tooling makes them visible.
 
 1. [Tooling for language design](5c5f4b9256b3-tooling-for-language-design.md)
-   (`5c5f4b92`), `doing`, its slices: the `kitty` command (`f280931f`),
+   (`5c5f4b92`), `done`, its slices: the `kitty` command (`f280931f`),
    the examples test (`942ff7a4`), then the playground (`45a1b9e9`).
 2. [M2: the parser](1cee599ce218-m2-the-parser.md) (`1cee599c`),
-   `doing`, its slices: the lexing and grammar specs (`0248a546`, done) first,
+   `done`, its slices: the lexing and grammar specs (`0248a546`, done) first,
    then, each waiting on the specs and the examples test, the lexer
    (`9d84d1f9`), the parser never panics (`277624e4`), function return
    types (`466ffceb`), keyword arguments with `=` and spread
@@ -28,7 +28,7 @@ tooling makes them visible.
    (`75d0d7ee`), the record's exit demo. Three follow-ups cut from the
    slices' Outcomes before the gate: labelled generic arguments with `=`
    (`6419ca56`), dedents before an error token (`a03d713e`) and the
-   parser recovery tidy-ups (`353161c4`, done).
+   parser recovery tidy-ups (`353161c4`), all done.
 3. The design plans, tagged `design`, blocked by the tooling record:
    [newlines inside brackets](d0658cb19697-design-newlines-inside-brackets.md),
    [supertraits and blanket impls](3738718cde03-design-supertraits-and-blanket-impls.md),
@@ -37,7 +37,7 @@ tooling makes them visible.
    and [modules and imports](a89ddd383a16-design-modules-and-imports.md),
    blocked by M2 because it belongs to the M3 conversation.
 4. [Gate: M2 accepted](0ccbdb209358-gate-m2-accepted.md) (`0ccbdb20`),
-   the user's, then the [M3 grilling](5890c35571be-m3-grilling.md)
+   accepted on 2026-09-19, then the [M3 grilling](5890c35571be-m3-grilling.md)
    (`5890c355`), which mints the M3 record.
 
 The first slice,
